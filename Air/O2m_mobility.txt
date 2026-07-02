@@ -1,0 +1,52 @@
+LXCat, www.lxcat.net
+Generated on 20 May 2026. All rights reserved.
+
+RECOMMENDED REFERENCE FORMAT
+- Viehland database, www.lxcat.net, retrieved on May 20, 2026.
+Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
+Please check below in the headers of databases.
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE:         Viehland database
+PERMLINK:         www.lxcat.net/Viehland
+DESCRIPTION:      The data here are from the Gaseous Ion Transport and Rate Coefficient Database, Software Release 4.1
+                  (March, 2006), as extended and updated on a regular basis.
+CONTACT:          Larry A. Viehland, Viehland@Chatham.edu
+HOW TO REFERENCE: L. A. Viehland and C. C. Kirkpatrick, Int. J. Mass Spectrom. Ion Proc. 149/150 (1995) 555.
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+************************************************************************************************************************
+
+COMMENT: Compiled Ko of Viehland & Mason, At. Data. Nucl. Data Tables 60 (1995) 37.
+
+********************************************************** Air **********************************************************
+
+SPECIES: O2^- / Air
+PROCESS: Mobility (Ko)
+PARAM.:  Tgas = 300 K
+UPDATED: 2010-05-14 22:04:20
+COLUMNS: Reduced electric field (Td) | Mobility (cm2/Vs)
+-----------------------------
+ 5.000000e+0	2.520000e+0
+ 6.000000e+0	2.520000e+0
+ 8.000000e+0	2.520000e+0
+ 1.000000e+1	2.520000e+0
+ 1.200000e+1	2.520000e+0
+ 1.500000e+1	2.530000e+0
+ 2.000000e+1	2.540000e+0
+ 2.500000e+1	2.550000e+0
+ 3.000000e+1	2.560000e+0
+ 3.500000e+1	2.580000e+0
+ 4.000000e+1	2.600000e+0
+ 5.000000e+1	2.640000e+0
+ 6.000000e+1	2.690000e+0
+ 7.000000e+1	2.750000e+0
+ 8.000000e+1	2.810000e+0
+ 1.000000e+2	2.910000e+0
+ 1.200000e+2	2.980000e+0
+ 1.400000e+2	3.010000e+0
+ 1.700000e+2	3.000000e+0
+ 2.000000e+2	2.960000e+0
+ 2.500000e+2	2.840000e+0
+-----------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

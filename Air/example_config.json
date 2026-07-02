@@ -1,0 +1,36 @@
+{
+  "configurations": [
+    {
+      "label": "Baseline",
+      "cross_sections": "Phelps.txt",
+      "ngroups": 3,
+      "cone_angle": 45.0,
+      "xi_photo": 1.0,
+      "xi_emit": 1.0,
+      "gamma0": 1e-6,
+      "gamma1": 0.0,
+      "eref": 170e7,
+      "beta": 1.0
+    },
+    {
+      "label": "High SEE",
+      "_comment": "100x higher ion secondary emission",
+      "gamma0": 1e-4
+    },
+    {
+      "label": "Low photoionization",
+      "_comment": "xi_photo < 1 reduces photoionization coupling (scale factor on get_B output)",
+      "xi_photo": 0.1,
+      "cone_angle": 5.0
+    },
+    {
+      "label": "No detachment",
+      "_comment": "Disable autodetachment (O2-(exc)->e), de-excitation (O2-(exc)->O2-), collisional detachment (O2-->e)",
+      "reaction_multipliers": {
+        "O2-(exc) -> e + O2":        0.0,
+        "O2-(exc) + O2 -> O2- + O2": 0.0,
+        "O2- + O2 -> e + 2O2":       0.0
+      }
+    }
+  ]
+}
