@@ -108,6 +108,7 @@ from FieldDistributions import (
 
 from Constants import kB as _kB, c_light as _C_LIGHT
 
+
 class Mechanism:
     """Loaded mechanism module with configuration baked in.
 
@@ -119,43 +120,53 @@ class Mechanism:
     appropriate cathode SEE overrides applied for that polarity.
     """
 
-    def __init__(self, _mod, label='',
-                 reaction_multipliers=None,
-                 xi_photo=1.0, xi_emit=1.0,
-                 gamma0=None, gamma1=None, eref=None, beta=None,
-                 pos_override=None, neg_override=None):
+    def __init__(
+        self,
+        _mod,
+        label="",
+        reaction_multipliers=None,
+        xi_photo=1.0,
+        xi_emit=1.0,
+        gamma0=None,
+        gamma1=None,
+        eref=None,
+        beta=None,
+        pos_override=None,
+        neg_override=None,
+    ):
         self._mod = _mod
         self.label = label
         self._reaction_multipliers = reaction_multipliers or {}
         self._xi_photo = float(xi_photo)
-        self._xi_emit  = float(xi_emit)
+        self._xi_emit = float(xi_emit)
         self._gamma0 = gamma0
         self._gamma1 = gamma1
-        self._eref   = eref
-        self._beta   = beta
-        self._pos_override = pos_override   # raw dict or None
-        self._neg_override = neg_override   # raw dict or None
-        self.SPECIES        = _mod.SPECIES
+        self._eref = eref
+        self._beta = beta
+        self._pos_override = pos_override  # raw dict or None
+        self._neg_override = neg_override  # raw dict or None
+        self.SPECIES = _mod.SPECIES
         self.ELECTRON_INDEX = _mod.ELECTRON_INDEX
-        if hasattr(_mod, 'alpha'):
+        if hasattr(_mod, "alpha"):
             self.alpha = lambda EN, p, T: _mod.alpha(EN, p, T)
-        if hasattr(_mod, 'eta'):
+        if hasattr(_mod, "eta"):
             self.eta = lambda EN, p, T: _mod.eta(EN, p, T)
 
-    def resolve(self, positive: bool) -> 'Mechanism':
+    def resolve(self, positive: bool) -> "Mechanism":
         """Return a polarity-resolved copy with cathode SEE overrides applied."""
         ovr = self._pos_override if positive else self._neg_override
         if ovr is None:
             return self
         return Mechanism(
-            self._mod, self.label,
+            self._mod,
+            self.label,
             reaction_multipliers=self._reaction_multipliers,
-            xi_photo=ovr.get('xi_photo', self._xi_photo),
-            xi_emit =ovr.get('xi_emit',  self._xi_emit),
-            gamma0  =ovr.get('gamma0',   self._gamma0),
-            gamma1  =ovr.get('gamma1',   self._gamma1),
-            eref    =ovr.get('eref',     self._eref),
-            beta    =ovr.get('beta',     self._beta),
+            xi_photo=ovr.get("xi_photo", self._xi_photo),
+            xi_emit=ovr.get("xi_emit", self._xi_emit),
+            gamma0=ovr.get("gamma0", self._gamma0),
+            gamma1=ovr.get("gamma1", self._gamma1),
+            eref=ovr.get("eref", self._eref),
+            beta=ovr.get("beta", self._beta),
         )
 
     def get_R(self, EN, p, T):
@@ -174,11 +185,15 @@ class Mechanism:
         return self._mod.get_kappa(p, T)
 
     def get_gamma_plus(self, EN, p, T):
-        return self._mod.get_gamma_plus_with(EN, p, T,
-                                              gamma0=self._gamma0,
-                                              gamma1=self._gamma1,
-                                              eref=self._eref,
-                                              beta=self._beta)
+        return self._mod.get_gamma_plus_with(
+            EN,
+            p,
+            T,
+            gamma0=self._gamma0,
+            gamma1=self._gamma1,
+            eref=self._eref,
+            beta=self._beta,
+        )
 
     def get_gamma_Psi(self, EN, p, T):
         return self._mod.get_gamma_Psi(EN, p, T) * self._xi_emit
@@ -193,19 +208,26 @@ class Mechanism:
         return self._mod.get_Pi_minus()
 
     def init_photoionization(self, ngroups=3, cone_angle_deg=2.0):
-        if hasattr(self._mod, 'init_photoionization'):
+        if hasattr(self._mod, "init_photoionization"):
             self._mod.init_photoionization(ngroups, cone_angle_deg)
 
 
 # Required attributes that every mechanism module must expose.
 _REQUIRED_ATTRS = [
-    "SPECIES", "ELECTRON_INDEX",
-    "get_R", "get_V",
-    "get_Pi_e", "get_Pi_plus", "get_Pi_minus",
-    "get_gamma_plus", "get_gamma_plus_with",
-    "get_B", "get_C", "get_kappa", "get_gamma_Psi",
+    "SPECIES",
+    "ELECTRON_INDEX",
+    "get_R",
+    "get_V",
+    "get_Pi_e",
+    "get_Pi_plus",
+    "get_Pi_minus",
+    "get_gamma_plus",
+    "get_gamma_plus_with",
+    "get_B",
+    "get_C",
+    "get_kappa",
+    "get_gamma_Psi",
 ]
-
 
 
 def _read_json_configs(json_paths):
@@ -219,18 +241,18 @@ def _read_json_configs(json_paths):
     results = []
     for path in json_paths:
         abs_path = os.path.abspath(path)
-        cfg_dir  = os.path.dirname(abs_path)
+        cfg_dir = os.path.dirname(abs_path)
         with open(abs_path) as fh:
             data = json.load(fh)
-        if isinstance(data, dict) and 'configurations' in data:
-            items = data['configurations']
+        if isinstance(data, dict) and "configurations" in data:
+            items = data["configurations"]
         elif isinstance(data, list):
             items = data
         else:
             items = [data]
         for item in items:
             d = dict(item)
-            d.setdefault('_cfg_dir', cfg_dir)
+            d.setdefault("_cfg_dir", cfg_dir)
             results.append(d)
     return results
 
@@ -260,10 +282,10 @@ def load_mechanism(path, config_dict=None):
         raise FileNotFoundError(f"Mechanism file not found: {abs_path}")
 
     # Discover Config.py in the same directory as the mechanism.
-    cfg_py = os.path.join(mech_dir, 'Config.py')
+    cfg_py = os.path.join(mech_dir, "Config.py")
     if os.path.isfile(cfg_py):
-        _cspec = importlib.util.spec_from_file_location('_mechconfig', cfg_py)
-        _cm    = importlib.util.module_from_spec(_cspec)
+        _cspec = importlib.util.spec_from_file_location("_mechconfig", cfg_py)
+        _cm = importlib.util.module_from_spec(_cspec)
         _cspec.loader.exec_module(_cm)
         config = _cm.Config.from_dict(config_dict or {}, mech_dir)
     elif config_dict:
@@ -274,7 +296,7 @@ def load_mechanism(path, config_dict=None):
         config = None
 
     spec = importlib.util.spec_from_file_location("mechanism", abs_path)
-    mod  = importlib.util.module_from_spec(spec)
+    mod = importlib.util.module_from_spec(spec)
     if config is not None:
         for attr, val in config.pre_exec_vars().items():
             mod.__dict__[attr] = val
@@ -286,7 +308,7 @@ def load_mechanism(path, config_dict=None):
         )
     if config is not None:
         config.post_exec_init(mod)
-    label  = config.label if config is not None else ''
+    label = config.label if config is not None else ""
     params = config.mechanism_params() if config is not None else {}
     return Mechanism(mod, label, **params)
 
@@ -305,49 +327,53 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     _KD_LOCAL_THRESHOLD = 12.0
     n = len(mod.SPECIES)
 
-    R     = mod.get_R(EN, p, T)
-    V     = mod.get_V(EN, p, T)
+    R = mod.get_R(EN, p, T)
+    V = mod.get_V(EN, p, T)
     # V is always diagonal; multiply R and C by 1/v column-wise via broadcasting
     # instead of forming the full n×n inverse matrix.  If a mechanism ever returns
     # non-diagonal V this will give wrong results — add np.linalg.inv fallback then.
     v_inv = 1.0 / np.diag(V)
-    A     = R * v_inv[np.newaxis, :]
+    A = R * v_inv[np.newaxis, :]
     if lam != 0.0:
-        A = A - lam * np.diag(v_inv)           # (R − λI) V⁻¹
+        A = A - lam * np.diag(v_inv)  # (R − λI) V⁻¹
 
-    B     = mod.get_B(EN, p, T)                              # (N_s, N_gamma)
-    C     = mod.get_C(EN, p, T) * v_inv[np.newaxis, :]      # (N_gamma, N_s)
-    kappa = mod.get_kappa(p, T)                        # (N_gamma,)
+    B = mod.get_B(EN, p, T)  # (N_s, N_gamma)
+    C = mod.get_C(EN, p, T) * v_inv[np.newaxis, :]  # (N_gamma, N_s)
+    kappa = mod.get_kappa(p, T)  # (N_gamma,)
     if lam != 0.0:
-        kappa = kappa + lam / _C_LIGHT                  # κ + λ/c
+        kappa = kappa + lam / _C_LIGHT  # κ + λ/c
     N_gamma = B.shape[1]
 
     if N_gamma > 0:
-        kd         = kappa * d
+        kd = kappa * d
         local_mask = kd > _KD_LOCAL_THRESHOLD
-        aug_mask   = ~local_mask
+        aug_mask = ~local_mask
         for j in np.where(local_mask)[0]:
             A += 2.0 * np.outer(B[:, j], C[j, :]) / kappa[j]
-        B_aug     = B[:, aug_mask]
-        C_aug_ph  = C[aug_mask, :]
+        B_aug = B[:, aug_mask]
+        C_aug_ph = C[aug_mask, :]
         kappa_aug = kappa[aug_mask]
         N_gamma_eff = int(aug_mask.sum())
     else:
         N_gamma_eff = 0
-        aug_mask    = None
-        B_aug = B; C_aug_ph = C; kappa_aug = kappa
+        aug_mask = None
+        B_aug = B
+        C_aug_ph = C
+        kappa_aug = kappa
 
     if N_gamma_eff == 0:
         A_aug = A
         n_aug = n
     else:
         D_mat = np.diag(kappa_aug)
-        z_gg  = np.zeros((N_gamma_eff, N_gamma_eff))
-        A_aug = np.block([
-            [A,           B_aug,  B_aug ],
-            [C_aug_ph,   -D_mat,  z_gg  ],
-            [-C_aug_ph,   z_gg,   D_mat ],
-        ])
+        z_gg = np.zeros((N_gamma_eff, N_gamma_eff))
+        A_aug = np.block(
+            [
+                [A, B_aug, B_aug],
+                [C_aug_ph, -D_mat, z_gg],
+                [-C_aug_ph, z_gg, D_mat],
+            ]
+        )
         n_aug = n + 2 * N_gamma_eff
 
     return A_aug, N_gamma_eff, aug_mask, n_aug
@@ -368,14 +394,14 @@ def _expm_shifted(M):
     caller.
     """
     real_eigs = np.real(np.linalg.eigvals(M))
-    lam_max   = float(np.max(real_eigs))
-    lam       = lam_max if lam_max > 0.0 else 0.0
+    lam_max = float(np.max(real_eigs))
+    lam = lam_max if lam_max > 0.0 else 0.0
     return scipy.linalg.expm(M - lam * np.eye(M.shape[0]))
 
 
 _DX_N_MIN_DEFAULT = 5
 _DX_N_MAX_DEFAULT = 200
-_DX_TOL_DEFAULT   = 0.03
+_DX_TOL_DEFAULT = 0.03
 
 
 def parse_dx_spec(tokens, parser=None):
@@ -393,6 +419,7 @@ def parse_dx_spec(tokens, parser=None):
     parser : argparse.ArgumentParser or None
         If given, validation errors are routed through parser.error().
     """
+
     def _err(msg):
         if parser is not None:
             parser.error(msg)
@@ -401,17 +428,20 @@ def parse_dx_spec(tokens, parser=None):
     N_min, N_max, tol = _DX_N_MIN_DEFAULT, _DX_N_MAX_DEFAULT, _DX_TOL_DEFAULT
     if tokens:
         try:
-            if len(tokens) >= 1: N_min = int(tokens[0])
-            if len(tokens) >= 2: N_max = int(tokens[1])
-            if len(tokens) >= 3: tol   = float(tokens[2])
+            if len(tokens) >= 1:
+                N_min = int(tokens[0])
+            if len(tokens) >= 2:
+                N_max = int(tokens[1])
+            if len(tokens) >= 3:
+                tol = float(tokens[2])
         except ValueError as exc:
-            _err(f'--dx: {exc}')
+            _err(f"--dx: {exc}")
     if N_min < 1:
-        _err(f'--dx: N_min must be ≥ 1, got {N_min}')
+        _err(f"--dx: N_min must be ≥ 1, got {N_min}")
     if N_max < N_min:
-        _err(f'--dx: N_max ({N_max}) must be ≥ N_min ({N_min})')
+        _err(f"--dx: N_max ({N_max}) must be ≥ N_min ({N_min})")
     if not 0.0 < tol < 1.0:
-        _err(f'--dx: tol must be in (0, 1), got {tol}')
+        _err(f"--dx: tol must be in (0, 1), got {tol}")
     return N_min, N_max, tol
 
 
@@ -434,13 +464,14 @@ def midpoint_propagator(A_func, x_lo, x_hi):
     ndarray
         Propagator matrix P = expm(A(x_mid) * h).
     """
-    h     = x_hi - x_lo
+    h = x_hi - x_lo
     x_mid = 0.5 * (x_lo + x_hi)
     return _expm_shifted(A_func(x_mid) * h)
 
 
-def _adaptive_midpoint_segment(A_func, x_lo, x_hi, tol, max_depth,
-                               P_coarse=None, _level=0, _diag=None):
+def _adaptive_midpoint_segment(
+    A_func, x_lo, x_hi, tol, max_depth, P_coarse=None, _level=0, _diag=None
+):
     """
     Compute the midpoint propagator for [x_lo, x_hi] with adaptive step halving.
 
@@ -481,30 +512,39 @@ def _adaptive_midpoint_segment(A_func, x_lo, x_hi, tol, max_depth,
     if max_depth == 0:
         return P_coarse
 
-    x_mid  = 0.5 * (x_lo + x_hi)
-    P_l    = midpoint_propagator(A_func, x_lo, x_mid)
-    P_r    = midpoint_propagator(A_func, x_mid, x_hi)
+    x_mid = 0.5 * (x_lo + x_hi)
+    P_l = midpoint_propagator(A_func, x_lo, x_mid)
+    P_r = midpoint_propagator(A_func, x_mid, x_hi)
     P_fine = P_r @ P_l
 
-    norm_ref = np.linalg.norm(P_fine, 'fro')
+    norm_ref = np.linalg.norm(P_fine, "fro")
     if norm_ref < 1e-300:
         norm_ref = 1.0
-    err = np.linalg.norm(P_fine - P_coarse, 'fro') / norm_ref
+    err = np.linalg.norm(P_fine - P_coarse, "fro") / norm_ref
 
     accepted = err <= tol
     if _diag is not None:
-        _diag.append({'x_lo': x_lo, 'x_hi': x_hi, 'level': _level,
-                      'err': err, 'accepted': accepted})
+        _diag.append(
+            {
+                "x_lo": x_lo,
+                "x_hi": x_hi,
+                "level": _level,
+                "err": err,
+                "accepted": accepted,
+            }
+        )
 
     if accepted:
         return P_fine
 
     # Error too large — refine each half, passing the already-computed half-step
     # propagators as the coarse estimates for the sub-calls.
-    P_l_fine = _adaptive_midpoint_segment(A_func, x_lo, x_mid, tol, max_depth - 1,
-                                          P_l, _level + 1, _diag)
-    P_r_fine = _adaptive_midpoint_segment(A_func, x_mid, x_hi, tol, max_depth - 1,
-                                          P_r, _level + 1, _diag)
+    P_l_fine = _adaptive_midpoint_segment(
+        A_func, x_lo, x_mid, tol, max_depth - 1, P_l, _level + 1, _diag
+    )
+    P_r_fine = _adaptive_midpoint_segment(
+        A_func, x_mid, x_hi, tol, max_depth - 1, P_r, _level + 1, _diag
+    )
     return P_r_fine @ P_l_fine
 
 
@@ -536,17 +576,17 @@ def magnus2_propagator(A_func, x_lo, x_hi):
     ndarray
         Propagator matrix P ≈ expm(∫_{x_lo}^{x_hi} A dx).
     """
-    h      = x_hi - x_lo
-    mid    = 0.5 * (x_lo + x_hi)
+    h = x_hi - x_lo
+    mid = 0.5 * (x_lo + x_hi)
     offset = h / (2.0 * math.sqrt(3.0))
-    A1     = A_func(mid - offset)
-    A2     = A_func(mid + offset)
+    A1 = A_func(mid - offset)
+    A2 = A_func(mid + offset)
     Omega1 = 0.5 * h * (A1 + A2)
     # When ‖Ω₁‖_F > π the Magnus series is not guaranteed to converge; the
     # commutator correction would dominate and produce a wildly wrong exponent.
     # Fall back to the midpoint rule, which uses expm(A_mid·h) directly and
     # remains accurate for any step size via scipy's scaling-and-squaring.
-    if np.linalg.norm(Omega1, 'fro') > math.pi:
+    if np.linalg.norm(Omega1, "fro") > math.pi:
         return midpoint_propagator(A_func, x_lo, x_hi)
     Omega2 = (math.sqrt(3.0) * h**2 / 12.0) * (A2 @ A1 - A1 @ A2)
     return _expm_shifted(Omega1 + Omega2)
@@ -562,42 +602,44 @@ def _assemble_det_Q(M, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
     """
     n = len(mod.SPECIES)
 
-    Pi_e     = mod.get_Pi_e()
-    Pi_plus  = mod.get_Pi_plus()
+    Pi_e = mod.get_Pi_e()
+    Pi_plus = mod.get_Pi_plus()
     Pi_minus = mod.get_Pi_minus()
-    gplus    = mod.get_gamma_plus(EN_cathode, p, T)
+    gplus = mod.get_gamma_plus(EN_cathode, p, T)
 
     if N_gamma_eff == 0:
-        Q0_e   = Pi_e + gplus[np.newaxis, :] @ Pi_plus
+        Q0_e = Pi_e + gplus[np.newaxis, :] @ Pi_plus
         Q0_neg = Pi_minus
-        Q0     = np.vstack([Q0_e, Q0_neg])
-        Qd     = Pi_plus @ M
+        Q0 = np.vstack([Q0_e, Q0_neg])
+        Qd = Pi_plus @ M
     else:
-        z_gamma = np.zeros((Pi_e.shape[0],     2 * N_gamma_eff))
-        z_plus  = np.zeros((Pi_plus.shape[0],  2 * N_gamma_eff))
+        z_gamma = np.zeros((Pi_e.shape[0], 2 * N_gamma_eff))
+        z_plus = np.zeros((Pi_plus.shape[0], 2 * N_gamma_eff))
         z_minus = np.zeros((Pi_minus.shape[0], 2 * N_gamma_eff))
-        Pi_e_aug     = np.hstack([Pi_e,    z_gamma])
-        Pi_plus_aug  = np.hstack([Pi_plus, z_plus])
-        Pi_minus_aug = np.hstack([Pi_minus,z_minus])
+        Pi_e_aug = np.hstack([Pi_e, z_gamma])
+        Pi_plus_aug = np.hstack([Pi_plus, z_plus])
+        Pi_minus_aug = np.hstack([Pi_minus, z_minus])
 
         Pi_fwd = np.zeros((N_gamma_eff, n_aug))
         Pi_bck = np.zeros((N_gamma_eff, n_aug))
         for j in range(N_gamma_eff):
-            Pi_fwd[j, n + j]               = 1.0
+            Pi_fwd[j, n + j] = 1.0
             Pi_bck[j, n + N_gamma_eff + j] = 1.0
 
         g_Psi = mod.get_gamma_Psi(EN_cathode, p, T)[aug_mask]
 
-        Q0_e   = (Pi_e_aug
-                  + gplus[np.newaxis, :] @ Pi_plus_aug
-                  - (g_Psi[np.newaxis, :] @ Pi_bck))
+        Q0_e = (
+            Pi_e_aug
+            + gplus[np.newaxis, :] @ Pi_plus_aug
+            - (g_Psi[np.newaxis, :] @ Pi_bck)
+        )
         Q0_neg = Pi_minus_aug
         Q0_fwd = Pi_fwd
-        Q0     = np.vstack([Q0_e, Q0_neg, Q0_fwd])
+        Q0 = np.vstack([Q0_e, Q0_neg, Q0_fwd])
 
         Qd_plus = Pi_plus_aug @ M
-        Qd_bck  = Pi_bck @ M
-        Qd      = np.vstack([Qd_plus, Qd_bck])
+        Qd_bck = Pi_bck @ M
+        Qd = np.vstack([Qd_plus, Qd_bck])
 
     Q = np.vstack([Q0, Qd])
 
@@ -606,7 +648,7 @@ def _assemble_det_Q(M, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
 
     row_norms = np.linalg.norm(Q, axis=1, keepdims=True)
     row_norms = np.where(row_norms < 1e-300, 1.0, row_norms)
-    Q_norm    = Q / row_norms
+    Q_norm = Q / row_norms
     sign, logabsdet = np.linalg.slogdet(Q_norm)
     cond_Q = np.linalg.cond(Q_norm)
     if cond_Q > 1e14:
@@ -618,10 +660,21 @@ def _assemble_det_Q(M, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
     return float(sign) * min(np.exp(logabsdet), 1e300)
 
 
-def inception_det(EN_ref, pd, mod, p, T, field_dist,
-                  N_min=_DX_N_MIN_DEFAULT, N_max=_DX_N_MAX_DEFAULT, tol=_DX_TOL_DEFAULT,
-                  lam=0.0, positive_polarity=True,
-                  propagator=midpoint_propagator, diag_list=None):
+def inception_det(
+    EN_ref,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min=_DX_N_MIN_DEFAULT,
+    N_max=_DX_N_MAX_DEFAULT,
+    tol=_DX_TOL_DEFAULT,
+    lam=0.0,
+    positive_polarity=True,
+    propagator=midpoint_propagator,
+    diag_list=None,
+):
     """
     Evaluate det Q(λ) for the inception boundary-value problem.
 
@@ -674,10 +727,10 @@ def inception_det(EN_ref, pd, mod, p, T, field_dist,
     float
         det Q(λ).  Inception threshold: det Q = 0.
     """
-    eff       = mod.resolve(positive_polarity)
-    d         = pd / p
-    f         = field_dist.build(d)
-    d_step    = d / N_min
+    eff = mod.resolve(positive_polarity)
+    d = pd / p
+    f = field_dist.build(d)
+    d_step = d / N_min
     max_depth = max(0, int(math.log2(max(1, N_max // N_min))))
 
     # A_func encapsulates the coordinate flip and all physics context.
@@ -690,14 +743,14 @@ def inception_det(EN_ref, pd, mod, p, T, field_dist,
 
     # Extract augmented-system metadata once from the first step midpoint.
     # Photon structure (aug_mask, N_gamma_eff) is assumed constant across the gap.
-    xi_mid0  = 0.5 * d_step / d
+    xi_mid0 = 0.5 * d_step / d
     xi_first = (1.0 - xi_mid0) if positive_polarity else xi_mid0
     _, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
         EN_ref * f(xi_first), d, eff, p, T, lam=lam
     )
     M = np.eye(n_aug)
 
-    with np.errstate(over='ignore', invalid='ignore'):
+    with np.errstate(over="ignore", invalid="ignore"):
         if propagator is midpoint_propagator:
             # Adaptive midpoint: each of the N_min segments is refined by step
             # halving until the relative Frobenius error < tol or max_depth is
@@ -706,12 +759,22 @@ def inception_det(EN_ref, pd, mod, p, T, field_dist,
             for i in range(N_min):
                 seg_diag = [] if diag_list is not None else None
                 P = _adaptive_midpoint_segment(
-                    A_func, i * d_step, (i + 1) * d_step,
-                    tol, max_depth, _diag=seg_diag,
+                    A_func,
+                    i * d_step,
+                    (i + 1) * d_step,
+                    tol,
+                    max_depth,
+                    _diag=seg_diag,
                 )
                 if diag_list is not None:
-                    diag_list.append({'segment': i, 'x_lo': i * d_step,
-                                      'x_hi': (i + 1) * d_step, 'halvings': seg_diag})
+                    diag_list.append(
+                        {
+                            "segment": i,
+                            "x_lo": i * d_step,
+                            "x_hi": (i + 1) * d_step,
+                            "halvings": seg_diag,
+                        }
+                    )
                 M = P @ M
         else:
             for i in range(N_min):
@@ -719,12 +782,11 @@ def inception_det(EN_ref, pd, mod, p, T, field_dist,
 
         xi_cathode = 1.0 if positive_polarity else 0.0
         EN_cathode = EN_ref * f(xi_cathode)
-        return _assemble_det_Q(M, EN_cathode, eff, p, T,
-                               N_gamma_eff, aug_mask, n_aug)
+        return _assemble_det_Q(M, EN_cathode, eff, p, T, N_gamma_eff, aug_mask, n_aug)
 
 
-_ROOT_CHECK_TOL  = 0.01    # |det Q(root)| / bracket-scale above this triggers a warning
-_NAN_SENTINEL    = 1e-290  # |value| below this → came from NaN → -1e-300 mapping
+_ROOT_CHECK_TOL = 0.01  # |det Q(root)| / bracket-scale above this triggers a warning
+_NAN_SENTINEL = 1e-290  # |value| below this → came from NaN → -1e-300 mapping
 
 
 def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
@@ -777,9 +839,9 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
         # Q is exactly singular (cond → ∞, det → 0).  Root is genuine.
         return True
 
-    bracket_scale = max(abs(fa) if np.isfinite(fa) else 0.0,
-                        abs(fb) if np.isfinite(fb) else 0.0,
-                        1e-300)
+    bracket_scale = max(
+        abs(fa) if np.isfinite(fa) else 0.0, abs(fb) if np.isfinite(fb) else 0.0, 1e-300
+    )
     if abs(det_root) > _ROOT_CHECK_TOL * bracket_scale:
         print(
             f"  [det Q check] EN = {root:.4f} Td  pd = {pd*1e3:.4g} bar·mm: "
@@ -789,10 +851,21 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
     return True
 
 
-def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
-                          n_scan=200, first_only=False, det_fn=None,
-                          fast_det_fn=None, med_det_fn=None,
-                          EN_hints=None, hint_factor=2.0):
+def find_all_breakdown_EN(
+    pd,
+    mod,
+    p,
+    T,
+    EN_lo=10.0,
+    EN_hi=3e5,
+    n_scan=200,
+    first_only=False,
+    det_fn=None,
+    fast_det_fn=None,
+    med_det_fn=None,
+    EN_hints=None,
+    hint_factor=2.0,
+):
     """
     Find E/N values where det Q(E/N, pd) = 0.
 
@@ -896,7 +969,7 @@ def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
                         all_ok = False
                         break
                 root = scipy.optimize.brentq(
-                    f_brentq, EN_a, EN_b, xtol=1E-8, rtol=1E-14
+                    f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
                 )
                 if _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
                     warm_roots.append(float(root))
@@ -914,6 +987,7 @@ def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
 
     def _scan_with(sfn):
         """Coarse sign-change scan using sfn; Brentq refinement always uses det_fn."""
+
         def f_s(EN):
             val = sfn(EN, pd, mod, p, T)
             return val if np.isfinite(val) else 0.0
@@ -941,7 +1015,7 @@ def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
                     if not found:
                         continue
                 root = scipy.optimize.brentq(
-                    f_brentq, EN_a, EN_b, xtol=1E-8, rtol=1E-14
+                    f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
                 )
                 if not _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
                     continue
@@ -952,9 +1026,7 @@ def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
                 # sfn returned NaN (mapped to 0) at the upper endpoint.  A sign
                 # change may be hidden just before the NaN boundary; fine-scan
                 # with the full det_fn to locate it.
-                fine = np.logspace(
-                    np.log10(EN_scan[i]), np.log10(EN_scan[i + 1]), 40
-                )
+                fine = np.logspace(np.log10(EN_scan[i]), np.log10(EN_scan[i + 1]), 40)
                 fine_v = [det_fn(en, pd, mod, p, T) for en in fine]
                 pos_j = None
                 for j, v in enumerate(fine_v):
@@ -962,11 +1034,20 @@ def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
                         pos_j = j
                     elif np.isfinite(v) and v < 0.0 and pos_j is not None:
                         root = scipy.optimize.brentq(
-                            f_brentq, fine[pos_j], fine[j], xtol=1E-8, rtol=1E-14
+                            f_brentq, fine[pos_j], fine[j], xtol=1e-8, rtol=1e-14
                         )
-                        if not _accept_root(root, fine[pos_j], fine[j],
-                                            fine_v[pos_j], v,
-                                            pd, det_fn, mod, p, T):
+                        if not _accept_root(
+                            root,
+                            fine[pos_j],
+                            fine[j],
+                            fine_v[pos_j],
+                            v,
+                            pd,
+                            det_fn,
+                            mod,
+                            p,
+                            T,
+                        ):
                             break
                         local_roots.append(float(root))
                         break
@@ -984,8 +1065,16 @@ def find_all_breakdown_EN(pd, mod, p, T, EN_lo=10.0, EN_hi=3E5,
     return roots
 
 
-def compute_paschen_curve(pd_arr, mod, p, T, all_branches=False,
-                          det_fn=None, fast_det_fn=None, med_det_fn=None):
+def compute_paschen_curve(
+    pd_arr,
+    mod,
+    p,
+    T,
+    all_branches=False,
+    det_fn=None,
+    fast_det_fn=None,
+    med_det_fn=None,
+):
     """
     Compute Paschen branches across a p*d sweep.
 
@@ -1017,23 +1106,31 @@ def compute_paschen_curve(pd_arr, mod, p, T, all_branches=False,
         One dict per branch.  Branch 0 is the one whose first root appeared
         earliest (lowest pd); within that, ordered by first-appearance E/N.
         Each dict has keys:
-          ``'idx'`` — integer indices into pd_arr where this branch has a root,
-          ``'pd'``, ``'EN'``, ``'V'``, ``'p'``, ``'d'`` — corresponding arrays.
+
+        - ``'idx'`` — integer indices into pd_arr where this branch has a root
+        - ``'pd'``, ``'EN'``, ``'V'``, ``'p'``, ``'d'`` — corresponding arrays
+
         Returns an empty list if no solutions are found anywhere.
     """
     if det_fn is None:
         det_fn = inception_det
-    p_arr  = np.full_like(pd_arr, p) if np.ndim(p) == 0 else np.asarray(p, dtype=float)
+    p_arr = np.full_like(pd_arr, p) if np.ndim(p) == 0 else np.asarray(p, dtype=float)
     branches = []
     branch_last_logEN = []  # last log10(EN) for each branch, for continuity tracking
-    prev_roots_EN = []      # roots found at the previous pd point (warm-start hints)
+    prev_roots_EN = []  # roots found at the previous pd point (warm-start hints)
 
     for i, (pd_i, p_i) in enumerate(zip(pd_arr, p_arr)):
-        roots = find_all_breakdown_EN(pd_i, mod, p_i, T,
-                                      first_only=not all_branches,
-                                      det_fn=det_fn, fast_det_fn=fast_det_fn,
-                                      med_det_fn=med_det_fn,
-                                      EN_hints=prev_roots_EN)
+        roots = find_all_breakdown_EN(
+            pd_i,
+            mod,
+            p_i,
+            T,
+            first_only=not all_branches,
+            det_fn=det_fn,
+            fast_det_fn=fast_det_fn,
+            med_det_fn=med_det_fn,
+            EN_hints=prev_roots_EN,
+        )
         prev_roots_EN = list(roots)
         if not roots:
             continue
@@ -1043,19 +1140,27 @@ def compute_paschen_curve(pd_arr, mod, p, T, all_branches=False,
             # First pd with roots: create one branch per root, sorted ascending
             for EN in sorted(roots):
                 V = EN * pd_i * 1e-21 / (_kB * T) * 1e5
-                branches.append({'idx': [i], 'pd': [pd_i], 'EN': [EN],
-                                  'V': [V], 'p': [p_i], 'd': [d_i]})
+                branches.append(
+                    {
+                        "idx": [i],
+                        "pd": [pd_i],
+                        "EN": [EN],
+                        "V": [V],
+                        "p": [p_i],
+                        "d": [d_i],
+                    }
+                )
                 branch_last_logEN.append(np.log10(EN))
         else:
             # Match each new root to the nearest existing branch in log-EN space.
             # Build cost matrix: rows = existing branches, cols = new roots.
             log_roots = np.log10(np.array(sorted(roots)))
-            log_last  = np.array(branch_last_logEN)
+            log_last = np.array(branch_last_logEN)
             cost = np.abs(log_last[:, None] - log_roots[None, :])
 
             assigned_branches = set()
-            assigned_roots    = set()
-            root_to_branch    = {}
+            assigned_roots = set()
+            root_to_branch = {}
 
             # Greedy: repeatedly pick the (branch, root) pair with smallest distance
             flat_order = np.argsort(cost, axis=None)
@@ -1074,25 +1179,32 @@ def compute_paschen_curve(pd_arr, mod, p, T, all_branches=False,
                 V = EN * pd_i * 1e-21 / (_kB * T) * 1e5
                 if r in root_to_branch:
                     b = root_to_branch[r]
-                    branches[b]['idx'].append(i)
-                    branches[b]['pd'].append(pd_i)
-                    branches[b]['EN'].append(EN)
-                    branches[b]['V'].append(V)
-                    branches[b]['p'].append(p_i)
-                    branches[b]['d'].append(d_i)
+                    branches[b]["idx"].append(i)
+                    branches[b]["pd"].append(pd_i)
+                    branches[b]["EN"].append(EN)
+                    branches[b]["V"].append(V)
+                    branches[b]["p"].append(p_i)
+                    branches[b]["d"].append(d_i)
                     branch_last_logEN[b] = np.log10(EN)
                 else:
-                    branches.append({'idx': [i], 'pd': [pd_i], 'EN': [EN],
-                                      'V': [V], 'p': [p_i], 'd': [d_i]})
+                    branches.append(
+                        {
+                            "idx": [i],
+                            "pd": [pd_i],
+                            "EN": [EN],
+                            "V": [V],
+                            "p": [p_i],
+                            "d": [d_i],
+                        }
+                    )
                     branch_last_logEN.append(np.log10(EN))
 
     for br in branches:
-        for k in ('pd', 'EN', 'V', 'p', 'd'):
+        for k in ("pd", "EN", "V", "p", "d"):
             br[k] = np.array(br[k], dtype=float)
-        br['idx'] = np.array(br['idx'], dtype=int)
+        br["idx"] = np.array(br["idx"], dtype=int)
 
     return branches
-
 
 
 def main():
@@ -1127,49 +1239,77 @@ def main():
         help="Path to mechanism Python file (e.g. Data/Air/Air.py).",
     )
     parser.add_argument(
-        "configs", nargs="*", metavar="CONFIG.json",
+        "configs",
+        nargs="*",
+        metavar="CONFIG.json",
         help=(
             "One or more JSON configuration files for the mechanism.  "
             "Each file may contain a single configuration object or a list "
-            "of objects under a \"configurations\" key.  All configurations "
+            'of objects under a "configurations" key.  All configurations '
             "across all files are run in sequence.  If omitted, a single "
             "baseline configuration with default parameters is used."
         ),
     )
     parser.add_argument(
-        "--p", type=float, nargs="+", default=[], metavar="P",
+        "--p",
+        type=float,
+        nargs="+",
+        default=[],
+        metavar="P",
         help="Fixed-p mode: pressure(s) in bar (default: 1.0 when --d is not given).",
     )
     parser.add_argument(
-        "--d", type=float, nargs="+", default=[], metavar="D",
+        "--d",
+        type=float,
+        nargs="+",
+        default=[],
+        metavar="D",
         help="Fixed-d mode: gap distance(s) in mm.",
     )
     parser.add_argument(
-        "--pd-min", type=float, default=1e-2, metavar="PD_MIN",
+        "--pd-min",
+        type=float,
+        default=1e-2,
+        metavar="PD_MIN",
         help="Minimum p*d in bar·mm (default: 1e-2).",
     )
     parser.add_argument(
-        "--pd-max", type=float, default=1e3, metavar="PD_MAX",
+        "--pd-max",
+        type=float,
+        default=1e3,
+        metavar="PD_MAX",
         help="Maximum p*d in bar·mm (default: 1e3).",
     )
     parser.add_argument(
-        "--pd-num", type=int, default=50, metavar="PD_NUM",
+        "--pd-num",
+        type=int,
+        default=50,
+        metavar="PD_NUM",
         help="Number of logarithmically spaced p*d grid points (default: 50).",
     )
     parser.add_argument(
-        "--T", type=float, default=293.0,
+        "--T",
+        type=float,
+        default=293.0,
         help="Gas temperature in Kelvin (default: 293.0).",
     )
     parser.add_argument(
-        "--write-to-file", type=str, default=None, metavar="FILE",
+        "--write-to-file",
+        type=str,
+        default=None,
+        metavar="FILE",
         help="Write all curves to a tab-separated file.",
     )
     parser.add_argument(
-        "--save-subplots", action="store_true", default=False,
+        "--save-subplots",
+        action="store_true",
+        default=False,
         help="Save each subplot as a separate PDF (no titles).",
     )
     parser.add_argument(
-        "--all-branches", action="store_true", default=False,
+        "--all-branches",
+        action="store_true",
+        default=False,
         help=(
             "Compute and plot all branches of the breakdown curve.  "
             "By default only branch 1 (lowest E/N root) is computed."
@@ -1177,7 +1317,10 @@ def main():
     )
     add_field_argument(parser)
     parser.add_argument(
-        '--dx', nargs='*', default=None, metavar='SPEC',
+        "--dx",
+        nargs="*",
+        default=None,
+        metavar="SPEC",
         help=(
             "Adaptive integration stepping: N_min [N_max [tol]].  "
             "N_min (default 5): minimum number of integration segments.  "
@@ -1189,16 +1332,21 @@ def main():
         ),
     )
     parser.add_argument(
-        '--lam', type=float, default=0.0, metavar='LAM',
+        "--lam",
+        type=float,
+        default=0.0,
+        metavar="LAM",
         help=(
-            'Temporal growth rate λ in s⁻¹ for the generalised inception criterion '
-            'det Q(λ) = 0 (default: 0.0 = standard inception threshold).  '
-            'λ > 0 → growing discharge (lower breakdown voltage); '
-            'λ < 0 → decaying discharge (higher breakdown voltage).'
+            "Temporal growth rate λ in s⁻¹ for the generalised inception criterion "
+            "det Q(λ) = 0 (default: 0.0 = standard inception threshold).  "
+            "λ > 0 → growing discharge (lower breakdown voltage); "
+            "λ < 0 → decaying discharge (higher breakdown voltage)."
         ),
     )
     parser.add_argument(
-        "--plot-separate-branches", action="store_true", default=False,
+        "--plot-separate-branches",
+        action="store_true",
+        default=False,
         help=(
             "Give each branch its own line style (solid / dashed / dotted / "
             "dash-dot) and legend entry ('branch 1', 'branch 2', …).  "
@@ -1206,7 +1354,9 @@ def main():
         ),
     )
     parser.add_argument(
-        "--plot-ionization-integral", action="store_true", default=False,
+        "--plot-ionization-integral",
+        action="store_true",
+        default=False,
         help=(
             "Overlay the ionization integral ∫max(α−η,0)dx on a second y-axis "
             "in the voltage subplot.  Only segments where α > η contribute.  "
@@ -1214,7 +1364,10 @@ def main():
         ),
     )
     parser.add_argument(
-        "--streamer-criterion", dest="streamer_criterion", type=float, default=None,
+        "--streamer-criterion",
+        dest="streamer_criterion",
+        type=float,
+        default=None,
         metavar="C",
         help=(
             "Solve for the streamer criterion ∫max(α−η,0)dx = C.  "
@@ -1224,11 +1377,15 @@ def main():
         ),
     )
     parser.add_argument(
-        "--no-plot", action="store_true", default=False,
+        "--no-plot",
+        action="store_true",
+        default=False,
         help="Skip the matplotlib figure entirely (useful for batch/scripted runs).",
     )
     parser.add_argument(
-        "--method", choices=["midpoint", "magnus2"], default="midpoint",
+        "--method",
+        choices=["midpoint", "magnus2"],
+        default="midpoint",
         help=(
             "Propagator algorithm for the path-ordered matrix exponential.  "
             "'midpoint' (default): zeroth-order Magnus / midpoint rule.  "
@@ -1247,9 +1404,11 @@ def main():
     _field_dist = parse_field_spec(args.field, parser)
     _N_min, _N_max, _dx_tol = parse_dx_spec(args.dx, parser)
 
-    _propagator = midpoint_propagator if args.method == 'midpoint' else magnus2_propagator
+    _propagator = (
+        midpoint_propagator if args.method == "midpoint" else magnus2_propagator
+    )
 
-    mech_dir  = os.path.dirname(os.path.abspath(args.mechanism))
+    mech_dir = os.path.dirname(os.path.abspath(args.mechanism))
     mech_name = os.path.basename(args.mechanism)
 
     # Read JSON config files as raw dicts; no gas-specific class needed here.
@@ -1257,27 +1416,27 @@ def main():
 
     # Determine n (number of species) from the first config.
     _mod0 = load_mechanism(args.mechanism, raw_dicts[0])
-    n     = len(_mod0.SPECIES)
+    n = len(_mod0.SPECIES)
     del _mod0
 
     if args.streamer_criterion is not None:
         _mod_check = load_mechanism(args.mechanism, raw_dicts[0])
-        if not (hasattr(_mod_check, 'alpha') and hasattr(_mod_check, 'eta')):
+        if not (hasattr(_mod_check, "alpha") and hasattr(_mod_check, "eta")):
             parser.error(
                 "--streamer-criterion requires the mechanism to expose alpha and eta"
             )
         del _mod_check
 
     # Fixed pd sweep
-    pd_arr = np.logspace(np.log10(args.pd_min * 1e-3),
-                         np.log10(args.pd_max * 1e-3),
-                         args.pd_num)
+    pd_arr = np.logspace(
+        np.log10(args.pd_min * 1e-3), np.log10(args.pd_max * 1e-3), args.pd_num
+    )
 
     # Build curve specs: (label, p_arr, d_arr, mod)
     # Each config dict gets its own freshly loaded Mechanism instance.
     curve_specs = []
     for cfg_dict in raw_dicts:
-        mod       = load_mechanism(args.mechanism, cfg_dict)
+        mod = load_mechanism(args.mechanism, cfg_dict)
         cfg_label = mod.label
         if len(mod.SPECIES) != n:
             raise ValueError(
@@ -1285,28 +1444,36 @@ def main():
                 f"expected {n} (from first config)."
             )
         for p in args.p:
-            curve_specs.append((
-                f"{cfg_label}, p={p} bar",
-                np.full_like(pd_arr, p), pd_arr / p,
-                mod,
-            ))
+            curve_specs.append(
+                (
+                    f"{cfg_label}, p={p} bar",
+                    np.full_like(pd_arr, p),
+                    pd_arr / p,
+                    mod,
+                )
+            )
         for d_mm in args.d:
             d_m = d_mm * 1e-3
-            curve_specs.append((
-                f"{cfg_label}, d={d_mm} mm",
-                pd_arr / d_m, np.full_like(pd_arr, d_m),
-                mod,
-            ))
+            curve_specs.append(
+                (
+                    f"{cfg_label}, d={d_mm} mm",
+                    pd_arr / d_m,
+                    np.full_like(pd_arr, d_m),
+                    mod,
+                )
+            )
 
     # Compute alpha=eta crossover E/N from the first config's module (for annotation).
     _en_cross = {}
     if curve_specs:
         _ref_mod = curve_specs[0][3]
-        if hasattr(_ref_mod, 'alpha') and hasattr(_ref_mod, 'eta'):
+        if hasattr(_ref_mod, "alpha") and hasattr(_ref_mod, "eta"):
             EN_scan = np.logspace(np.log10(10.0), np.log10(1e5), 200)
             for p in args.p:
-                f_cross = lambda EN, _p=p: _ref_mod.alpha(EN, _p, args.T) - _ref_mod.eta(EN, _p, args.T)
-                f_vals  = np.array([f_cross(en) for en in EN_scan])
+                f_cross = lambda EN, _p=p: _ref_mod.alpha(
+                    EN, _p, args.T
+                ) - _ref_mod.eta(EN, _p, args.T)
+                f_vals = np.array([f_cross(en) for en in EN_scan])
                 sign_changes = np.where(f_vals[:-1] * f_vals[1:] < 0)[0]
                 if len(sign_changes):
                     i = sign_changes[0]
@@ -1317,88 +1484,110 @@ def main():
                     _en_cross[p] = None
 
     _first_mod = curve_specs[0][3] if curve_specs else None
-    _plot_aed  = (args.plot_ionization_integral
-                  and _first_mod is not None
-                  and hasattr(_first_mod, 'alpha') and hasattr(_first_mod, 'eta'))
+    _plot_aed = (
+        args.plot_ionization_integral
+        and _first_mod is not None
+        and hasattr(_first_mod, "alpha")
+        and hasattr(_first_mod, "eta")
+    )
 
     def _aed_integral(EN_ref, p_val, d_val, _mod):
         """Compute ∫max(α−η,0)dx respecting the actual field profile."""
-        if _field_dist.field_type == 'uniform':
-            return max(0.0, _mod.alpha(EN_ref, p_val, args.T) - _mod.eta(EN_ref, p_val, args.T)) * d_val
-        f      = _field_dist.build(d_val)
-        xis    = (np.arange(_N_min) + 0.5) / _N_min
+        if _field_dist.field_type == "uniform":
+            return (
+                max(
+                    0.0,
+                    _mod.alpha(EN_ref, p_val, args.T) - _mod.eta(EN_ref, p_val, args.T),
+                )
+                * d_val
+            )
+        f = _field_dist.build(d_val)
+        xis = (np.arange(_N_min) + 0.5) / _N_min
         EN_arr = EN_ref * np.array([f(xi) for xi in xis])
-        ds     = d_val / _N_min
-        diff   = np.array([_mod.alpha(en, p_val, args.T) - _mod.eta(en, p_val, args.T)
-                           for en in EN_arr])
+        ds = d_val / _N_min
+        diff = np.array(
+            [
+                _mod.alpha(en, p_val, args.T) - _mod.eta(en, p_val, args.T)
+                for en in EN_arr
+            ]
+        )
         return float(np.sum(np.maximum(0.0, diff)) * ds)
 
     def _polarity_desc(polarity):
-        if _field_dist.field_type == 'uniform':
-            return polarity               # "positive" / "negative"
-        return f"sphere={polarity}"       # "sphere=positive" / "sphere=negative"
+        if _field_dist.field_type == "uniform":
+            return polarity  # "positive" / "negative"
+        return f"sphere={polarity}"  # "sphere=positive" / "sphere=negative"
 
     def _branch0_grids(branches):
-        V_g  = np.full_like(pd_arr, np.nan)
+        V_g = np.full_like(pd_arr, np.nan)
         EN_g = np.full_like(pd_arr, np.nan)
-        p_g  = np.full_like(pd_arr, np.nan)
-        d_g  = np.full_like(pd_arr, np.nan)
+        p_g = np.full_like(pd_arr, np.nan)
+        d_g = np.full_like(pd_arr, np.nan)
         if branches:
             br0 = branches[0]
-            V_g[br0['idx']]  = br0['V']
-            EN_g[br0['idx']] = br0['EN']
-            p_g[br0['idx']]  = br0['p']
-            d_g[br0['idx']]  = br0['d']
+            V_g[br0["idx"]] = br0["V"]
+            EN_g[br0["idx"]] = br0["EN"]
+            p_g[br0["idx"]] = br0["p"]
+            d_g[br0["idx"]] = br0["d"]
         return V_g, EN_g, p_g, d_g
 
     # Collects (label, p_arr, d_arr, EN_star, V_star) for every solved curve.
-    _file_records    = []
+    _file_records = []
     _streamer_records = []  # (label, p_arr, d_arr, EN_arr, V_arr) per streamer setting
-    _all_V_pos    = {}   # label -> full 200-point V array, positive polarity
-    _all_V_neg    = {}   # label -> full 200-point V array, negative polarity
-    _curve_color  = {}   # label -> matplotlib line colour (for consistent colouring on ax3)
+    _all_V_pos = {}  # label -> full 200-point V array, positive polarity
+    _all_V_neg = {}  # label -> full 200-point V array, negative polarity
+    _curve_color = (
+        {}
+    )  # label -> matplotlib line colour (for consistent colouring on ax3)
 
     if not args.no_plot:
-        plt.rcParams['font.size'] += 2
+        plt.rcParams["font.size"] += 2
 
         # Set up figure — panels: V*, E/N*, optionally modifier ratio, optionally field-error %
         _show_ratio = len(raw_dicts) > 1
-        _n_panels   = 2 + int(_show_ratio)
-        fig, _axes  = plt.subplots(1, _n_panels, figsize=(7 * _n_panels, 6))
-        ax1, ax2    = _axes[0], _axes[1]
-        _next_ax    = 2
+        _n_panels = 2 + int(_show_ratio)
+        fig, _axes = plt.subplots(1, _n_panels, figsize=(7 * _n_panels, 6))
+        ax1, ax2 = _axes[0], _axes[1]
+        _next_ax = 2
         if _show_ratio:
-            ax3 = _axes[_next_ax]; _next_ax += 1
+            ax3 = _axes[_next_ax]
+            _next_ax += 1
         else:
             ax3 = None
         _field_str = _field_dist.label
-        _method_str = '' if args.method == 'midpoint' else f',  {args.method}'
+        _method_str = "" if args.method == "midpoint" else f",  {args.method}"
         _suptitle = fig.suptitle(
-            f"Paschen Curve  —  {mech_name},  T = {args.T} K,  {_field_str}{_method_str}", fontsize=13
+            f"Paschen Curve  —  {mech_name},  T = {args.T} K,  {_field_str}{_method_str}",
+            fontsize=13,
         )
 
         _AED_ALPHA = 0.4
         ax1b = ax1.twinx() if _plot_aed else None
         if ax1b is not None:
-            ax1b.set_yscale('symlog', linthresh=1)
+            ax1b.set_yscale("symlog", linthresh=1)
             ax1b.yaxis.set_major_locator(
-                _mticker.SymmetricalLogLocator(linthresh=1, base=10, subs=[1.0, 2.0, 5.0])
+                _mticker.SymmetricalLogLocator(
+                    linthresh=1, base=10, subs=[1.0, 2.0, 5.0]
+                )
             )
             ax1b.yaxis.set_major_formatter(
                 _mticker.LogFormatter(minor_thresholds=(np.inf, np.inf))
             )
-            ax1b.set_ylabel(r'$\int_0^d \max(\alpha-\eta,\,0)\,\mathrm{d}x$', alpha=_AED_ALPHA)
-            ax1b.spines['right'].set_alpha(_AED_ALPHA)
-            ax1b.tick_params(axis='y', colors=(0, 0, 0, _AED_ALPHA))
+            ax1b.set_ylabel(
+                r"$\int_0^d \max(\alpha-\eta,\,0)\,\mathrm{d}x$", alpha=_AED_ALPHA
+            )
+            ax1b.spines["right"].set_alpha(_AED_ALPHA)
+            ax1b.tick_params(axis="y", colors=(0, 0, 0, _AED_ALPHA))
 
             def _aed_format_coord(x, y, _a1=ax1, _a1b=ax1b):
                 _, y1 = _a1.transData.inverted().transform(
                     _a1b.transData.transform((x, y))
                 )
                 return f"pd = {x:.3g} bar·mm    U = {y1:.4g} kV    (α−η)d = {y:.4g}"
+
             ax1b.format_coord = _aed_format_coord
 
-        _markers   = ["o", "s", "^", "D", "v", "P", "X", "*"]
+        _markers = ["o", "s", "^", "D", "v", "P", "X", "*"]
         _BRANCH_LS = ["-", "--", ":", "-."]
     else:
         ax1 = ax2 = ax3 = ax1b = None
@@ -1406,63 +1595,120 @@ def main():
 
     for curve_idx, (label, p_arr, _d_arr, mod) in enumerate(curve_specs):
 
-        if _field_dist.field_type == 'sphere-sphere':
+        if _field_dist.field_type == "sphere-sphere":
             max_dR = np.max(_d_arr) / _field_dist.sphere_R
             if max_dR > 4.0:
-                print(f"  Warning [{label}]: max d/R = {max_dR:.3g} > 4 — "
-                      f"sphere-sphere field approximation may be inaccurate.")
+                print(
+                    f"  Warning [{label}]: max d/R = {max_dR:.3g} > 4 — "
+                    f"sphere-sphere field approximation may be inaccurate."
+                )
 
         # Determine det functions for both polarities.
         # fast_det_fn  — uniform field, always N=1 (coarse sign-change scan)
         # med_det_fn   — N=min(5,N), modest resolution (fallback scan)
         # det_fn       — full field_dist accuracy (Brentq)
-        if _field_dist.field_type == 'uniform':
-            det_pos = det_neg = functools.partial(inception_det, field_dist=_field_dist,
-                                                  N_min=_N_min, N_max=_N_max, tol=_dx_tol,
-                                                  lam=args.lam, positive_polarity=True,
-                                                  propagator=_propagator)
+        if _field_dist.field_type == "uniform":
+            det_pos = det_neg = functools.partial(
+                inception_det,
+                field_dist=_field_dist,
+                N_min=_N_min,
+                N_max=_N_max,
+                tol=_dx_tol,
+                lam=args.lam,
+                positive_polarity=True,
+                propagator=_propagator,
+            )
             fast_det_pos = fast_det_neg = None
-            med_det_pos  = med_det_neg  = None
+            med_det_pos = med_det_neg = None
         else:
-            _fast_fd = FieldDistribution('uniform')
-            _med_fd  = FieldDistribution(_field_dist.field_type, _field_dist.sphere_R)
-            _N_med   = min(5, _N_min)   # cheap constant scan; N_med = N_med disables adaptation
-            det_pos = functools.partial(inception_det, field_dist=_field_dist,
-                                        N_min=_N_min, N_max=_N_max, tol=_dx_tol,
-                                        lam=args.lam, positive_polarity=True,
-                                        propagator=_propagator)
-            det_neg = (det_pos if _field_dist.is_symmetric
-                       else functools.partial(inception_det, field_dist=_field_dist,
-                                              N_min=_N_min, N_max=_N_max, tol=_dx_tol,
-                                              lam=args.lam, positive_polarity=False,
-                                              propagator=_propagator))
-            fast_det_pos = fast_det_neg = functools.partial(inception_det,
-                                              field_dist=_fast_fd,
-                                              N_min=1, N_max=1, tol=_dx_tol,
-                                              lam=args.lam, propagator=_propagator)
-            med_det_pos = functools.partial(inception_det, field_dist=_med_fd,
-                                            N_min=_N_med, N_max=_N_med, tol=_dx_tol,
-                                            lam=args.lam, positive_polarity=True,
-                                            propagator=_propagator)
-            med_det_neg = (med_det_pos if _field_dist.is_symmetric
-                           else functools.partial(inception_det, field_dist=_med_fd,
-                                                  N_min=_N_med, N_max=_N_med, tol=_dx_tol,
-                                                  lam=args.lam, positive_polarity=False,
-                                                  propagator=_propagator))
+            _fast_fd = FieldDistribution("uniform")
+            _med_fd = FieldDistribution(_field_dist.field_type, _field_dist.sphere_R)
+            _N_med = min(
+                5, _N_min
+            )  # cheap constant scan; N_med = N_med disables adaptation
+            det_pos = functools.partial(
+                inception_det,
+                field_dist=_field_dist,
+                N_min=_N_min,
+                N_max=_N_max,
+                tol=_dx_tol,
+                lam=args.lam,
+                positive_polarity=True,
+                propagator=_propagator,
+            )
+            det_neg = (
+                det_pos
+                if _field_dist.is_symmetric
+                else functools.partial(
+                    inception_det,
+                    field_dist=_field_dist,
+                    N_min=_N_min,
+                    N_max=_N_max,
+                    tol=_dx_tol,
+                    lam=args.lam,
+                    positive_polarity=False,
+                    propagator=_propagator,
+                )
+            )
+            fast_det_pos = fast_det_neg = functools.partial(
+                inception_det,
+                field_dist=_fast_fd,
+                N_min=1,
+                N_max=1,
+                tol=_dx_tol,
+                lam=args.lam,
+                propagator=_propagator,
+            )
+            med_det_pos = functools.partial(
+                inception_det,
+                field_dist=_med_fd,
+                N_min=_N_med,
+                N_max=_N_med,
+                tol=_dx_tol,
+                lam=args.lam,
+                positive_polarity=True,
+                propagator=_propagator,
+            )
+            med_det_neg = (
+                med_det_pos
+                if _field_dist.is_symmetric
+                else functools.partial(
+                    inception_det,
+                    field_dist=_med_fd,
+                    N_min=_N_med,
+                    N_max=_N_med,
+                    tol=_dx_tol,
+                    lam=args.lam,
+                    positive_polarity=False,
+                    propagator=_propagator,
+                )
+            )
 
         print(f"\nSolving Paschen curve: {label} ({_polarity_desc('positive')})")
-        branches_pos = compute_paschen_curve(pd_arr, mod, p_arr, args.T,
-                                             all_branches=args.all_branches,
-                                             det_fn=det_pos, fast_det_fn=fast_det_pos,
-                                             med_det_fn=med_det_pos)
+        branches_pos = compute_paschen_curve(
+            pd_arr,
+            mod,
+            p_arr,
+            args.T,
+            all_branches=args.all_branches,
+            det_fn=det_pos,
+            fast_det_fn=fast_det_pos,
+            med_det_fn=med_det_pos,
+        )
         if _field_dist.is_symmetric:
-            branches_neg = branches_pos   # symmetric; reuse same object
+            branches_neg = branches_pos  # symmetric; reuse same object
         else:
             print(f"\nSolving Paschen curve: {label} ({_polarity_desc('negative')})")
-            branches_neg = compute_paschen_curve(pd_arr, mod, p_arr, args.T,
-                                                 all_branches=args.all_branches,
-                                                 det_fn=det_neg, fast_det_fn=fast_det_neg,
-                                                 med_det_fn=med_det_neg)
+            branches_neg = compute_paschen_curve(
+                pd_arr,
+                mod,
+                p_arr,
+                args.T,
+                all_branches=args.all_branches,
+                det_fn=det_neg,
+                fast_det_fn=fast_det_neg,
+                med_det_fn=med_det_neg,
+            )
 
         if not branches_pos and not branches_neg:
             print(f"  [{label}] No breakdown found for any pd value.")
@@ -1471,47 +1717,68 @@ def main():
             continue
 
         polarity_pairs = [
-            ('positive', branches_pos, '-'),
-            ('negative', branches_neg, '--'),
+            ("positive", branches_pos, "-"),
+            ("negative", branches_neg, "--"),
         ]
         for polarity, branches, ls_pol in polarity_pairs:
             if not branches:
                 continue
             pol_label = f"{label} ({_polarity_desc(polarity)})"
             for b_idx, br in enumerate(branches):
-                order     = np.argsort(br['pd'])
-                br_pd     = br['pd'][order]
-                br_EN     = br['EN'][order]
-                br_V      = br['V'][order]
-                br_p      = br['p'][order]
-                br_d      = br['d'][order]
+                order = np.argsort(br["pd"])
+                br_pd = br["pd"][order]
+                br_EN = br["EN"][order]
+                br_V = br["V"][order]
+                br_p = br["p"][order]
+                br_d = br["d"][order]
 
                 if not args.no_plot:
                     markevery = [0, len(br_pd) - 1]
                     if args.plot_separate_branches:
-                        ls      = _BRANCH_LS[b_idx % len(_BRANCH_LS)]
+                        ls = _BRANCH_LS[b_idx % len(_BRANCH_LS)]
                         b_label = f"{pol_label} (branch {b_idx + 1})"
                     else:
-                        ls      = ls_pol
+                        ls = ls_pol
                         b_label = pol_label if b_idx == 0 else "_nolegend_"
-                    is_first = (polarity == 'positive' and b_idx == 0)
-                    color_kw = {} if is_first else {'color': _curve_color[label]}
-                    plot_kw  = dict(label=b_label,
-                                    marker=_markers[curve_idx % len(_markers)],
-                                    markevery=markevery, markersize=6, ls=ls, **color_kw)
+                    is_first = polarity == "positive" and b_idx == 0
+                    color_kw = {} if is_first else {"color": _curve_color[label]}
+                    plot_kw = dict(
+                        label=b_label,
+                        marker=_markers[curve_idx % len(_markers)],
+                        markevery=markevery,
+                        markersize=6,
+                        ls=ls,
+                        **color_kw,
+                    )
                     ax1.loglog(br_pd * 1e3, br_V / 1000, **plot_kw)
                     if is_first:
                         _curve_color[label] = ax1.get_lines()[-1].get_color()
                     col = _curve_color[label]
                     if ax1b is not None:
-                        aed = np.array([
-                            _aed_integral(en, p, d, mod) if np.isfinite(en) else np.nan
-                            for en, p, d in zip(br_EN, br_p, br_d)
-                        ])
-                        ax1b.plot(br_pd * 1e3, aed, color=col, alpha=_AED_ALPHA,
-                                  ls=ls_pol, lw=1.5, zorder=1)
-                    ax2.loglog(br_pd * 1e3, br_EN,
-                               **{**plot_kw, 'color': col, 'label': b_label})
+                        aed = np.array(
+                            [
+                                (
+                                    _aed_integral(en, p, d, mod)
+                                    if np.isfinite(en)
+                                    else np.nan
+                                )
+                                for en, p, d in zip(br_EN, br_p, br_d)
+                            ]
+                        )
+                        ax1b.plot(
+                            br_pd * 1e3,
+                            aed,
+                            color=col,
+                            alpha=_AED_ALPHA,
+                            ls=ls_pol,
+                            lw=1.5,
+                            zorder=1,
+                        )
+                    ax2.loglog(
+                        br_pd * 1e3,
+                        br_EN,
+                        **{**plot_kw, "color": col, "label": b_label},
+                    )
 
                 # Print summary table for this branch
                 print(
@@ -1533,16 +1800,30 @@ def main():
 
         # Map branch 0 onto the full pd grid for file output and ratio plot
         V_pos, EN_pos, p_grid, d_grid = _branch0_grids(branches_pos)
-        V_neg, EN_neg, _,      _      = _branch0_grids(branches_neg)
+        V_neg, EN_neg, _, _ = _branch0_grids(branches_neg)
 
         _all_V_pos[label] = V_pos
         _all_V_neg[label] = V_neg
 
         _file_records.append(
-            (f"{label} ({_polarity_desc('positive')})", p_grid, d_grid, EN_pos, V_pos, mod)
+            (
+                f"{label} ({_polarity_desc('positive')})",
+                p_grid,
+                d_grid,
+                EN_pos,
+                V_pos,
+                mod,
+            )
         )
         _file_records.append(
-            (f"{label} ({_polarity_desc('negative')})", p_grid, d_grid, EN_neg, V_neg, mod)
+            (
+                f"{label} ({_polarity_desc('negative')})",
+                p_grid,
+                d_grid,
+                EN_neg,
+                V_neg,
+                mod,
+            )
         )
 
     if args.streamer_criterion is not None:
@@ -1552,22 +1833,30 @@ def main():
         for _cs_label, _p_arr_cs, _d_arr_cs, _mod_cs in curve_specs:
             _s_label = f"Streamer (C={_C}), {_cs_label}"
             _EN_s = np.full_like(pd_arr, np.nan)
-            _V_s  = np.full_like(pd_arr, np.nan)
+            _V_s = np.full_like(pd_arr, np.nan)
 
             print(f"\nSolving streamer criterion: {_s_label}")
             for _i, (_pd_i, _p_i, _d_i) in enumerate(zip(pd_arr, _p_arr_cs, _d_arr_cs)):
-                _fvals = np.array([_aed_integral(_en, _p_i, _d_i, _mod_cs) - _C for _en in _EN_sc])
-                _idx   = np.where(_fvals[:-1] * _fvals[1:] < 0)[0]
+                _fvals = np.array(
+                    [_aed_integral(_en, _p_i, _d_i, _mod_cs) - _C for _en in _EN_sc]
+                )
+                _idx = np.where(_fvals[:-1] * _fvals[1:] < 0)[0]
                 if _idx.size == 0:
                     continue
                 _k = _idx[0]
                 try:
                     _root = scipy.optimize.brentq(
-                        lambda _en, __p=_p_i, __d=_d_i, __m=_mod_cs: _aed_integral(_en, __p, __d, __m) - _C,
-                        _EN_sc[_k], _EN_sc[_k + 1], xtol=1e-6, rtol=1e-10,
+                        lambda _en, __p=_p_i, __d=_d_i, __m=_mod_cs: _aed_integral(
+                            _en, __p, __d, __m
+                        )
+                        - _C,
+                        _EN_sc[_k],
+                        _EN_sc[_k + 1],
+                        xtol=1e-6,
+                        rtol=1e-10,
                     )
                     _EN_s[_i] = _root
-                    _V_s[_i]  = _root * _pd_i * 1e-21 / (_kB * args.T) * 1e5
+                    _V_s[_i] = _root * _pd_i * 1e-21 / (_kB * args.T) * 1e5
                 except ValueError:
                     pass
 
@@ -1579,8 +1868,15 @@ def main():
                 continue
 
             if not args.no_plot:
-                _sm_kw = dict(color='k', ls='-.', lw=1.5, marker='x', markersize=5,
-                              markevery=max(1, int(_smask.sum()) // 10), label=_s_label)
+                _sm_kw = dict(
+                    color="k",
+                    ls="-.",
+                    lw=1.5,
+                    marker="x",
+                    markersize=5,
+                    markevery=max(1, int(_smask.sum()) // 10),
+                    label=_s_label,
+                )
                 ax1.loglog(pd_arr[_smask] * 1e3, _V_s[_smask] / 1000, **_sm_kw)
                 ax2.loglog(pd_arr[_smask] * 1e3, _EN_s[_smask], **_sm_kw)
 
@@ -1589,7 +1885,7 @@ def main():
                 f"{'E/N (Td)':>12}  {'U (kV)':>12}  {'E (V/m)':>14}  [{_s_label}]"
             )
             print("  " + "-" * 90)
-            _sstep   = max(1, int(_smask.sum()) // 20)
+            _sstep = max(1, int(_smask.sum()) // 20)
             _sindices = np.where(_smask)[0][::_sstep]
             for _j in _sindices:
                 print(
@@ -1603,29 +1899,37 @@ def main():
 
     if args.write_to_file and _file_records:
         import datetime
+
         SEP = "\t"
 
         # Build flat column list: (name, value_fn) where value_fn(j) -> float
         columns = [("pd_bar_mm", lambda j: pd_arr[j] * 1e3)]
         for lbl, p_arr_c, d_arr_c, EN_c, V_c, _rec_mod in _file_records:
             columns += [
-                (f"p_bar[{lbl}]",  lambda j, a=p_arr_c:            a[j]),
-                (f"d_mm[{lbl}]",   lambda j, a=d_arr_c:            a[j] * 1e3),
-                (f"EN_Td[{lbl}]",  lambda j, a=EN_c:               a[j]),
-                (f"U_kV[{lbl}]",   lambda j, a=V_c:                a[j] / 1e3),
-                (f"E_Vm[{lbl}]",   lambda j, a=V_c, b=d_arr_c:
-                     a[j] / b[j] if np.isfinite(a[j]) else np.nan),
+                (f"p_bar[{lbl}]", lambda j, a=p_arr_c: a[j]),
+                (f"d_mm[{lbl}]", lambda j, a=d_arr_c: a[j] * 1e3),
+                (f"EN_Td[{lbl}]", lambda j, a=EN_c: a[j]),
+                (f"U_kV[{lbl}]", lambda j, a=V_c: a[j] / 1e3),
+                (
+                    f"E_Vm[{lbl}]",
+                    lambda j, a=V_c, b=d_arr_c: (
+                        a[j] / b[j] if np.isfinite(a[j]) else np.nan
+                    ),
+                ),
             ]
 
         if _plot_aed:
             for lbl, p_arr_c, d_arr_c, EN_c, V_c, _rec_mod in _file_records:
-                columns.append((
-                    f"ionization_integral[{lbl}]",
-                    lambda j, _EN=EN_c, _p=p_arr_c, _d=d_arr_c, _m=_rec_mod: (
-                        _aed_integral(_EN[j], _p[j], _d[j], _m)
-                        if np.isfinite(_EN[j]) else np.nan
+                columns.append(
+                    (
+                        f"ionization_integral[{lbl}]",
+                        lambda j, _EN=EN_c, _p=p_arr_c, _d=d_arr_c, _m=_rec_mod: (
+                            _aed_integral(_EN[j], _p[j], _d[j], _m)
+                            if np.isfinite(_EN[j])
+                            else np.nan
+                        ),
                     )
-                ))
+                )
 
         # Alpha=eta crossover columns (one group per pressure where a root exists)
         for p_val, en_c in _en_cross.items():
@@ -1633,20 +1937,38 @@ def main():
                 continue
             lbl = f"alpha=eta, p={p_val} bar"
             columns += [
-                (f"p_bar[{lbl}]",  lambda j, _p=p_val:                      _p),
-                (f"d_mm[{lbl}]",   lambda j, _p=p_val:                      pd_arr[j] / _p * 1e3),
-                (f"EN_Td[{lbl}]",  lambda j, _en=en_c:                      _en),
-                (f"U_kV[{lbl}]",   lambda j, _en=en_c, _T=args.T:           _en * pd_arr[j] * 1e-16 / (_kB * _T) / 1e3),
-                (f"E_Vm[{lbl}]",   lambda j, _en=en_c, _p=p_val, _T=args.T: _en * _p * 1e5 / (_kB * _T) * 1e-21),
+                (f"p_bar[{lbl}]", lambda j, _p=p_val: _p),
+                (f"d_mm[{lbl}]", lambda j, _p=p_val: pd_arr[j] / _p * 1e3),
+                (f"EN_Td[{lbl}]", lambda j, _en=en_c: _en),
+                (
+                    f"U_kV[{lbl}]",
+                    lambda j, _en=en_c, _T=args.T: _en
+                    * pd_arr[j]
+                    * 1e-16
+                    / (_kB * _T)
+                    / 1e3,
+                ),
+                (
+                    f"E_Vm[{lbl}]",
+                    lambda j, _en=en_c, _p=p_val, _T=args.T: _en
+                    * _p
+                    * 1e5
+                    / (_kB * _T)
+                    * 1e-21,
+                ),
             ]
 
         # Streamer criterion columns
         for _slbl, _sp_arr, _sd_arr, _sEN, _sV in _streamer_records:
             columns += [
-                (f"EN_Td[{_slbl}]", lambda j, a=_sEN:              a[j]),
-                (f"U_kV[{_slbl}]",  lambda j, a=_sV:               a[j] / 1e3),
-                (f"E_Vm[{_slbl}]",  lambda j, a=_sV, b=_sd_arr:
-                     a[j] / b[j] if np.isfinite(a[j]) else np.nan),
+                (f"EN_Td[{_slbl}]", lambda j, a=_sEN: a[j]),
+                (f"U_kV[{_slbl}]", lambda j, a=_sV: a[j] / 1e3),
+                (
+                    f"E_Vm[{_slbl}]",
+                    lambda j, a=_sV, b=_sd_arr: (
+                        a[j] / b[j] if np.isfinite(a[j]) else np.nan
+                    ),
+                ),
             ]
 
         # Column width: wide enough for every header name plus a 2-char margin,
@@ -1658,23 +1980,39 @@ def main():
 
         try:
             _repo_dir = os.path.dirname(os.path.abspath(__file__))
-            _git_hash = subprocess.check_output(
-                ['git', 'rev-parse', '--short', 'HEAD'],
-                cwd=_repo_dir, stderr=subprocess.DEVNULL,
-            ).decode().strip()
-            _dirty = subprocess.check_output(
-                ['git', 'status', '--porcelain',
-                 os.path.abspath(__file__),
-                 os.path.abspath(args.mechanism)],
-                cwd=_repo_dir, stderr=subprocess.DEVNULL,
-            ).decode().strip()
-            git_str = _git_hash + (' (dirty)' if _dirty else '')
+            _git_hash = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=_repo_dir,
+                    stderr=subprocess.DEVNULL,
+                )
+                .decode()
+                .strip()
+            )
+            _dirty = (
+                subprocess.check_output(
+                    [
+                        "git",
+                        "status",
+                        "--porcelain",
+                        os.path.abspath(__file__),
+                        os.path.abspath(args.mechanism),
+                    ],
+                    cwd=_repo_dir,
+                    stderr=subprocess.DEVNULL,
+                )
+                .decode()
+                .strip()
+            )
+            git_str = _git_hash + (" (dirty)" if _dirty else "")
         except Exception:
-            git_str = 'unavailable'
+            git_str = "unavailable"
 
         with open(args.write_to_file, "w") as fh:
             fh.write("# --- METADATA ---\n")
-            fh.write(f"# Date:    {datetime.datetime.now().isoformat(timespec='seconds')}\n")
+            fh.write(
+                f"# Date:    {datetime.datetime.now().isoformat(timespec='seconds')}\n"
+            )
             fh.write(f"# Git:     {git_str}\n")
             fh.write(f"# Command: {' '.join(_sys.argv)}\n")
             fh.write("# ---\n")
@@ -1682,15 +2020,17 @@ def main():
             fh.write(f"# Temperature: {args.T} K\n")
             p_str = ", ".join(f"{p} bar" for p in args.p)
             fh.write(f"# Pressures:   {p_str}\n")
-            cfg_labels = ", ".join(d.get('label', 'Baseline') for d in raw_dicts)
+            cfg_labels = ", ".join(d.get("label", "Baseline") for d in raw_dicts)
             fh.write(f"# Configs:     {cfg_labels}\n")
             fh.write(f"# Field type:  {_field_dist.field_type}\n")
             fh.write(f"# Lambda:      {args.lam} s⁻¹\n")
             fh.write(f"# Method:      {args.method}\n")
-            fh.write(f"# Stepping:    N_min={_N_min}, N_max={_N_max}, tol={_dx_tol:.3g}\n")
-            if _field_dist.field_type != 'uniform':
+            fh.write(
+                f"# Stepping:    N_min={_N_min}, N_max={_N_max}, tol={_dx_tol:.3g}\n"
+            )
+            if _field_dist.field_type != "uniform":
                 fh.write(f"# Sphere R:    {_field_dist.sphere_R*1e3:.4g} mm\n")
-            if _field_dist.field_type == 'sphere-plane':
+            if _field_dist.field_type == "sphere-plane":
                 fh.write(
                     f"# Polarity:    sphere=positive → sphere is anode (+),  "
                     f"sphere=negative → sphere is cathode (−)\n"
@@ -1717,14 +2057,16 @@ def main():
             for p, en_c in _en_cross.items():
                 if en_c is None:
                     continue
-                lbl = (rf"$\alpha=\eta$, p={p} bar ({en_c:.1f} Td)"
-                       if multi_p else
-                       rf"$\alpha=\eta$  ({en_c:.1f} Td)")
-                ax2.axhline(en_c, color='k', ls=':', lw=1.5, label=lbl)
+                lbl = (
+                    rf"$\alpha=\eta$, p={p} bar ({en_c:.1f} Td)"
+                    if multi_p
+                    else rf"$\alpha=\eta$  ({en_c:.1f} Td)"
+                )
+                ax2.axhline(en_c, color="k", ls=":", lw=1.5, label=lbl)
 
         if ax3 is not None and _all_V_pos:
-            _ref_cfg_label  = raw_dicts[0].get('label', 'Baseline')
-            n_settings      = len(args.p) + len(args.d)
+            _ref_cfg_label = raw_dicts[0].get("label", "Baseline")
+            n_settings = len(args.p) + len(args.d)
             for curve_idx, (label, _p_arr, _d_arr, _cm) in enumerate(curve_specs):
                 # Extract config label and p/d setting from the curve label.
                 # Label format: "<config.label>, p=X bar" or "<config.label>, d=X mm"
@@ -1743,19 +2085,24 @@ def main():
                     continue
                 V_k = _all_V_pos[label]
                 V_b = _all_V_pos[ref_label]
-                with np.errstate(invalid='ignore', divide='ignore'):
+                with np.errstate(invalid="ignore", divide="ignore"):
                     ratio = V_k / V_b
                 mask_r = np.isfinite(ratio)
                 if not np.any(mask_r):
                     continue
                 ratio_label = f"{cfg_lbl} ({setting})" if n_settings > 1 else cfg_lbl
-                marker    = _markers[curve_idx % len(_markers)]
+                marker = _markers[curve_idx % len(_markers)]
                 markevery = max(1, mask_r.sum() // 15)
-                ax3.semilogx(pd_arr[mask_r] * 1e3, ratio[mask_r],
-                             label=ratio_label,
-                             color=_curve_color.get(label),
-                             marker=marker, markevery=markevery, markersize=6)
-            ax3.axhline(1.0, color='k', ls='--', lw=1.0)
+                ax3.semilogx(
+                    pd_arr[mask_r] * 1e3,
+                    ratio[mask_r],
+                    label=ratio_label,
+                    color=_curve_color.get(label),
+                    marker=marker,
+                    markevery=markevery,
+                    markersize=6,
+                )
+            ax3.axhline(1.0, color="k", ls="--", lw=1.0)
             ax3.set_xlabel("p·d  (bar·mm)")
             ax3.set_ylabel(rf"$U / U_{{\mathrm{{{_ref_cfg_label}}}}}$")
             ax3.set_title(f"Voltage ratio vs. {_ref_cfg_label!r}")
@@ -1778,6 +2125,7 @@ def main():
 
         if args.save_subplots:
             import matplotlib.transforms as _mtrans
+
             mech_stem = os.path.splitext(mech_name)[0]
 
             # Panels: (primary_ax, twin_ax_or_None, output_filename)

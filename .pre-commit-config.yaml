@@ -1,0 +1,43 @@
+# Raw reference data (BOLSIG+ / cross-section / Zheleznyak tables) must be
+# left byte-for-byte as provided by their source -- exclude it from every
+# whitespace/EOF-rewriting hook below. Source files (.py, .json, .rst, ...)
+# are not affected.
+exclude: ^Air/.*\.(txt|dat)$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: check-merge-conflict
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+
+  - repo: local
+    hooks:
+      - id: sphinx-build
+        name: sphinx docs build
+        description: >
+          Build the Sphinx documentation locally and fail the commit if
+          Sphinx reports errors (broken references, autodoc import
+          failures, malformed RST, etc.). Uses the "dummy" builder, which
+          runs the full build/autodoc/reference-resolution pipeline but
+          writes no output files, so the working tree is never left dirty.
+        entry: python3 -m sphinx -b dummy -q Docs /tmp/incept1d-docs-precommit
+        language: system
+        pass_filenames: false
+        files: ^(Docs/.*|.*\.py)$

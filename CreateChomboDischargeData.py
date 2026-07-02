@@ -50,6 +50,7 @@ from Reactions import parse_reaction
 # Modifier / JSON config loading
 # ---------------------------------------------------------------------------
 
+
 def _load_modifier(modifier_path, config_label=None):
     """Return (pre_exec_vars, reaction_multipliers) from a modifier JSON file.
 
@@ -61,10 +62,10 @@ def _load_modifier(modifier_path, config_label=None):
     with open(modifier_path) as f:
         data = json.load(f)
 
-    if 'configurations' in data:
-        configs = data['configurations']
+    if "configurations" in data:
+        configs = data["configurations"]
         if config_label is not None:
-            matches = [c for c in configs if c.get('label') == config_label]
+            matches = [c for c in configs if c.get("label") == config_label]
             if not matches:
                 raise ValueError(
                     f"No configuration with label '{config_label}' in {modifier_path}. "
@@ -77,19 +78,23 @@ def _load_modifier(modifier_path, config_label=None):
         cfg = data
 
     pre_vars = {}
-    cs = cfg.get('cross_sections')
+    cs = cfg.get("cross_sections")
     if cs is not None:
         if not os.path.isabs(cs):
             candidate = os.path.join(mod_dir, cs)
             cs = candidate if os.path.isfile(candidate) else cs
-        pre_vars['BOLSIG_FILE'] = cs
+        pre_vars["BOLSIG_FILE"] = cs
 
-    for attr, key in [('_GAMMA0', 'gamma0'), ('_GAMMA1', 'gamma1'),
-                      ('_EREF',  'eref'),   ('_BETA',  'beta')]:
+    for attr, key in [
+        ("_GAMMA0", "gamma0"),
+        ("_GAMMA1", "gamma1"),
+        ("_EREF", "eref"),
+        ("_BETA", "beta"),
+    ]:
         if cfg.get(key) is not None:
             pre_vars[attr] = cfg[key]
 
-    multipliers = cfg.get('reaction_multipliers', {})
+    multipliers = cfg.get("reaction_multipliers", {})
     return pre_vars, multipliers
 
 
@@ -97,17 +102,24 @@ def _load_modifier(modifier_path, config_label=None):
 # Mechanism loading
 # ---------------------------------------------------------------------------
 
+
 def load_mechanism(mech_path, pre_exec_vars=None):
     """exec the mechanism file and return its namespace as a SimpleNamespace."""
     with open(mech_path) as f:
         code = f.read()
 
-    namespace = {'__file__': os.path.abspath(mech_path)}
+    namespace = {"__file__": os.path.abspath(mech_path)}
     namespace.update(pre_exec_vars or {})
-    exec(compile(code, mech_path, 'exec'), namespace)
+    exec(compile(code, mech_path, "exec"), namespace)
     mod = types.SimpleNamespace(**namespace)
 
-    for attr in ('SPECIES', 'ELECTRON_INDEX', 'REACTIONS', 'ElectronMeanEnergy', 'get_V'):
+    for attr in (
+        "SPECIES",
+        "ELECTRON_INDEX",
+        "REACTIONS",
+        "ElectronMeanEnergy",
+        "get_V",
+    ):
         if not hasattr(mod, attr):
             raise AttributeError(
                 f"Mechanism '{mech_path}' does not define '{attr}'. "
@@ -120,6 +132,7 @@ def load_mechanism(mech_path, pre_exec_vars=None):
 # Neutral-density factor helpers
 # ---------------------------------------------------------------------------
 
+
 def _neutral_factor(rxn_str, species_set, mod, N):
     """Return the neutral density factor from the LHS of a reaction string.
 
@@ -131,10 +144,10 @@ def _neutral_factor(rxn_str, species_set, mod, N):
     for name, count in reactants.items():
         if name in species_set:
             continue
-        if name == 'M':
-            factor *= N ** count
+        if name == "M":
+            factor *= N**count
         else:
-            mf_attr = f'x{name}'
+            mf_attr = f"x{name}"
             xX = getattr(mod, mf_attr, None)
             if xX is None:
                 raise RuntimeError(
@@ -151,7 +164,7 @@ def _is_three_body(rxn_str, species_set):
     for name, count in reactants.items():
         if name in species_set:
             continue
-        if name == 'M' or count > 1:
+        if name == "M" or count > 1:
             return True
     return False
 
@@ -163,11 +176,11 @@ def _neutral_reactant_description(rxn_str, species_set, mod, N):
     for name, count in reactants.items():
         if name in species_set:
             continue
-        if name == 'M':
+        if name == "M":
             exp = f"^{count}" if count > 1 else ""
             parts.append(f"N(p,T){exp}")
         else:
-            mf_attr = f'x{name}'
+            mf_attr = f"x{name}"
             xX = getattr(mod, mf_attr, None)
             xstr = f"x{name}" if xX is None else f"x{name}={xX}"
             exp = f"^{count}" if count > 1 else ""
@@ -178,6 +191,7 @@ def _neutral_reactant_description(rxn_str, species_set, mod, N):
 # ---------------------------------------------------------------------------
 # Data generation
 # ---------------------------------------------------------------------------
+
 
 def generate(mod, EN_arr, p, T, reaction_multipliers):
     """Return (columns, headers) for all EN points.
@@ -209,8 +223,10 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
         V = mod.get_V(en, p, T)
         muN_all[idx] = np.abs(np.diag(V)) / (en * 1e-21)
 
-    norm_mult = {rxn_str.replace(' ', '').replace('→', '->'): v
-                 for rxn_str, v in reaction_multipliers.items()}
+    norm_mult = {
+        rxn_str.replace(" ", "").replace("→", "->"): v
+        for rxn_str, v in reaction_multipliers.items()
+    }
 
     ki_cols = []
     ki_hdrs = []
@@ -218,7 +234,7 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
         three_body = _is_three_body(rxn_str, species_set)
         units = "m^6/s" if three_body else "m^3/s"
         nf = _neutral_factor(rxn_str, species_set, mod, N)
-        mult = norm_mult.get(rxn_str.replace(' ', ''), 1.0)
+        mult = norm_mult.get(rxn_str.replace(" ", ""), 1.0)
         ki_col = np.zeros(n_EN)
         for idx, en in enumerate(EN_arr):
             assembled = rate_fn(en, p, T)
@@ -240,10 +256,10 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
 
     v_e = muN_all[:, mod.ELECTRON_INDEX] * EN_arr * 1e-21
 
-    alpha_col  = np.zeros(n_EN)
-    eta_col    = np.zeros(n_EN)
+    alpha_col = np.zeros(n_EN)
+    eta_col = np.zeros(n_EN)
     alpha_rxns = []
-    eta_rxns   = []
+    eta_rxns = []
     for rxn_idx, (rxn_str, _) in enumerate(mod.REACTIONS):
         reactants, products = parse_reaction(rxn_str)
         drivers = [s for s in reactants if s in species_set]
@@ -258,9 +274,9 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
             eta_col += assembled
             eta_rxns.append(rxn_str)
     alpha_col /= v_e
-    eta_col   /= v_e
+    eta_col /= v_e
     alpha_col /= N
-    eta_col   /= N
+    eta_col /= N
 
     # --- Assemble in the specified column order ---
 
@@ -291,7 +307,9 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
         columns.append(muN_all[:, i])
         headers.append(f"mu*N for {sp} [m^-1 V^-1 s^-1]")
         columns.append(muN_all[:, i] * DN_factor)
-        headers.append(f"D*N for {sp} [m^-1 s^-1] (Einstein: D*N = mu*N * kB*T/Q, T={T} K)")
+        headers.append(
+            f"D*N for {sp} [m^-1 s^-1] (Einstein: D*N = mu*N * kB*T/Q, T={T} K)"
+        )
 
     for ki_col, hdr in zip(ki_cols, ki_hdrs):
         columns.append(ki_col)
@@ -300,12 +318,22 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
     return columns, headers
 
 
-def build_header(mech_path, modifier_path, config_label, p, T, headers,
-                 pre_exec_vars=None, EN_min=None, EN_max=None, num_EN=None,
-                 species=None):
+def build_header(
+    mech_path,
+    modifier_path,
+    config_label,
+    p,
+    T,
+    headers,
+    pre_exec_vars=None,
+    EN_min=None,
+    EN_max=None,
+    num_EN=None,
+    species=None,
+):
     """Assemble the full file header string."""
     N = p * 1e5 / (kB * T)
-    bolsig = (pre_exec_vars or {}).get('BOLSIG_FILE', '(module default)')
+    bolsig = (pre_exec_vars or {}).get("BOLSIG_FILE", "(module default)")
     lines = [
         "chombo-discharge transport coefficient table",
         f"Generated  : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -343,6 +371,7 @@ def build_header(mech_path, modifier_path, config_label, p, T, headers,
 # Plotting
 # ---------------------------------------------------------------------------
 
+
 def plot_results(mod, EN_arr, columns, p, T, mech_path):
     """Generate a 5-subplot transport coefficient figure."""
     N = p * 1e5 / (kB * T)
@@ -351,10 +380,10 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
 
     fig = plt.figure(figsize=(14, 13))
     gs = fig.add_gridspec(3, 2, hspace=0.38, wspace=0.28)
-    ax_rates    = fig.add_subplot(gs[0, :])   # full top row
-    ax_mu       = fig.add_subplot(gs[1, 0])
-    ax_diff     = fig.add_subplot(gs[1, 1])
-    ax_energy   = fig.add_subplot(gs[2, 0])
+    ax_rates = fig.add_subplot(gs[0, :])  # full top row
+    ax_mu = fig.add_subplot(gs[1, 0])
+    ax_diff = fig.add_subplot(gs[1, 1])
+    ax_energy = fig.add_subplot(gs[2, 0])
     ax_townsend = fig.add_subplot(gs[2, 1])
 
     # ------------------------------------------------------------------ #
@@ -374,20 +403,26 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
         if mask.any():
             ax_rates.loglog(EN_arr[mask], rate_to_plot[mask], label=rxn_str)
 
-    all_rates = np.concatenate([
-        columns[rate_col_start + i] * _neutral_factor(rxn_str, species_set, mod, N) / N
-        for i, (rxn_str, _) in enumerate(mod.REACTIONS)
-    ])
+    all_rates = np.concatenate(
+        [
+            columns[rate_col_start + i]
+            * _neutral_factor(rxn_str, species_set, mod, N)
+            / N
+            for i, (rxn_str, _) in enumerate(mod.REACTIONS)
+        ]
+    )
     y_max = all_rates[all_rates > 0].max() * 2.0
     y_min = y_max * 1e-10
 
     ax_rates.set_xlim(EN_arr[0], EN_arr[-1])
     ax_rates.set_ylim(y_min, y_max)
-    ax_rates.set_xlabel('E/N  [Td]')
-    ax_rates.set_ylabel(r'$k \cdot [\mathrm{neutrals}] \,/\, N \;\;[\mathrm{m}^3\,\mathrm{s}^{-1}]$')
-    ax_rates.set_title('Reaction rates')
-    ax_rates.legend(fontsize=7, loc='best')
-    ax_rates.grid(True, which='both', alpha=0.3)
+    ax_rates.set_xlabel("E/N  [Td]")
+    ax_rates.set_ylabel(
+        r"$k \cdot [\mathrm{neutrals}] \,/\, N \;\;[\mathrm{m}^3\,\mathrm{s}^{-1}]$"
+    )
+    ax_rates.set_title("Reaction rates")
+    ax_rates.legend(fontsize=7, loc="best")
+    ax_rates.grid(True, which="both", alpha=0.3)
 
     # ------------------------------------------------------------------ #
     # Subplot 2: Reduced mobilities  mu*N  [m^-1 V^-1 s^-1]              #
@@ -397,11 +432,11 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
         ax_mu.loglog(EN_arr, columns[mu_col_start + 2 * i], label=sp)
 
     ax_mu.set_xlim(EN_arr[0], EN_arr[-1])
-    ax_mu.set_xlabel('E/N  [Td]')
-    ax_mu.set_ylabel(r'$\mu N \;\;[\mathrm{m}^{-1}\,\mathrm{V}^{-1}\,\mathrm{s}^{-1}]$')
-    ax_mu.set_title('Reduced mobilities')
-    ax_mu.legend(loc='best')
-    ax_mu.grid(True, which='both', alpha=0.3)
+    ax_mu.set_xlabel("E/N  [Td]")
+    ax_mu.set_ylabel(r"$\mu N \;\;[\mathrm{m}^{-1}\,\mathrm{V}^{-1}\,\mathrm{s}^{-1}]$")
+    ax_mu.set_title("Reduced mobilities")
+    ax_mu.legend(loc="best")
+    ax_mu.grid(True, which="both", alpha=0.3)
 
     # ------------------------------------------------------------------ #
     # Subplot 3: Reduced diffusion coefficients  D*N  [m^-1 s^-1]        #
@@ -411,45 +446,49 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
         ax_diff.loglog(EN_arr, columns[dn_col_start + 2 * i], label=sp)
 
     ax_diff.set_xlim(EN_arr[0], EN_arr[-1])
-    ax_diff.set_xlabel('E/N  [Td]')
-    ax_diff.set_ylabel(r'$D N \;\;[\mathrm{m}^{-1}\,\mathrm{s}^{-1}]$')
-    ax_diff.set_title('Reduced diffusion coefficients')
-    ax_diff.legend(loc='best')
-    ax_diff.grid(True, which='both', alpha=0.3)
+    ax_diff.set_xlabel("E/N  [Td]")
+    ax_diff.set_ylabel(r"$D N \;\;[\mathrm{m}^{-1}\,\mathrm{s}^{-1}]$")
+    ax_diff.set_title("Reduced diffusion coefficients")
+    ax_diff.legend(loc="best")
+    ax_diff.grid(True, which="both", alpha=0.3)
 
     # ------------------------------------------------------------------ #
     # Subplot 4: Electron mean energy  [eV]                               #
     # ------------------------------------------------------------------ #
     ax_energy.loglog(EN_arr, columns[3])
     ax_energy.set_xlim(EN_arr[0], EN_arr[-1])
-    ax_energy.set_xlabel('E/N  [Td]')
-    ax_energy.set_ylabel('Mean electron energy  [eV]')
-    ax_energy.set_title('Electron mean energy')
-    ax_energy.grid(True, which='both', alpha=0.3)
+    ax_energy.set_xlabel("E/N  [Td]")
+    ax_energy.set_ylabel("Mean electron energy  [eV]")
+    ax_energy.set_title("Electron mean energy")
+    ax_energy.grid(True, which="both", alpha=0.3)
 
     # ------------------------------------------------------------------ #
     # Subplot 5: Reduced Townsend coefficients alpha/N and eta/N  [m^2]  #
     # ------------------------------------------------------------------ #
     alpha_over_N = columns[1]
-    eta_over_N   = columns[2]
+    eta_over_N = columns[2]
 
     mask_a = alpha_over_N > 0
-    mask_e = eta_over_N   > 0
+    mask_e = eta_over_N > 0
     if mask_a.any():
-        ax_townsend.loglog(EN_arr[mask_a], alpha_over_N[mask_a], label=r'$\alpha/N$  (ionization)')
+        ax_townsend.loglog(
+            EN_arr[mask_a], alpha_over_N[mask_a], label=r"$\alpha/N$  (ionization)"
+        )
     if mask_e.any():
-        ax_townsend.loglog(EN_arr[mask_e], eta_over_N[mask_e],   label=r'$\eta/N$  (attachment)')
+        ax_townsend.loglog(
+            EN_arr[mask_e], eta_over_N[mask_e], label=r"$\eta/N$  (attachment)"
+        )
 
     ax_townsend.set_xlim(EN_arr[0], EN_arr[-1])
-    ax_townsend.set_xlabel('E/N  [Td]')
-    ax_townsend.set_ylabel(r'$\alpha/N,\,\eta/N \;\;[\mathrm{m}^{2}]$')
-    ax_townsend.set_title('Reduced Townsend ionization and attachment coefficients')
-    ax_townsend.legend(loc='best')
-    ax_townsend.grid(True, which='both', alpha=0.3)
+    ax_townsend.set_xlabel("E/N  [Td]")
+    ax_townsend.set_ylabel(r"$\alpha/N,\,\eta/N \;\;[\mathrm{m}^{2}]$")
+    ax_townsend.set_title("Reduced Townsend ionization and attachment coefficients")
+    ax_townsend.legend(loc="best")
+    ax_townsend.grid(True, which="both", alpha=0.3)
 
     mech_name = os.path.basename(mech_path)
     fig.suptitle(
-        f'Transport coefficients — {mech_name},  p = {p} bar,  T = {T} K',
+        f"Transport coefficients — {mech_name},  p = {p} bar,  T = {T} K",
         fontsize=12,
     )
 
@@ -460,19 +499,53 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate chombo-discharge transport data from a mechanism file."
     )
-    parser.add_argument('mechanism', help="Path to mechanism Python file (e.g. Air/Air_Pancheshnyi.py)")
-    parser.add_argument('--modifier',      default=None,   help="Path to modifier JSON file")
-    parser.add_argument('--config-label',  default=None,   help="Label of configuration to use in modifier JSON")
-    parser.add_argument('--min-EN',        type=float, default=1.0,    metavar='TD', help="Minimum E/N in Townsend (default: 1)")
-    parser.add_argument('--max-EN',        type=float, default=1e6,   metavar='TD', help="Maximum E/N in Townsend (default: 1e6)")
-    parser.add_argument('--num-EN',        type=int,   default=1000,               help="Number of E/N points (default: 1000)")
-    parser.add_argument('--pressure',      type=float, default=1.0,     metavar='BAR', help="Gas pressure in bar")
-    parser.add_argument('--temperature',   type=float, default=300.0,   metavar='K',   help="Gas temperature in K")
-    parser.add_argument('--write-to-file', default=None, metavar='FILE', help="Write data to FILE (default: do not write)")
+    parser.add_argument(
+        "mechanism", help="Path to mechanism Python file (e.g. Air/Air_Pancheshnyi.py)"
+    )
+    parser.add_argument("--modifier", default=None, help="Path to modifier JSON file")
+    parser.add_argument(
+        "--config-label",
+        default=None,
+        help="Label of configuration to use in modifier JSON",
+    )
+    parser.add_argument(
+        "--min-EN",
+        type=float,
+        default=1.0,
+        metavar="TD",
+        help="Minimum E/N in Townsend (default: 1)",
+    )
+    parser.add_argument(
+        "--max-EN",
+        type=float,
+        default=1e6,
+        metavar="TD",
+        help="Maximum E/N in Townsend (default: 1e6)",
+    )
+    parser.add_argument(
+        "--num-EN", type=int, default=1000, help="Number of E/N points (default: 1000)"
+    )
+    parser.add_argument(
+        "--pressure", type=float, default=1.0, metavar="BAR", help="Gas pressure in bar"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=300.0,
+        metavar="K",
+        help="Gas temperature in K",
+    )
+    parser.add_argument(
+        "--write-to-file",
+        default=None,
+        metavar="FILE",
+        help="Write data to FILE (default: do not write)",
+    )
     args = parser.parse_args()
 
     write = args.write_to_file is not None
@@ -481,7 +554,9 @@ def main():
     pre_vars = {}
     reaction_multipliers = {}
     if args.modifier:
-        pre_vars, reaction_multipliers = _load_modifier(args.modifier, args.config_label)
+        pre_vars, reaction_multipliers = _load_modifier(
+            args.modifier, args.config_label
+        )
 
     mod = load_mechanism(args.mechanism, pre_vars)
 
@@ -491,23 +566,30 @@ def main():
         args.num_EN,
     )
 
-    columns, headers = generate(mod, EN_arr, args.pressure, args.temperature, reaction_multipliers)
+    columns, headers = generate(
+        mod, EN_arr, args.pressure, args.temperature, reaction_multipliers
+    )
 
     if write:
         header_str = build_header(
-            args.mechanism, args.modifier, args.config_label,
-            args.pressure, args.temperature, headers,
+            args.mechanism,
+            args.modifier,
+            args.config_label,
+            args.pressure,
+            args.temperature,
+            headers,
             pre_exec_vars=pre_vars,
-            EN_min=args.min_EN, EN_max=args.max_EN, num_EN=args.num_EN,
+            EN_min=args.min_EN,
+            EN_max=args.max_EN,
+            num_EN=args.num_EN,
             species=mod.SPECIES,
         )
         data = np.column_stack(columns)
-        np.savetxt(args.output, data, delimiter='\t', header=header_str)
+        np.savetxt(args.output, data, delimiter="\t", header=header_str)
         print(f"Written: {args.output}  ({len(EN_arr)} rows, {data.shape[1]} columns)")
 
-    plot_results(mod, EN_arr, columns, args.pressure, args.temperature,
-                 args.mechanism)
+    plot_results(mod, EN_arr, columns, args.pressure, args.temperature, args.mechanism)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

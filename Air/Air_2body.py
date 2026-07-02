@@ -43,30 +43,33 @@ import math
 import matplotlib.pyplot as plt
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(_HERE, '..'))
+sys.path.insert(0, os.path.join(_HERE, ".."))
 from Constants import kB, Q
-from Reactions import compile_reactions as _compile_reactions, build_R_from_compiled as _build_R_fast
+from Reactions import (
+    compile_reactions as _compile_reactions,
+    build_R_from_compiled as _build_R_fast,
+)
 
 # ---------------------------------------------------------------------------
 # Photoionization constants — two-stream model (Zheleznyak absorption curve)
 # ---------------------------------------------------------------------------
 
-_XI_EXC  = globals().get('_XI_EXC',  0.6)            # Excitation+emission efficiency ν_exc
-_XI_IONI = globals().get('_XI_IONI', 0.1)            # Photoionization efficiency ξ
-_XI_EMIT = globals().get('_XI_EMIT', 0.1)            # Photoemission efficiency ξ
-_PQ_BAR  = globals().get('_PQ_BAR',  30.0 / 750.064) # Quenching pressure: 30 Torr → bar
+_XI_EXC = globals().get("_XI_EXC", 0.6)  # Excitation+emission efficiency ν_exc
+_XI_IONI = globals().get("_XI_IONI", 0.1)  # Photoionization efficiency ξ
+_XI_EMIT = globals().get("_XI_EMIT", 0.1)  # Photoemission efficiency ξ
+_PQ_BAR = globals().get("_PQ_BAR", 30.0 / 750.064)  # Quenching pressure: 30 Torr → bar
 
 # Ion secondary-emission coefficients — configurable via globals().get() injection
-_GAMMA0 = globals().get('_GAMMA0', 1e-6)   # base SEE yield (N2+, O2+)
-_GAMMA1 = globals().get('_GAMMA1', 0.0)    # exponential prefactor
-_EREF   = globals().get('_EREF',   170e7)  # reference field [V/m]
-_BETA   = globals().get('_BETA',   1.0)    # field scaling exponent
+_GAMMA0 = globals().get("_GAMMA0", 1e-6)  # base SEE yield (N2+, O2+)
+_GAMMA1 = globals().get("_GAMMA1", 0.0)  # exponential prefactor
+_EREF = globals().get("_EREF", 170e7)  # reference field [V/m]
+_BETA = globals().get("_BETA", 1.0)  # field scaling exponent
 
 # Mutable module state — set by init_photoionization() at import time
-_N_GAMMA     = None   # number of photon groups
-_kappa_SI    = None   # kappa/pO2 [m⁻¹ Pa⁻¹], shape (N_γ,)
-_g_groups    = None   # photon group fractions, shape (N_γ,), sum = 1
-_CONE_FACTOR = None   # ΔΩ/(4π) = (1 − cos θ_cone) / 2
+_N_GAMMA = None  # number of photon groups
+_kappa_SI = None  # kappa/pO2 [m⁻¹ Pa⁻¹], shape (N_γ,)
+_g_groups = None  # photon group fractions, shape (N_γ,), sum = 1
+_CONE_FACTOR = None  # ΔΩ/(4π) = (1 − cos θ_cone) / 2
 
 
 def init_photoionization(ngroups=3, cone_angle_deg=45.0):
@@ -88,13 +91,15 @@ def init_photoionization(ngroups=3, cone_angle_deg=45.0):
     """
     global _N_GAMMA, _kappa_SI, _g_groups, _CONE_FACTOR
     import sys
+
     sys.path.insert(0, _HERE)
     from Zheleznyak import fit_twostream
+
     kappa, g, _ = fit_twostream(ngroups)
-    _N_GAMMA     = ngroups
-    _kappa_SI    = kappa          # kappa/pO2 [m^-1 Pa^-1] from Zheleznyak fit
-    _g_groups    = g
-    cone_rad     = cone_angle_deg * math.pi / 180.0
+    _N_GAMMA = ngroups
+    _kappa_SI = kappa  # kappa/pO2 [m^-1 Pa^-1] from Zheleznyak fit
+    _g_groups = g
+    cone_rad = cone_angle_deg * math.pi / 180.0
     _CONE_FACTOR = (1.0 - math.cos(cone_rad)) / 2.0
 
 
@@ -104,29 +109,30 @@ init_photoionization()
 # Gas composition
 # ---------------------------------------------------------------------------
 
-xO2 = 0.21   # Mole fraction of O2
-xN2 = 0.79   # Mole fraction of N2
+xO2 = 0.21  # Mole fraction of O2
+xN2 = 0.79  # Mole fraction of N2
 
 # ---------------------------------------------------------------------------
 # Ion transport
 # ---------------------------------------------------------------------------
 
-_N_1bar  = 1E5 / (kB * 300.0)       # Neutral density at 1 bar, 300 K [m^-3]
-ion_muN  = 2E-4 * _N_1bar            # N2+, O2+ reduced mobility mu*N [m^-1 V^-1 s^-1]
-_muN_Om  = 1.2E22                    # O-           reduced mobility mu*N [m^-1 V^-1 s^-1]
-m_O3     = 48 * 1.66053906660E-27    # Ozone (O3) mass [kg]
+_N_1bar = 1e5 / (kB * 300.0)  # Neutral density at 1 bar, 300 K [m^-3]
+ion_muN = 2e-4 * _N_1bar  # N2+, O2+ reduced mobility mu*N [m^-1 V^-1 s^-1]
+_muN_Om = 1.2e22  # O-           reduced mobility mu*N [m^-1 V^-1 s^-1]
+m_O3 = 48 * 1.66053906660e-27  # Ozone (O3) mass [kg]
 
 # ---------------------------------------------------------------------------
 # Species list and electron index
 # ---------------------------------------------------------------------------
 
-SPECIES        = ["e", "N2+", "O2+", "O-", "O2-(exc)", "O2-", "O3-*", "O3-"]
+SPECIES = ["e", "N2+", "O2+", "O-", "O2-(exc)", "O2-", "O3-*", "O3-"]
 ELECTRON_INDEX = 0
-_N_SPECIES     = len(SPECIES)
+_N_SPECIES = len(SPECIES)
 
 # ---------------------------------------------------------------------------
 # BOLSIG+ output file parser
 # ---------------------------------------------------------------------------
+
 
 def _load_bolsig(path):
     """
@@ -149,56 +155,55 @@ def _load_bolsig(path):
         energy_table, mobility_table, diffusion_table,
         n2ionize_table, o2ionize_table, o2dissociate_table
     """
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         raw = f.read()
-    lines = [l.decode('ascii', errors='replace').strip()
-             for l in raw.split(b'\r')]
+    lines = [l.decode("ascii", errors="replace").strip() for l in raw.split(b"\r")]
 
     # --- Section 1 ---
     sec1_rows, in_sec1 = [], False
     for l in lines:
-        if 'R#' in l and 'A1' in l and 'A2' in l:
+        if "R#" in l and "A1" in l and "A2" in l:
             in_sec1 = True
             continue
         if in_sec1:
-            if not l or 'Rate coefficients' in l:
+            if not l or "Rate coefficients" in l:
                 break
             vals = l.split()
-            if vals and vals[0].lstrip('-').isdigit():
+            if vals and vals[0].lstrip("-").isdigit():
                 sec1_rows.append([float(v) for v in vals])
     sec1 = np.array(sec1_rows)
-    EN1    = sec1[:, 1]
+    EN1 = sec1[:, 1]
     energy = sec1[:, 2]
-    muN    = sec1[:, 3]
-    DN     = sec1[:, 4]
+    muN = sec1[:, 3]
+    DN = sec1[:, 4]
 
     # --- Section 2 legend ---
-    legend = {}   # cx_num (int) -> (species, proc_type)
+    legend = {}  # cx_num (int) -> (species, proc_type)
     in_legend = False
     sec2_hdr_idx = None
     for i, l in enumerate(lines):
-        if 'Rate coefficients (m3/s)' in l and 'Inverse' not in l:
+        if "Rate coefficients (m3/s)" in l and "Inverse" not in l:
             in_legend = True
             continue
         if in_legend:
-            if 'R#' in l and 'E/N' in l:
+            if "R#" in l and "E/N" in l:
                 sec2_hdr_idx = i
                 in_legend = False
                 break
             parts = l.split()
-            if parts and parts[0].startswith('C') and parts[0][1:].isdigit():
-                cx   = int(parts[0][1:])
-                sp   = parts[1] if len(parts) > 1 else ''
-                pt   = parts[2] if len(parts) > 2 else ''
+            if parts and parts[0].startswith("C") and parts[0][1:].isdigit():
+                cx = int(parts[0][1:])
+                sp = parts[1] if len(parts) > 1 else ""
+                pt = parts[2] if len(parts) > 2 else ""
                 legend[cx] = (sp, pt)
 
     # --- Section 2 data ---
     sec2_rows = []
-    for l in lines[sec2_hdr_idx + 1:]:
-        if not l or 'Inverse' in l:
+    for l in lines[sec2_hdr_idx + 1 :]:
+        if not l or "Inverse" in l:
             break
         vals = l.split()
-        if not vals or not vals[0].lstrip('-').isdigit():
+        if not vals or not vals[0].lstrip("-").isdigit():
             break
         sec2_rows.append([float(v) for v in vals])
     sec2 = np.array(sec2_rows)
@@ -212,19 +217,21 @@ def _load_bolsig(path):
         col = cx + 2
         if col >= sec2.shape[1]:
             continue
-        if sp == 'N2' and pt == 'Ionization':
+        if sp == "N2" and pt == "Ionization":
             k1_t += sec2[:, col]
-        elif sp == 'O2' and pt == 'Ionization':
+        elif sp == "O2" and pt == "Ionization":
             k2_t += sec2[:, col]
-        elif sp == 'O2' and pt == 'Attachment':
+        elif sp == "O2" and pt == "Attachment":
             k3_t += sec2[:, col]
 
-    return (np.column_stack([EN1, energy]),
-            np.column_stack([EN1, muN]),
-            np.column_stack([EN1, DN]),
-            np.column_stack([EN2, k1_t]),
-            np.column_stack([EN2, k2_t]),
-            np.column_stack([EN2, k3_t]))
+    return (
+        np.column_stack([EN1, energy]),
+        np.column_stack([EN1, muN]),
+        np.column_stack([EN1, DN]),
+        np.column_stack([EN2, k1_t]),
+        np.column_stack([EN2, k2_t]),
+        np.column_stack([EN2, k3_t]),
+    )
 
 
 def _load_lxcat_mobility(path):
@@ -238,13 +245,13 @@ def _load_lxcat_mobility(path):
     np.interp on the resulting table clamps out-of-range queries to the
     nearest boundary value.
     """
-    _N0 = 2.6868e25   # Loschmidt constant [m^-3]
+    _N0 = 2.6868e25  # Loschmidt constant [m^-3]
     rows = []
     in_data = False
     with open(path) as f:
         for line in f:
             stripped = line.strip()
-            if stripped.startswith('----'):
+            if stripped.startswith("----"):
                 if not in_data:
                     in_data = True
                 else:
@@ -254,7 +261,7 @@ def _load_lxcat_mobility(path):
                 parts = stripped.split()
                 if len(parts) == 2:
                     EN_td = float(parts[0])
-                    Ko    = float(parts[1])          # cm^2/(V*s)
+                    Ko = float(parts[1])  # cm^2/(V*s)
                     rows.append([EN_td, Ko * 1e-4 * _N0])
     return np.array(rows)
 
@@ -263,11 +270,16 @@ def _load_lxcat_mobility(path):
 # Cross-section and transport data tables (loaded once at import time)
 # ---------------------------------------------------------------------------
 
-BOLSIG_FILE = globals().get('BOLSIG_FILE', os.path.join(_HERE, "Phelps.txt"))
+BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_HERE, "Phelps.txt"))
 
-(energy_table, mobility_table, diffusion_table,
- n2ionize_table, o2ionize_table,
- o2dissociate_table) = _load_bolsig(BOLSIG_FILE)
+(
+    energy_table,
+    mobility_table,
+    diffusion_table,
+    n2ionize_table,
+    o2ionize_table,
+    o2dissociate_table,
+) = _load_bolsig(BOLSIG_FILE)
 
 _o2m_mobility_table = _load_lxcat_mobility(os.path.join(_HERE, "O2m_mobility.txt"))
 _o3m_mobility_table = _load_lxcat_mobility(os.path.join(_HERE, "O3m_mobility.txt"))
@@ -276,6 +288,7 @@ _o3m_mobility_table = _load_lxcat_mobility(os.path.join(_HERE, "O3m_mobility.txt
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _make_N(p=1.0, T=293.0):
     """
@@ -296,12 +309,13 @@ def _make_N(p=1.0, T=293.0):
     float
         Neutral number density N in m^-3.
     """
-    return p * 1E5 / (kB * T)
+    return p * 1e5 / (kB * T)
 
 
 # ---------------------------------------------------------------------------
 # Transport coefficient functions
 # ---------------------------------------------------------------------------
+
 
 def ElectronMeanEnergy(EN):
     """
@@ -425,6 +439,7 @@ def ElectronDiffusion(EN):
 # Rate coefficient functions k1 – k12
 # ---------------------------------------------------------------------------
 
+
 def k1(EN):
     """
     Rate coefficient for electron-impact ionisation of N2.
@@ -514,10 +529,13 @@ def k45(EN, T=293.0):
         Three-body rate coefficient in m^6 s^-1.
     """
     Te = ElectronTemperature(EN)
-    return (1.4E-29 * (300.0 / Te)
-            * math.exp(-600.0 / T)
-            * math.exp(700.0 * (Te - T) / (Te * T))
-            * 1E-12)
+    return (
+        1.4e-29
+        * (300.0 / Te)
+        * math.exp(-600.0 / T)
+        * math.exp(700.0 * (Te - T) / (Te * T))
+        * 1e-12
+    )
 
 
 def k4(EN, T=293.0):
@@ -566,7 +584,7 @@ def k5(EN):
     float
         Autodetachment rate in s^-1.
     """
-    return 1E10
+    return 1e10
 
 
 def k6(EN):
@@ -587,7 +605,7 @@ def k6(EN):
     float
         Rate coefficient in m^3 s^-1.
     """
-    return 1E-15
+    return 1e-15
 
 
 def k7(EN):
@@ -606,7 +624,7 @@ def k7(EN):
     float
         Rate coefficient in m^3 s^-1.
     """
-    return 1.24E-17 * math.exp(-pow(179.0 / (8.8 + EN), 2))
+    return 1.24e-17 * math.exp(-pow(179.0 / (8.8 + EN), 2))
 
 
 def k8(EN):
@@ -627,7 +645,7 @@ def k8(EN):
     float
         Rate coefficient in m^3 s^-1.
     """
-    return 6.96E-17 * math.exp(-pow(198.0 / (5.6 + EN), 2))
+    return 6.96e-17 * math.exp(-pow(198.0 / (5.6 + EN), 2))
 
 
 def k9(EN):
@@ -651,7 +669,7 @@ def k9(EN):
     float
         Effective two-body rate coefficient in m^3 s^-1.
     """
-    return 1.1E-42 * math.exp(-pow(EN / 65.0, 2)) * k10(EN) / k11(EN)
+    return 1.1e-42 * math.exp(-pow(EN / 65.0, 2)) * k10(EN) / k11(EN)
 
 
 def k10(EN):
@@ -672,7 +690,7 @@ def k10(EN):
     float
         Autodetachment rate in s^-1.
     """
-    return 1E10
+    return 1e10
 
 
 def k11(EN):
@@ -693,7 +711,7 @@ def k11(EN):
     float
         Rate coefficient in m^3 s^-1.
     """
-    return 1E-15
+    return 1e-15
 
 
 def k12(EN, T=293.0):
@@ -718,7 +736,7 @@ def k12(EN, T=293.0):
     float
         Rate coefficient in m^3 s^-1.
     """
-    u = O3mMobility(EN) * EN * 1E-21                        # O3- drift speed [m/s]
+    u = O3mMobility(EN) * EN * 1e-21  # O3- drift speed [m/s]
     eps = (1.5 * kB * T + 0.25 * math.pi * m_O3 * u**2) / Q  # Mean ion energy [eV]
 
     #    return 1E-18 * math.exp(-1.5 / eps)
@@ -748,8 +766,8 @@ def alpha(EN, p=1.0, T=293.0):
     """
     N = _make_N(p, T)
     K1 = k1(EN) * xN2 * N
-    K2 = k2(EN) * xO2 * N    
-    return (K1 + K2) / (ElectronMobility(EN) * EN * 1E-21)
+    K2 = k2(EN) * xO2 * N
+    return (K1 + K2) / (ElectronMobility(EN) * EN * 1e-21)
 
 
 def eta(EN, p=1.0, T=293.0):
@@ -775,10 +793,10 @@ def eta(EN, p=1.0, T=293.0):
     float
         Effective Townsend attachment coefficient in m^-1.
     """
-    N  = _make_N(p, T)
+    N = _make_N(p, T)
     K3 = k3(EN) * xO2 * N
     K4 = k4(EN, T) * xO2 * N
-    return (K3 + K4) / (ElectronMobility(EN) * EN * 1E-21)
+    return (K3 + K4) / (ElectronMobility(EN) * EN * 1e-21)
 
 
 # ---------------------------------------------------------------------------
@@ -786,18 +804,18 @@ def eta(EN, p=1.0, T=293.0):
 # ---------------------------------------------------------------------------
 
 REACTIONS = [
-    ("e + N2 -> 2e + N2+",               lambda EN, p, T: k1(EN)     * xN2 * _make_N(p, T)),
-    ("e + O2 -> 2e + O2+",               lambda EN, p, T: k2(EN)     * xO2 * _make_N(p, T)),
-    ("e + O2 -> O- + O",                 lambda EN, p, T: k3(EN)     * xO2 * _make_N(p, T)),
-    ("e + O2 -> O2-(exc)",               lambda EN, p, T: k4(EN, T)  * xO2 * _make_N(p, T)),
-    ("O2-(exc) -> e + O2",               lambda EN, p, T: k5(EN)),
-    ("O2-(exc) + O2 -> O2- + O2",        lambda EN, p, T: k6(EN)     * xO2 * _make_N(p, T)),
-    ("O2- + O2 -> e + 2O2",              lambda EN, p, T: k7(EN)     * _make_N(p, T)),
-    ("O- + O2 -> O + O2-",               lambda EN, p, T: k8(EN)     * xO2 * _make_N(p, T)),
-    ("O- + O2 -> O3-*",                  lambda EN, p, T: k9(EN)     * xO2 * _make_N(p, T)),
-    ("O3-* -> O- + O2",                  lambda EN, p, T: k10(EN)),
-    ("O3-* + M -> O3- + M",              lambda EN, p, T: k11(EN)    * _make_N(p, T)),
-    ("O3- + O2 -> O- + 2O2",             lambda EN, p, T: k12(EN, T) * xO2 * _make_N(p, T)),
+    ("e + N2 -> 2e + N2+", lambda EN, p, T: k1(EN) * xN2 * _make_N(p, T)),
+    ("e + O2 -> 2e + O2+", lambda EN, p, T: k2(EN) * xO2 * _make_N(p, T)),
+    ("e + O2 -> O- + O", lambda EN, p, T: k3(EN) * xO2 * _make_N(p, T)),
+    ("e + O2 -> O2-(exc)", lambda EN, p, T: k4(EN, T) * xO2 * _make_N(p, T)),
+    ("O2-(exc) -> e + O2", lambda EN, p, T: k5(EN)),
+    ("O2-(exc) + O2 -> O2- + O2", lambda EN, p, T: k6(EN) * xO2 * _make_N(p, T)),
+    ("O2- + O2 -> e + 2O2", lambda EN, p, T: k7(EN) * _make_N(p, T)),
+    ("O- + O2 -> O + O2-", lambda EN, p, T: k8(EN) * xO2 * _make_N(p, T)),
+    ("O- + O2 -> O3-*", lambda EN, p, T: k9(EN) * xO2 * _make_N(p, T)),
+    ("O3-* -> O- + O2", lambda EN, p, T: k10(EN)),
+    ("O3-* + M -> O3- + M", lambda EN, p, T: k11(EN) * _make_N(p, T)),
+    ("O3- + O2 -> O- + 2O2", lambda EN, p, T: k12(EN, T) * xO2 * _make_N(p, T)),
 ]
 
 _COMPILED_REACTIONS = _compile_reactions(REACTIONS, SPECIES)
@@ -872,23 +890,26 @@ def get_V(EN, p=1.0, T=293.0):
     numpy.ndarray, shape (8, 8)
         Diagonal drift-velocity matrix V in m/s.
     """
-    Z_diag = np.array([-1., +1., +1., -1., -1., -1., -1., -1.])
-    muN = np.array([
-        ElectronMobility(EN),   # 0: e
-        ion_muN,                # 1: N2+
-        ion_muN,                # 2: O2+
-        _muN_Om,                # 3: O-
-        O2mMobility(EN),        # 4: O2-(exc)
-        O2mMobility(EN),        # 5: O2-
-        O3mMobility(EN),        # 6: O3-*
-        O3mMobility(EN),        # 7: O3-
-    ])
-    return np.diag(-Z_diag * muN * EN * 1E-21)
+    Z_diag = np.array([-1.0, +1.0, +1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+    muN = np.array(
+        [
+            ElectronMobility(EN),  # 0: e
+            ion_muN,  # 1: N2+
+            ion_muN,  # 2: O2+
+            _muN_Om,  # 3: O-
+            O2mMobility(EN),  # 4: O2-(exc)
+            O2mMobility(EN),  # 5: O2-
+            O3mMobility(EN),  # 6: O3-*
+            O3mMobility(EN),  # 7: O3-
+        ]
+    )
+    return np.diag(-Z_diag * muN * EN * 1e-21)
 
 
 # ---------------------------------------------------------------------------
 # Row-selection matrices — required by the determinant inception criterion
 # ---------------------------------------------------------------------------
+
 
 def get_Pi_e():
     """
@@ -920,8 +941,8 @@ def get_Pi_plus():
         Two one-hot rows, one per positive-ion species.
     """
     M = np.zeros((2, _N_SPECIES))
-    M[0, 1] = 1.0   # N2+
-    M[1, 2] = 1.0   # O2+
+    M[0, 1] = 1.0  # N2+
+    M[1, 2] = 1.0  # O2+
     return M
 
 
@@ -975,8 +996,8 @@ def get_gamma_plus(EN, p, T):
     g = np.zeros(2)
     if E > 0.0:
         factor = np.exp(-_EREF / (_BETA * E))
-        g[0] = _GAMMA0 + _GAMMA1 * factor   # N2+
-        g[1] = _GAMMA0 + _GAMMA1 * factor   # O2+
+        g[0] = _GAMMA0 + _GAMMA1 * factor  # N2+
+        g[1] = _GAMMA0 + _GAMMA1 * factor  # O2+
     return g
 
 
@@ -985,8 +1006,8 @@ def get_gamma_plus_with(EN, p, T, gamma0=None, gamma1=None, eref=None, beta=None
     gamma parameters.  None → use the module-level defaults (_GAMMA0 etc.)."""
     g0 = gamma0 if gamma0 is not None else _GAMMA0
     g1 = gamma1 if gamma1 is not None else _GAMMA1
-    er = eref   if eref   is not None else _EREF
-    bt = beta   if beta   is not None else _BETA
+    er = eref if eref is not None else _EREF
+    bt = beta if beta is not None else _BETA
     N = _make_N(p, T)
     E = EN * N * 1e-21
     g = np.zeros(2)
@@ -1000,6 +1021,7 @@ def get_gamma_plus_with(EN, p, T, gamma0=None, gamma1=None, eref=None, beta=None
 # Photoionization interface — three-group Eddington (SP₁) model
 # Bourdon et al. (2007) PSST 16 656
 # ---------------------------------------------------------------------------
+
 
 def get_B(EN, p=1.0, T=293.0):
     """
@@ -1030,8 +1052,8 @@ def get_B(EN, p=1.0, T=293.0):
     """
     kappa = get_kappa(p, T)
     B = np.zeros((_N_SPECIES, _N_GAMMA))
-    B[0, :] = _XI_IONI * kappa    # electrons
-    B[2, :] = _XI_IONI * kappa    # O₂⁺
+    B[0, :] = _XI_IONI * kappa  # electrons
+    B[2, :] = _XI_IONI * kappa  # O₂⁺
     return B
 
 
@@ -1070,10 +1092,10 @@ def get_C(EN, p=1.0, T=293.0):
         C_raw acting on species densities n.  The caller must right-multiply
         by V⁻¹ to obtain the flux-space matrix needed by A_aug.
     """
-    N      = _make_N(p, T)
+    N = _make_N(p, T)
     xi_eff = _XI_EXC * _PQ_BAR / (p + _PQ_BAR)
-    K_ion  = k1(EN) * xN2 * N + k2(EN) * xO2 * N
-    eta    = xi_eff * K_ion
+    K_ion = k1(EN) * xN2 * N + k2(EN) * xO2 * N
+    eta = xi_eff * K_ion
     C = np.zeros((_N_GAMMA, _N_SPECIES))
     C[:, ELECTRON_INDEX] = _CONE_FACTOR * eta * _g_groups
     return C
@@ -1145,30 +1167,39 @@ if __name__ == "__main__":
         )
     )
     parser.add_argument(
-        "--p", type=float, default=1.0,
-        help="Gas pressure in bar (default: 1.0)."
+        "--p", type=float, default=1.0, help="Gas pressure in bar (default: 1.0)."
     )
     parser.add_argument(
-        "--T", type=float, default=293.0,
-        help="Gas temperature in Kelvin (default: 293.0)."
+        "--T",
+        type=float,
+        default=293.0,
+        help="Gas temperature in Kelvin (default: 293.0).",
     )
     parser.add_argument(
-        "--write_data", type=str, default=None, metavar="FILE",
+        "--write_data",
+        type=str,
+        default=None,
+        metavar="FILE",
         help=(
             "Write tabulated transport data to FILE.  "
             "If omitted, no data file is written."
-        )
+        ),
     )
     parser.add_argument(
-        "--ngroups", type=int, default=3,
-        help="Number of photon groups for two-stream photoionization (default: 3)."
+        "--ngroups",
+        type=int,
+        default=3,
+        help="Number of photon groups for two-stream photoionization (default: 3).",
     )
     parser.add_argument(
-        "--cone-angle", dest="cone_angle", type=float, default=2.0,
+        "--cone-angle",
+        dest="cone_angle",
+        type=float,
+        default=2.0,
         help=(
             "Half-opening angle of the photon emission cone in degrees (default: 45.0).  "
             "Translated to the spatial factor ΔΩ/(4π) = (1 − cos θ) / 2."
-        )
+        ),
     )
     args = parser.parse_args()
 
@@ -1195,10 +1226,10 @@ if __name__ == "__main__":
     }
 
     numPts = 500
-    EN_arr = np.logspace(1, 3, numPts)   # 10 – 1000 Td
+    EN_arr = np.logspace(1, 3, numPts)  # 10 – 1000 Td
 
     # Accumulate off-diagonal R entries across the E/N range
-    offdiag_data = {}   # (i, j) -> ndarray
+    offdiag_data = {}  # (i, j) -> ndarray
     for en_idx, en in enumerate(EN_arr):
         R = get_R(en, p_val, T_val)
         for i in range(_N_SPECIES):
@@ -1223,29 +1254,30 @@ if __name__ == "__main__":
 
     ax1.set_xlabel("E/N (Td)")
     ax1.set_ylabel("Rate (s$^{-1}$)")
-    ax1.set_title(
-        f"Reaction rates — Air_2body.py,  p = {p_val} bar,  T = {T_val} K"
-    )
+    ax1.set_title(f"Reaction rates — Air_2body.py,  p = {p_val} bar,  T = {T_val} K")
     ax1.legend(loc="best", fontsize=8, ncol=2)
     ax1.grid(True, which="both", ls="--", alpha=0.4)
     ax1.set_ylim(bottom=1e-6)
 
     # --- Second subplot: α, η, and α−η ---
     alpha_arr = np.array([alpha(en, p_val, T_val) for en in EN_arr])
-    eta_arr   = np.array([eta(en,   p_val, T_val) for en in EN_arr])
-    net_arr   = alpha_arr - eta_arr
+    eta_arr = np.array([eta(en, p_val, T_val) for en in EN_arr])
+    net_arr = alpha_arr - eta_arr
 
     ax2.loglog(EN_arr, alpha_arr, label=r"$\alpha$")
-    ax2.loglog(EN_arr, eta_arr,   label=r"$\eta$")
+    ax2.loglog(EN_arr, eta_arr, label=r"$\eta$")
 
     pos_mask = net_arr > 0
     neg_mask = net_arr < 0
     if np.any(pos_mask):
-        ax2.loglog(EN_arr[pos_mask],  net_arr[pos_mask],  "k-",
-                   label=r"$\alpha - \eta$")
+        ax2.loglog(EN_arr[pos_mask], net_arr[pos_mask], "k-", label=r"$\alpha - \eta$")
     if np.any(neg_mask):
-        ax2.loglog(EN_arr[neg_mask], -net_arr[neg_mask], "k--",
-                   label=r"$\eta - \alpha$  ($\eta > \alpha$ region)")
+        ax2.loglog(
+            EN_arr[neg_mask],
+            -net_arr[neg_mask],
+            "k--",
+            label=r"$\eta - \alpha$  ($\eta > \alpha$ region)",
+        )
 
     ax2.set_xlabel("E/N (Td)")
     ax2.set_ylabel(r"Townsend coefficient (m$^{-1}$)")
@@ -1260,18 +1292,18 @@ if __name__ == "__main__":
         numPts_file = 1500
         EN_file = np.logspace(1, 2, numPts_file)
 
-        K1_f  = np.array([k1(en)        * xN2 * N_val for en in EN_file])
-        K2_f  = np.array([k2(en)        * xO2 * N_val for en in EN_file])
-        K3_f  = np.array([k3(en)        * xO2 * N_val for en in EN_file])
-        K4_f  = np.array([k4(en, T_val) * xO2 * N_val for en in EN_file])
-        K5_f  = np.array([k5(en)                       for en in EN_file])
-        K6_f  = np.array([k6(en)        * xO2 * N_val for en in EN_file])
-        K7_f  = np.array([k7(en)        * xO2 * N_val for en in EN_file])
-        K8_f  = np.array([k8(en)        * xO2 * N_val for en in EN_file])
-        K9_f  = np.array([k9(en)        * xO2 * N_val for en in EN_file])
-        K10_f = np.array([k10(en)                      for en in EN_file])
-        K11_f = np.array([k11(en)       * N_val        for en in EN_file])
-        K12_f = np.array([k12(en, T_val)* xO2 * N_val for en in EN_file])
+        K1_f = np.array([k1(en) * xN2 * N_val for en in EN_file])
+        K2_f = np.array([k2(en) * xO2 * N_val for en in EN_file])
+        K3_f = np.array([k3(en) * xO2 * N_val for en in EN_file])
+        K4_f = np.array([k4(en, T_val) * xO2 * N_val for en in EN_file])
+        K5_f = np.array([k5(en) for en in EN_file])
+        K6_f = np.array([k6(en) * xO2 * N_val for en in EN_file])
+        K7_f = np.array([k7(en) * xO2 * N_val for en in EN_file])
+        K8_f = np.array([k8(en) * xO2 * N_val for en in EN_file])
+        K9_f = np.array([k9(en) * xO2 * N_val for en in EN_file])
+        K10_f = np.array([k10(en) for en in EN_file])
+        K11_f = np.array([k11(en) * N_val for en in EN_file])
+        K12_f = np.array([k12(en, T_val) * xO2 * N_val for en in EN_file])
         header = (
             f"Transport data for N2/O2 air (80% N2, 20% O2) "
             f"at {p_val} bar, {T_val} K\n"
@@ -1293,14 +1325,23 @@ if __name__ == "__main__":
         )
         np.savetxt(
             args.write_data,
-            np.column_stack((
-                EN_file,
-                K1_f / p_val, K2_f / p_val, K3_f / p_val, K4_f / p_val,
-                K5_f,
-                K6_f / p_val, K7_f / p_val, K8_f / p_val, K9_f / p_val,
-                K10_f,
-                K11_f / p_val, K12_f / p_val,
-            )),
+            np.column_stack(
+                (
+                    EN_file,
+                    K1_f / p_val,
+                    K2_f / p_val,
+                    K3_f / p_val,
+                    K4_f / p_val,
+                    K5_f,
+                    K6_f / p_val,
+                    K7_f / p_val,
+                    K8_f / p_val,
+                    K9_f / p_val,
+                    K10_f,
+                    K11_f / p_val,
+                    K12_f / p_val,
+                )
+            ),
             header=header,
         )
         print(f"Wrote {args.write_data}")

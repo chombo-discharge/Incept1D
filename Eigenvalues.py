@@ -114,8 +114,8 @@ def compute_eigenvalues(mod, EN_range, p, T):
     numpy.ndarray, shape (M, N), dtype complex
         Tracked eigenvalues.
     """
-    n      = len(mod.SPECIES)
-    n_EN   = len(EN_range)
+    n = len(mod.SPECIES)
+    n_EN = len(EN_range)
     eigvals = np.zeros((n_EN, n), dtype=complex)
 
     # Scan high→low so the ionisation mode (unambiguously the largest real
@@ -123,9 +123,9 @@ def compute_eigenvalues(mod, EN_range, p, T):
     # structural zero eigenvalues that exist because columns 1 and 2 of R are
     # identically zero (N2+, O2+ have no off-diagonal source reactions).
     for i, EN in enumerate(EN_range[::-1]):
-        R    = mod.get_R(EN, p, T)
-        V    = mod.get_V(EN, p, T)
-        A    = R @ np.linalg.inv(V)
+        R = mod.get_R(EN, p, T)
+        V = mod.get_V(EN, p, T)
+        A = R @ np.linalg.inv(V)
         eigs = np.linalg.eigvals(A)
 
         if i == 0:
@@ -158,8 +158,8 @@ def compute_pressure_scan(mod, EN_range, pressures, T, eig_index):
     numpy.ndarray, shape (M, P)
         Re(λ_{eig_index} / N) for each (E/N, pressure) pair, in m².
     """
-    n_EN   = len(EN_range)
-    n_p    = len(pressures)
+    n_EN = len(EN_range)
+    n_p = len(pressures)
     result = np.zeros((n_EN, n_p))
 
     for pi, p in enumerate(pressures):
@@ -170,15 +170,19 @@ def compute_pressure_scan(mod, EN_range, pressures, T, eig_index):
     return result
 
 
-def _write_default(outfile, EN_range, eigvals_red, mech_name, p, T, N_density, label, n):
+def _write_default(
+    outfile, EN_range, eigvals_red, mech_name, p, T, N_density, label, n
+):
     """Write all eigenvalue tracks to a tab-separated file (default mode)."""
     SEP = "\t"
     columns = [("EN_Td", lambda i: EN_range[i])]
     for j in range(n):
-        columns.append((
-            f"Re_lam{j}_N_m2",
-            lambda i, _ev=eigvals_red, _j=j: np.real(_ev[i, _j]),
-        ))
+        columns.append(
+            (
+                f"Re_lam{j}_N_m2",
+                lambda i, _ev=eigvals_red, _j=j: np.real(_ev[i, _j]),
+            )
+        )
     W = max(18, max(len(c) for c, _ in columns) + 2)
 
     with open(outfile, "w") as fh:
@@ -197,20 +201,23 @@ def _write_default(outfile, EN_range, eigvals_red, mech_name, p, T, N_density, l
     print(f"Written: {outfile}")
 
 
-def _write_pressure_scan(outfile, EN_range, scan_data, pressures, mech_name,
-                         T, eig_index, label):
+def _write_pressure_scan(
+    outfile, EN_range, scan_data, pressures, mech_name, T, eig_index, label
+):
     """Write pressure-scan eigenvalue data to a tab-separated file."""
     SEP = "\t"
     p_labels = [f"Re_lam{eig_index}_N_p{p:.3g}bar" for p in pressures]
-    columns  = ["EN_Td"] + p_labels
+    columns = ["EN_Td"] + p_labels
     W = max(22, max(len(c) for c in columns) + 2)
 
     with open(outfile, "w") as fh:
         fh.write(f"# Mechanism:        {mech_name}\n")
         fh.write(f"# Temperature:      {T} K\n")
         fh.write(f"# Eigenvalue index: {eig_index}\n")
-        fh.write(f"# Pressure range:   {pressures[0]:.3g} – {pressures[-1]:.3g} bar"
-                 f"  ({len(pressures)} log-spaced)\n")
+        fh.write(
+            f"# Pressure range:   {pressures[0]:.3g} – {pressures[-1]:.3g} bar"
+            f"  ({len(pressures)} log-spaced)\n"
+        )
         fh.write(f"# Config:           {label}\n")
         fh.write(f"# Generated:        {datetime.date.today().isoformat()}\n")
         fh.write("#\n")
@@ -237,74 +244,96 @@ def main():
         help="Path to mechanism Python file (e.g. Air/Air_Hosl.py).",
     )
     parser.add_argument(
-        "configs", nargs="*", metavar="CONFIG.json",
+        "configs",
+        nargs="*",
+        metavar="CONFIG.json",
         help=(
             "One or more JSON configuration files.  Each file may contain a "
-            "single configuration object or a list under a \"configurations\" "
+            'single configuration object or a list under a "configurations" '
             "key.  If omitted, a single baseline configuration is used.  "
             "Each configuration produces one subplot."
         ),
     )
     parser.add_argument(
-        "--p", type=float, default=1.0,
+        "--p",
+        type=float,
+        default=1.0,
         help="Gas pressure in bar — used in default mode (default: 1.0).",
     )
     parser.add_argument(
-        "--T", type=float, default=293.0,
+        "--T",
+        type=float,
+        default=293.0,
         help="Gas temperature in Kelvin (default: 293.0).",
     )
     parser.add_argument(
-        "--EN-lo", type=float, default=10.0,
+        "--EN-lo",
+        type=float,
+        default=10.0,
         help="Lower E/N bound in Td (default: 10).",
     )
     parser.add_argument(
-        "--EN-hi", type=float, default=500.0,
+        "--EN-hi",
+        type=float,
+        default=500.0,
         help="Upper E/N bound in Td (default: 500).",
     )
     parser.add_argument(
-        "--EN-num", type=int, default=500,
+        "--EN-num",
+        type=int,
+        default=500,
         help="Number of log-spaced E/N points (default: 500).",
     )
     parser.add_argument(
-        "--pressure-scan", action="store_true",
+        "--pressure-scan",
+        action="store_true",
         help=(
             "Activate pressure-scan mode: plot the selected eigenvalue track "
             "vs E/N for several log-spaced pressures."
         ),
     )
     parser.add_argument(
-        "--p-min", type=float, default=1e-3,
+        "--p-min",
+        type=float,
+        default=1e-3,
         help="Minimum pressure in bar for pressure-scan mode (default: 1e-3).",
     )
     parser.add_argument(
-        "--p-max", type=float, default=10.0,
+        "--p-max",
+        type=float,
+        default=10.0,
         help="Maximum pressure in bar for pressure-scan mode (default: 10).",
     )
     parser.add_argument(
-        "--p-num", type=int, default=5,
+        "--p-num",
+        type=int,
+        default=5,
         help="Number of log-spaced pressures in pressure-scan mode (default: 5).",
     )
     parser.add_argument(
-        "--eig-index", type=int, default=0,
+        "--eig-index",
+        type=int,
+        default=0,
         help=(
             "Eigenvalue track index to show in pressure-scan mode "
             "(default: 0 = leading/maximum-real mode)."
         ),
     )
     parser.add_argument(
-        "--write-to-file", type=str, default=None, metavar="FILE",
+        "--write-to-file",
+        type=str,
+        default=None,
+        metavar="FILE",
         help="Write eigenvalue data to tab-separated file(s).",
     )
     args = parser.parse_args()
 
     mech_name = os.path.basename(args.mechanism)
     raw_dicts = _read_json_configs(args.configs) if args.configs else [{}]
-    mods      = [load_mechanism(args.mechanism, d) for d in raw_dicts]
-    n_mods    = len(mods)
+    mods = [load_mechanism(args.mechanism, d) for d in raw_dicts]
+    n_mods = len(mods)
 
-    EN_range = np.logspace(
-        np.log10(args.EN_lo), np.log10(args.EN_hi), args.EN_num
-    )
+    EN_range = np.logspace(np.log10(args.EN_lo), np.log10(args.EN_hi), args.EN_num)
 
     base_out, ext_out = (
         os.path.splitext(args.write_to_file) if args.write_to_file else (None, ".txt")
@@ -314,9 +343,7 @@ def main():
     # Pressure-scan mode
     # ------------------------------------------------------------------
     if args.pressure_scan:
-        pressures = np.logspace(
-            np.log10(args.p_min), np.log10(args.p_max), args.p_num
-        )
+        pressures = np.logspace(np.log10(args.p_min), np.log10(args.p_max), args.p_num)
 
         n = len(mods[0].SPECIES)
         if args.eig_index >= n:
@@ -324,28 +351,33 @@ def main():
                 f"--eig-index {args.eig_index} out of range for {n} species."
             )
 
-        cmap     = plt.cm.viridis
+        cmap = plt.cm.viridis
         p_colors = cmap(np.linspace(0.1, 0.9, len(pressures)))
-        p_mid    = np.sqrt(args.p_min * args.p_max)
-        N_mid    = p_mid * 1e5 / (_kB * args.T)
+        p_mid = np.sqrt(args.p_min * args.p_max)
+        N_mid = p_mid * 1e5 / (_kB * args.T)
         linthresh = 1e-21 / N_mid
 
         fig, axs = plt.subplots(
-            n_mods, 1, figsize=(11, 5 * n_mods),
-            sharex=True, squeeze=False,
+            n_mods,
+            1,
+            figsize=(11, 5 * n_mods),
+            sharex=True,
+            squeeze=False,
         )
         axs = axs[:, 0]
 
         for ki, mod in enumerate(mods):
-            label    = mod.label or "Baseline"
+            label = mod.label or "Baseline"
             scan_red = compute_pressure_scan(
                 mod, EN_range, pressures, args.T, args.eig_index
             )
             ax = axs[ki]
             for pi, p in enumerate(pressures):
                 ax.plot(
-                    EN_range, scan_red[:, pi],
-                    color=p_colors[pi], label=f"p = {p:.3g} bar",
+                    EN_range,
+                    scan_red[:, pi],
+                    color=p_colors[pi],
+                    label=f"p = {p:.3g} bar",
                 )
             ax.set_xscale("log")
             ax.set_yscale("symlog", linthresh=linthresh)
@@ -361,8 +393,14 @@ def main():
             if args.write_to_file:
                 outfile = f"{base_out}_{label.lower()}{ext_out}"
                 _write_pressure_scan(
-                    outfile, EN_range, scan_red, pressures,
-                    mech_name, args.T, args.eig_index, label,
+                    outfile,
+                    EN_range,
+                    scan_red,
+                    pressures,
+                    mech_name,
+                    args.T,
+                    args.eig_index,
+                    label,
                 )
 
         axs[-1].set_xlabel("E/N (Td)")
@@ -373,9 +411,9 @@ def main():
     # ------------------------------------------------------------------
     # Default mode: all eigenvalue tracks vs E/N at fixed pressure
     # ------------------------------------------------------------------
-    n         = len(mods[0].SPECIES)
+    n = len(mods[0].SPECIES)
     N_density = args.p * 1e5 / (_kB * args.T)
-    _colors   = plt.cm.tab10(np.linspace(0, 0.9, n))
+    _colors = plt.cm.tab10(np.linspace(0, 0.9, n))
 
     all_eigvals_red = []
     for mod in mods:
@@ -383,18 +421,25 @@ def main():
         all_eigvals_red.append(ev / N_density)
 
     fig, axs = plt.subplots(
-        n_mods, 1, figsize=(11, 5 * n_mods),
-        sharex=True, squeeze=False,
+        n_mods,
+        1,
+        figsize=(11, 5 * n_mods),
+        sharex=True,
+        squeeze=False,
     )
     axs = axs[:, 0]
 
     for ki, mod in enumerate(mods):
-        label      = mod.label or "Baseline"
+        label = mod.label or "Baseline"
         eigvals_red = all_eigvals_red[ki]
         ax = axs[ki]
         for j in range(n):
-            ax.plot(EN_range, np.real(eigvals_red[:, j]),
-                    color=_colors[j], label=f"$\\lambda_{{{j}}}/N$")
+            ax.plot(
+                EN_range,
+                np.real(eigvals_red[:, j]),
+                color=_colors[j],
+                label=f"$\\lambda_{{{j}}}/N$",
+            )
         ax.set_xscale("log")
         ax.set_yscale("symlog", linthresh=1.0 / N_density)
         ax.axhline(0, color="k", lw=0.8, ls="--")
@@ -409,8 +454,15 @@ def main():
         if args.write_to_file:
             outfile = f"{base_out}_{label.lower()}{ext_out}"
             _write_default(
-                outfile, EN_range, eigvals_red,
-                mech_name, args.p, args.T, N_density, label, n,
+                outfile,
+                EN_range,
+                eigvals_red,
+                mech_name,
+                args.p,
+                args.T,
+                N_density,
+                label,
+                n,
             )
 
     axs[-1].set_xlabel("E/N (Td)")

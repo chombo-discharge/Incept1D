@@ -46,9 +46,9 @@ from scipy.optimize import nnls, minimize
 # Original values: 0.035 and 2.0 cm^-1 Torr^-1; converted to SI [m^-1 Pa^-1]
 # via  1 cm^-1 Torr^-1 = 100 m^-1 / 133.322 Pa  =  100/133.322 m^-1 Pa^-1
 # ---------------------------------------------------------------------------
-_CGS_TO_SI = 100.0 / 133.322   # cm^-1 Torr^-1  →  m^-1 Pa^-1
+_CGS_TO_SI = 100.0 / 133.322  # cm^-1 Torr^-1  →  m^-1 Pa^-1
 _LAMBDA1 = 0.035 * _CGS_TO_SI  # lower limit (longest photon range) [m^-1 Pa^-1]
-_LAMBDA2 = 2.0   * _CGS_TO_SI  # upper limit (shortest photon range) [m^-1 Pa^-1]
+_LAMBDA2 = 2.0 * _CGS_TO_SI  # upper limit (shortest photon range) [m^-1 Pa^-1]
 
 
 def zheleznyak(chi):
@@ -111,7 +111,9 @@ def fit_twostream(n_groups, n_pts=2000, threshold=0.0, chi_hi=None):
 
     # --- Step 1: NNLS initial guess ---
     kappa0 = np.logspace(np.log10(_LAMBDA1), np.log10(_LAMBDA2), n_groups)
-    A_rel = np.column_stack([np.exp(-kappa0[j] * chi) / target for j in range(n_groups)])
+    A_rel = np.column_stack(
+        [np.exp(-kappa0[j] * chi) / target for j in range(n_groups)]
+    )
     w0, _ = nnls(A_rel, np.ones_like(chi))
     w0 = np.maximum(w0, 1e-10)
 
@@ -130,32 +132,37 @@ def fit_twostream(n_groups, n_pts=2000, threshold=0.0, chi_hi=None):
         approx = sum(w[j] * np.exp(-k[j] * chi) for j in range(n_groups))
         return float(np.mean(((approx - target) / target) ** 2))
 
-    res = minimize(objective, x0, method='L-BFGS-B', bounds=bounds,
-                   options={'maxiter': 5000, 'ftol': 1e-14, 'gtol': 1e-10})
+    res = minimize(
+        objective,
+        x0,
+        method="L-BFGS-B",
+        bounds=bounds,
+        options={"maxiter": 5000, "ftol": 1e-14, "gtol": 1e-10},
+    )
 
     lk = np.clip(res.x[:n_groups], lk_lo, lk_hi)
     lw = np.clip(res.x[n_groups:], -30.0, 10.0)
     kappa = np.exp(lk)
-    w     = np.exp(lw)
+    w = np.exp(lw)
 
     # --- Step 3: sort by kappa and normalise g ---
-    idx   = np.argsort(kappa)
+    idx = np.argsort(kappa)
     kappa = kappa[idx]
-    w     = w[idx]
-    g     = w / kappa
-    g    /= g.sum()
-    w     = g * kappa   # adjusted to match normalised g
+    w = w[idx]
+    g = w / kappa
+    g /= g.sum()
+    w = g * kappa  # adjusted to match normalised g
 
     # --- Step 4: discard negligible groups and renormalise ---
     if threshold > 0.0:
-        keep  = g >= threshold
+        keep = g >= threshold
         kappa = kappa[keep]
-        g     = g[keep]
-        g    /= g.sum()
-        w     = g * kappa
+        g = g[keep]
+        g /= g.sum()
+        w = g * kappa
 
-    approx  = sum(w[j] * np.exp(-kappa[j] * chi) for j in range(len(kappa)))
-    scale   = np.trapz(target, chi) / max(np.trapz(approx, chi), 1e-30)
+    approx = sum(w[j] * np.exp(-kappa[j] * chi) for j in range(len(kappa)))
+    scale = np.trapz(target, chi) / max(np.trapz(approx, chi), 1e-30)
     rel_rms = float(np.sqrt(np.mean(((approx * scale - target) / target) ** 2)))
 
     return kappa, g, rel_rms
@@ -177,22 +184,35 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--ngroups", type=int, default=5, metavar="N",
+        "--ngroups",
+        type=int,
+        default=5,
+        metavar="N",
         help="Number of photon groups",
     )
     parser.add_argument(
-        "--threshold", type=float, default=0.0, metavar="T",
+        "--threshold",
+        type=float,
+        default=0.0,
+        metavar="T",
         help="Drop groups with g_j < T after normalisation (default: keep all)",
     )
     parser.add_argument(
-        "--pd_max", type=float, default=None, metavar="PD",
+        "--pd_max",
+        type=float,
+        default=None,
+        metavar="PD",
         help="Upper fit limit as reduced gap pd [bar cm]; chi_hi = 200*pd_max [Pa m]"
-             " (default: 50/lambda1)",
+        " (default: 50/lambda1)",
     )
     parser.add_argument(
-        "--write-to-file", dest="write_to_file", type=str, default=None, metavar="FILE",
+        "--write-to-file",
+        dest="write_to_file",
+        type=str,
+        default=None,
+        metavar="FILE",
         help="Write subplot data to FILE_absorption_curve.dat, FILE_error_terms.dat,"
-             " FILE_solutions.dat",
+        " FILE_solutions.dat",
     )
     args = parser.parse_args()
 
@@ -208,8 +228,10 @@ def main():
     if n_kept < n:
         header += f", {n_kept} kept after threshold={args.threshold:.1e}"
     print(f"Two-stream fit to Zheleznyak (1982) absorption curve  ({header})")
-    print(f"  UV window:  lambda1 = {_LAMBDA1:.6e} m^-1 Pa^-1, "
-          f"lambda2 = {_LAMBDA2:.6e} m^-1 Pa^-1")
+    print(
+        f"  UV window:  lambda1 = {_LAMBDA1:.6e} m^-1 Pa^-1, "
+        f"lambda2 = {_LAMBDA2:.6e} m^-1 Pa^-1"
+    )
     print()
     col_w = 24
     print(f"  {'j':>4}  {'(kappa/pO2)_j [1/(m Pa)]':>{col_w}}  {'g_j':>14}")
@@ -223,28 +245,31 @@ def main():
 
     # --- Absorption function comparison ---
     chi = np.logspace(np.log10(0.01 / _LAMBDA2), np.log10(1e3), 3000)
-    K_zh  = zheleznyak(chi)
-    K_2s  = sum(w[j] * np.exp(-kappa[j] * chi) for j in range(n_kept))
+    K_zh = zheleznyak(chi)
+    K_2s = sum(w[j] * np.exp(-kappa[j] * chi) for j in range(n_kept))
     # scale K_2s to same integral as K_zh for visual comparison
     scale = np.trapz(K_zh, chi) / max(np.trapz(K_2s, chi), 1e-30)
     K_2s_scaled = K_2s * scale
 
     # --- Convolution with a Gaussian source ---
     x_max = 4.0 / _LAMBDA1
-    x     = np.linspace(0.0, x_max, 600)
+    x = np.linspace(0.0, x_max, 600)
     sigma = 0.04 * x_max
-    source = np.exp(-((x - 0.3 * x_max) / sigma) ** 2)   # off-centre Gaussian
+    source = np.exp(-(((x - 0.3 * x_max) / sigma) ** 2))  # off-centre Gaussian
 
     def K_zh_fn(R):
         return zheleznyak(np.maximum(R, 1e-14))
 
     def K_2s_fn(R):
         R = np.asarray(R)
-        return sum(w[j] * np.exp(-kappa[j] * np.maximum(R, 1e-14)) for j in range(n_kept)) * scale
+        return (
+            sum(w[j] * np.exp(-kappa[j] * np.maximum(R, 1e-14)) for j in range(n_kept))
+            * scale
+        )
 
     conv_zh = _convolution_1d(K_zh_fn, source, x)
     conv_2s = _convolution_1d(K_2s_fn, source, x)
-    norm_c  = max(conv_zh.max(), 1e-30)
+    norm_c = max(conv_zh.max(), 1e-30)
     conv_zh /= norm_c
     conv_2s /= norm_c
 
@@ -254,14 +279,15 @@ def main():
     # --- Write subplot data to files ---
     if args.write_to_file is not None:
         import datetime, sys as _sys
-        stem      = args.write_to_file
-        generated = datetime.datetime.now().isoformat(timespec='seconds')
-        command   = " ".join(_sys.argv)
+
+        stem = args.write_to_file
+        generated = datetime.datetime.now().isoformat(timespec="seconds")
+        command = " ".join(_sys.argv)
 
         def _write(fname, header_lines, col_names, columns):
             """Write columns (list of 1-D arrays) to a fixed-width dat file."""
             W = max(22, max(len(c) for c in col_names) + 2)
-            with open(fname, 'w') as fh:
+            with open(fname, "w") as fh:
                 for line in header_lines:
                     fh.write(f"# {line}\n")
                 fh.write("#\n")
@@ -272,7 +298,7 @@ def main():
 
         # --- FILE 1: absorption curve ---
         group_col_names = [f"group_{j+1}_kappa{kappa[j]:.3e}" for j in range(n_kept)]
-        group_cols      = [w[j] * scale * np.exp(-kappa[j] * chi) for j in range(n_kept)]
+        group_cols = [w[j] * scale * np.exp(-kappa[j] * chi) for j in range(n_kept)]
         _write(
             f"{stem}_absorption_curve.dat",
             [
@@ -288,7 +314,8 @@ def main():
                 "  chi            : reduced path length p_O2*r  [Pa m]",
                 "  K_zheleznyak   : Zheleznyak (1982) absorption function  [m^-1 Pa^-1]",
                 "  K_twostream    : two-stream fit, integral-normalised to K_zheleznyak  [m^-1 Pa^-1]",
-            ] + [
+            ]
+            + [
                 f"  {group_col_names[j]:20s}: group {j+1}: "
                 f"kappa={kappa[j]:.4e} m^-1 Pa^-1,  g={g[j]:.4e}  [m^-1 Pa^-1]"
                 for j in range(n_kept)
@@ -342,42 +369,48 @@ def main():
 
     # Panel 1: absorption function (log-log)
     ax = axes[0]
-    ax.loglog(chi, K_zh,        'k-',  lw=2, label='Zheleznyak (1982)')
-    ax.loglog(chi, K_2s_scaled, 'r--', lw=2, label=f'Two-stream ({n_kept} groups)')
+    ax.loglog(chi, K_zh, "k-", lw=2, label="Zheleznyak (1982)")
+    ax.loglog(chi, K_2s_scaled, "r--", lw=2, label=f"Two-stream ({n_kept} groups)")
     for j in range(n_kept):
         if g[j] > 1e-6:
-            ax.loglog(chi, w[j] * scale * np.exp(-kappa[j] * chi),
-                      ':', color='steelblue', alpha=0.55,
-                      label='Individual groups' if j == 0 else None)
-    ax.set_xlabel(r'$\chi = p_{\mathrm{O}_2}\,r$  [Pa m]')
-    ax.set_ylabel(r'$K(\chi)$  [Pa$^{-1}$ m$^{-1}$]')
-    ax.set_title('Absorption function')
+            ax.loglog(
+                chi,
+                w[j] * scale * np.exp(-kappa[j] * chi),
+                ":",
+                color="steelblue",
+                alpha=0.55,
+                label="Individual groups" if j == 0 else None,
+            )
+    ax.set_xlabel(r"$\chi = p_{\mathrm{O}_2}\,r$  [Pa m]")
+    ax.set_ylabel(r"$K(\chi)$  [Pa$^{-1}$ m$^{-1}$]")
+    ax.set_title("Absorption function")
     ax.set_ylim(bottom=1e-14, top=10)
     ax.legend(fontsize=8)
-    ax.grid(True, which='both', ls=':', alpha=0.4)
+    ax.grid(True, which="both", ls=":", alpha=0.4)
 
     # Panel 2: relative error
     ax = axes[1]
-    ax.semilogx(chi, err, 'r-', lw=1.5)
-    ax.set_xlabel(r'$\chi = p_{\mathrm{O}_2}\,r$  [Pa m]')
-    ax.set_ylabel('Relative error [%]')
-    ax.set_title('Pointwise relative error')
-    ax.grid(True, ls=':', alpha=0.4)
+    ax.semilogx(chi, err, "r-", lw=1.5)
+    ax.set_xlabel(r"$\chi = p_{\mathrm{O}_2}\,r$  [Pa m]")
+    ax.set_ylabel("Relative error [%]")
+    ax.set_title("Pointwise relative error")
+    ax.grid(True, ls=":", alpha=0.4)
 
     # Panel 3: convolution with test source
     ax = axes[2]
-    ax.plot(x, conv_zh, 'k-',  lw=2, label='Zheleznyak (1982)')
-    ax.plot(x, conv_2s, 'r--', lw=2, label=f'Two-stream ({n} groups)')
-    ax.plot(x, source / source.max(), color='gray', ls=':', lw=1.5,
-            label='Source (norm.)')
-    ax.set_xlabel(r'$\chi = p_{\mathrm{O}_2}\,r$  [Pa m]')
-    ax.set_ylabel('Normalised photoionisation rate')
-    ax.set_title('Convolution: Gaussian source')
+    ax.plot(x, conv_zh, "k-", lw=2, label="Zheleznyak (1982)")
+    ax.plot(x, conv_2s, "r--", lw=2, label=f"Two-stream ({n} groups)")
+    ax.plot(
+        x, source / source.max(), color="gray", ls=":", lw=1.5, label="Source (norm.)"
+    )
+    ax.set_xlabel(r"$\chi = p_{\mathrm{O}_2}\,r$  [Pa m]")
+    ax.set_ylabel("Normalised photoionisation rate")
+    ax.set_title("Convolution: Gaussian source")
     ax.legend(fontsize=8)
-    ax.grid(True, ls=':', alpha=0.4)
+    ax.grid(True, ls=":", alpha=0.4)
 
     plt.suptitle(
-        rf'Zheleznyak vs two-stream ({n_kept} groups, RMS rel. error = {rel_rms*100:.1f}%)',
+        rf"Zheleznyak vs two-stream ({n_kept} groups, RMS rel. error = {rel_rms*100:.1f}%)",
         fontsize=11,
     )
     plt.tight_layout()

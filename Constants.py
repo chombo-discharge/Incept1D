@@ -6,4 +6,4 @@ All values are sourced from scipy.constants (CODATA 2018 recommended values).
 
 from scipy.constants import k as kB, e as Q, c as c_light
 
-__all__ = ['kB', 'Q', 'c_light']
+__all__ = ["kB", "Q", "c_light"]

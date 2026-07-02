@@ -11,6 +11,7 @@ Reaction string format
     "e + N2 -> 2e + N2+"
 
 Rules:
+
 - Species tokens must be separated by ` + ` (spaces around the plus sign) so
   that cation names like `N2+` are never broken apart by the tokeniser.
 - Optional leading integer stoichiometric coefficient: `2e`, `3N2`.
@@ -69,8 +70,9 @@ def build_R_from_compiled(compiled, n, EN, p, T, multipliers=None):
     produced by compile_reactions.  multipliers is handled identically to
     build_R (keys are normalised before comparison).
     """
-    norm_mult = ({_normalize(k): v for k, v in multipliers.items()}
-                 if multipliers else {})
+    norm_mult = (
+        {_normalize(k): v for k, v in multipliers.items()} if multipliers else {}
+    )
     R = np.zeros((n, n))
     for j, delta, rate_fn, norm_key in compiled:
         K = rate_fn(EN, p, T) * norm_mult.get(norm_key, 1.0)
@@ -90,13 +92,13 @@ def _parse_side(text: str) -> dict:
     (e.g. `N2+`) is never treated as a separator.
     """
     result = {}
-    for token in re.split(r'\s+\+\s+', text.strip()):
+    for token in re.split(r"\s+\+\s+", text.strip()):
         token = token.strip()
         if not token:
             continue
-        m = re.match(r'^(\d+)?(.*)', token)
+        m = re.match(r"^(\d+)?(.*)", token)
         coeff = int(m.group(1)) if m.group(1) else 1
-        name  = m.group(2).strip()
+        name = m.group(2).strip()
         if name:
             result[name] = result.get(name, 0) + coeff
     return result
@@ -104,7 +106,7 @@ def _parse_side(text: str) -> dict:
 
 def parse_reaction(rxn_str: str):
     """Return (reactants_dict, products_dict) for a reaction string."""
-    lhs, rhs = re.split(r'\s*->\s*', rxn_str, maxsplit=1)
+    lhs, rhs = re.split(r"\s*->\s*", rxn_str, maxsplit=1)
     return _parse_side(lhs), _parse_side(rhs)
 
 
@@ -140,7 +142,7 @@ def build_R(reactions, species, EN, p, T, multipliers=None):
     if multipliers is None:
         multipliers = {}
 
-    norm_mult  = {_normalize(k): v for k, v in multipliers.items()}
+    norm_mult = {_normalize(k): v for k, v in multipliers.items()}
     known_keys = {_normalize(rxn_str) for rxn_str, _ in reactions}
     for k in norm_mult:
         if k not in known_keys:
@@ -150,13 +152,13 @@ def build_R(reactions, species, EN, p, T, multipliers=None):
                 flush=True,
             )
 
-    n      = len(species)
+    n = len(species)
     sp_idx = {s: i for i, s in enumerate(species)}
-    R      = np.zeros((n, n))
+    R = np.zeros((n, n))
 
     for rxn_str, rate_fn in reactions:
         scale = norm_mult.get(_normalize(rxn_str), 1.0)
-        K     = rate_fn(EN, p, T) * scale
+        K = rate_fn(EN, p, T) * scale
 
         reactants, products = parse_reaction(rxn_str)
 

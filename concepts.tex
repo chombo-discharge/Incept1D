@@ -1,0 +1,1247 @@
+\documentclass{iopjournal}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{makecell}
+\usepackage{bm}
+\usepackage{xspace}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{setspace}
+\usepackage[backend=biber, style=numeric-comp, sorting=none, url=true, doi=true, eprint=false, isbn=false, firstinits, maxcitenames=2, maxbibnames=5]{biblatex}
+
+\newcommand{\todo}[1]{\color{red}{#1}\color{black}}
+\providecommand\ito{\^{I}to\xspace}
+\newcommand{\e}{\ensuremath{\text{e}}}
+\newcommand{\p}{\ensuremath{\text{p}}}
+\newcommand{\m}{\ensuremath{\text{m}}}
+\newcommand{\M}{\ensuremath{\text{M}}}
+\newcommand{\diff}{\ensuremath{\text{d}}}
+\newcommand{\SF}{\text{SF}$_6$}
+\newcommand{\uinc}{\ensuremath{U_{\text{inc}}}}
+\newcommand{\kinc}{\ensuremath{K_{\text{inc}}}}
+\newcommand{\crit}{\ensuremath{\text{cr}}}
+\providecommand\Ntwo{\ensuremath{\textrm{N}_2}}
+\providecommand\Otwo{\ensuremath{\textrm{O}_2}}
+\def\IOone{\ensuremath{\textrm{O}_{\textrm{I}}}}
+\providecommand\IOtwo{\ensuremath{\textrm{O}_{\textrm{II}}}}
+\providecommand\Ntwop{\ensuremath{\textrm{N}_2^+}}
+\providecommand\NtwoO{\ensuremath{\textrm{N}_2\textrm{O}}}
+\providecommand\Otwop{\ensuremath{\textrm{O}_2^+}}
+\providecommand\Otwom{\ensuremath{\textrm{O}_2^-}}
+\providecommand\Othree{\ensuremath{\textrm{O}_3}}
+\providecommand\Othreem{\ensuremath{\textrm{O}_3^-}}
+\providecommand\Othreems{\ensuremath{\textrm{O}_3^{-*}}}
+\providecommand\Ominus{\ensuremath{\textrm{O}^-}}
+\providecommand\Otwoms{\ensuremath{\textrm{O}_2^{-*}}}
+\providecommand\NtwoCstate{\ensuremath{\textrm{N}_2(\text{C}^3\Pi_{\text{u}})}}
+\providecommand\NtwoBstate{\ensuremath{\textrm{N}_2(\text{B}^3\Pi_{\text{g}})}}
+\providecommand\photoY{\ensuremath{Y}}
+\providecommand\photon{\ensuremath{\hbar\omega}}
+\providecommand\Pie{\ensuremath{\bm{\Pi}_\e}}
+\providecommand\Pip{\ensuremath{\bm{\Pi}_\p}}
+\providecommand\Pim{\ensuremath{\bm{\Pi}_\m}}
+\providecommand\Pir{\ensuremath{\bm{\Pi}_+}}
+\providecommand\Pil{\ensuremath{\bm{\Pi}_-}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{derivation}{Proof}
+%\newtheorem{lemma}[theorem][Lemma]
+
+\DeclareMathOperator\diag{diag}
+\DeclareMathOperator\sgn{sgn}
+\DeclareMathOperator\arccosh{arccosh}
+
+
+% Bibliography file
+\addbibresource{references.bib}
+\addbibresource{databases.bib}
+
+\DeclareSIUnit\townsend{Td}
+\DeclareSIUnit\bar{bar}
+\DeclareSIUnit\torr{Torr}
+\DeclareSIUnit\unitDt{\ensuremath{\Delta t}}
+
+% Graphics path
+\graphicspath{{../Figures/}}
+
+% Hack for getting rid of warnings when using percentage sign in references abstracts
+\DeclareSourcemap{
+  \maps[datatype=bibtex]{
+    \map{
+      \step[fieldset=abstract, null]
+    }
+  }
+}
+
+% Setup SI units
+\sisetup{
+  propagate-math-font  = true,
+  mode                 = math,
+  separate-uncertainty = true,
+  per-mode             = reciprocal,
+  range-units          = single,
+  range-phrase         = \text{ - },
+  list-final-separator = \text{, },
+  list-exponents       = combine-bracket
+}
+
+% Set up links
+\hypersetup{
+  colorlinks=true,
+  allcolors=blue
+}
+
+% Point to graphics path.
+\graphicspath{{../Figures/}}
+
+\begin{document}
+
+\title{Role of negative-ion kinetics for electrical breakdown in air gaps}
+
+\author{Robert Marskar$^{1,*}$\orcid{0000-0003-1706-9736}}%, Christian Franck$^2$\orcid{0000-0002-2201-7327}}
+
+\affil{$^1$SINTEF Energy Research, Sem S\ae lands vei 11, 7034 Trondheim, Norway.}
+
+%\affil{$^2$Institute for Power Systems and High Voltage Technology, ETH Zurich, Physikstrasse 3, 8092 Zurich, Switzerland}
+
+\affil{$^*$Author to whom any correspondence should be addressed.}
+
+\email{robert.marskar@sintef.no}
+
+\keywords{Negative ions, detachment, inception, breakdown}
+
+\begin{abstract}
+  \small
+  We investigate the onset of self-sustained electric discharges in high-pressure air, with emphasis on negative-ion dynamics in air gaps.
+  We develop a one-dimensional inception condition accounting for negative-ion drift, attachment, detachment, conversion between the oxygen anions \Ominus, \Otwom, and \Othreem, and photoionization.
+  When the negative-ion transit time exceeds the collisional detachment time, detachment liberates electrons mid-gap that contribute to avalanche growth, substantially modifying the asymptotic behavior of the Paschen curve at large values of the reduced gap distance $pd$ (pressure times gap length).
+  These modifications are negligible at low $pd$ but become significant beyond $pd \approx \SI{1}{\bar\centi\meter}$; neglecting ion conversion and detachment yields errors exceeding \SI{25}{\percent} at $pd = \SI{160}{\bar\milli\meter}$.
+  Critically, inception can occur even when electron attachment exceeds electron impact ionization --- a regime inaccessible to classical Townsend or streamer theory --- because detachment acts as a delayed secondary electron source even under sub-critical conditions.
+  These predictions are validated against DC breakdown measurements up to \SI{400}{\kilo\volt} in quasi-uniform fields up to $pd = \SI{160}{\bar\milli\meter}$, with good agreement.
+  Three-dimensional plasma simulations initiated from a few cathodic electron at $pd = \SI{160}{\bar\milli\meter}$ verify that the breakdown process proceeds via ion-conversion mechanisms rather than direct avalanche-to-streamer transitions.
+\end{abstract}
+
+\section{Introduction}
+
+Paschen's law \cite{Paschen1889} states that the DC breakdown voltage of a uniform-field gap is a universal function of the reduced gap distance $pd$, where $p$ is the gas pressure and $d$ is the electrode separation \cite{Raizer1991, Kuffel2000}.
+It follows from Townsend's ionization theory: avalanche growth is parameterized by the first Townsend coefficient $\alpha(E/p)$, combined with a cathode secondary electron emission (SEE) efficiency $\gamma$.
+This yields the classical breakdown criterion $\alpha d = \ln(1 + \gamma^{-1})$, from which the Paschen curve $U_\text{br}(pd)$ is recovered using the empirical fit $\alpha = Ap\exp(-Bp/E)$ \cite{Raizer1991}, where $A$ and $B$ are gas-specific constants.
+
+It is recognized that the Paschen law is asymptotically inaccurate beyond $pd \gtrsim \SIrange{1}{10}{\bar\milli\meter}$.
+Its failure is often attributed to streamer formation \cite{Meek1940}, which appears due to field enhancement from space charge layers.
+Streamers \cite{Nijdam2020} form quite easily in the presence of electrode protrusions that locally enhance the field, and their relevance for breakdown in large non-uniform gaps is generally speaking uncontested.
+The inception mechanism is typically attributed to the avalanche-to-streamer transition, representing the limit where a sufficiently large number of electron-ion pairs are generated to modify the electric field.
+The streamer threshold is often represented by the streamer constant, which has a value $(\alpha-\eta) d = \numrange{18}{20}$ in air \cite{Raether1939,Meek1940}, where $\eta$ is the attachment coefficient and $\alpha-\eta$ is the effective ionization coefficient.
+
+The Paschen curve rests on several assumptions: It requires a spatially uniform field, i.e., parallel plate electrodes, does not account for diffusion, and completely neglects negative ions.
+These assumptions might break down in gases of practical interest --- including air and \SF, as well as emerging eco-friendly alternatives such as $\text{C}_4\text{F}_7\text{N}$ that are used in gas-insulated switchgear and high-voltage circuit breakers \cite{Rabie2018}.
+Modified Paschen curves incorporating electron attachment as a permanent sink of electrons were studied a long time ago, and provide a well-known correction to the Paschen curve \cite{Raizer1991}.
+A limitation in this treatment is the neglect of negative-ion transit, and in particular any transformation of negative ions back into electrons before they reach the anode.
+
+Attachment and detachment couple the electron and negative-ion populations on the ion transit timescale across the gap.
+In moderate-to-high electric fields, negative ions formed by attachment are not permanently lost, and free electrons can be recovered through collisional detachment.
+It is only when the negative-ion transit time is short compared to the detachment time that negative ions become a permanent electron sink, and in this case they do not further influence the inception dynamics.
+Conversely, if the detachment time is shorter than the negative-ion transit time, detachment liberates electrons, which can then reparticipate in the generation of additional charge carriers.
+Essentially, detachment acts as a delayed secondary source of electrons and lowers the apparent effective ionization coefficient relative to predictions that neglect it \cite{Pancheshnyi2013,Hsl2017, Haefliger2018, Hosl2019}.
+This affects, for example, the tail of an electron swarm in pulsed Townsend experiments \cite{Wen1988}.
+The Paschen curve must therefore intrinsically depend also on the negative-ion kinetics, with potential implications for the asymptotic behavior of the Paschen law for large $pd$.
+
+A self-consistent treatment including detachment is essential for accurate breakdown predictions at large $pd$ in electronegative gases.
+The fundamental role that is played by detachment is not new, and has been a topic in pulsed Townsend experiments \cite{Wen1988,Hsl2017, Haefliger2018, Hosl2019} as well as in the context of the apparent effective ionization coefficient \cite{Pancheshnyi2013,Zhao2016}.
+However, the role of detachment in the context of electric breakdown in long air gaps is only sporadically reported in the literature.
+Early works include \textcite{Frommhold1964, Ryzko1967, Teich1991}, who all investigated attachment and detachment processes in dry air.
+Of particular interest to us is the work by \textcite{Teich1991}, who used a hypothetical discharge model of oxygen to show that breakdown may occur well below the critical $E/N$.
+None of these early works considered the impact of negative-ion conversion.
+In the past two decades, substantially fewer studies have been devoted to the role of negative ions on the discharge dynamics.
+The most recent results that we are aware of are those given by \textcite{Hsl2017} for dry air, but the main focus in this study is determination of rate coefficients; not their impact on electrical breakdown modeling.
+
+In this paper, we investigate the influence of electron detachment on electrical breakdown in air, and compare theoretical predictions with experimental measurements.
+We also show that breakdown can happen well below the critical $E/N$, and use three-dimensional plasma simulations to explore the breakdown dynamics.
+We begin by analytically obtaining a one-dimensional inception condition that also accounts for ion transit, ion conversion, attachment, detachment, and photoionization.
+We show that at low values of $pd$ the role of negative-ion transit and detachment is negligible, as expected, whereas substantial modifications to the Paschen curve are found at large $pd$.
+Similar to early works \cite{Frommhold1964, Teich1991, Pancheshnyi2013, Zhao2016}, we find that inception can occur significantly below the critical field.
+In this regime, electron attachment exceeds electron impact ionization and direct Townsend breakdown and avalanche-to-streamer transitions are impossible in the conventional sense.
+
+This paper is organized as follows:
+Section~\ref{sec:methods} introduces the coupled model and the inception condition that determines the onset of a self-sustained electric discharge, as well as the experimental procedure.
+A comparison between calculations and experiments is given in section~\ref{sec:results}, where we also study the sensitivity of the results to some of the physical processes as well as the electron swarm data.
+We compare against models that invoke simplifying assumptions, such as ignoring detachment or photoionization, and quantify the relative error.
+A comparison against canonical data sources is also provided.
+Finally, we analyze the spatio-temporal onset of the discharge, using three-dimensional plasma simulations.
+The paper is then summarized in section~\ref{sec:summary}.
+
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Theoretical model}
+\label{sec:model}
+\subsubsection{Equations of motion}
+To derive a solution from which we can study the impact of negative-ion kinetics, we approximate the full three-dimensional evolution of electrons and ions by a one-dimensional drift-reaction equation,
+
+\begin{equation}
+  \label{eq:drift_reaction}
+  \partial_t\vec{n} + \partial_x\left(\bm{V}\vec{n}\right) = \bm{R}\vec{n} + \sum_j\vec{\beta}_j\xi_j\kappa_j\Psi_j^0,
+\end{equation}
+where $\vec{n}$ is the column vector of length $N_s$ containing the species densities.
+$\bm{V}=\diag\left(v_1,v_2,\ldots\right)$ is the diagonal matrix of species velocities, and $\bm{R}$ is a reaction-rate matrix which crucially does not depend on $\vec{n}$.
+We will work within the local field approximation (LFA), where the rates in $\bm{R}$ only depend on the reduced electric field, temperature, and pressure.
+The final term describes photoionization through multiple photon groups $j$, where $\kappa_j\Psi_j^0$ is the number of absorbed ionizing photons per unit volume by group $j$, and $\kappa_j$ is the absorption coefficient of this group.
+Here, $\xi_j$ is a photoionization efficiency for group $j$, and the column vectors $\vec{\beta}_j$ select which species are ionized by the radiation.
+Below, we clarify how $\Psi_j^0$ relates to the radiative transfer equation.
+
+Owing to difficulties with imposing consistent boundary conditions for radiative transfer using Helmholtz or Eddington models \cite{Bourdon2007, Marskar2019a}, we work directly from a truncated discrete ordinates method for the radiative transfer equation.
+We assume that ionizing photons are only generated by electrons, and thus denote the volumetric photon production rate by $\rho n_\e$, where $n_\e$ is the electron density.
+Formally, $n_\e = \vec{u}_\e^\intercal \vec{n}$, where $\vec{u}_\e$ is the electron unit vector in the space defined by $\vec{n}$.
+I.e., $\vec{u}_\e$ has a value of one on the row corresponding to the electrons and is zero everywhere else.
+Assuming isotropic emission, the radiative transfer equation for some photon group $j$ is
+
+\begin{equation}
+  \frac{1}{c}\partial_t \Psi_j + \hat{\bm{\Omega}}\cdot\nabla \Psi_j = -\kappa_j\Psi_j + \frac{1}{4\pi}g_j\rho\vec{u}_\e^\intercal \vec{n},
+\end{equation}
+where $\Psi_j$ is the photon flux in the direction $\hat{\bm{\Omega}} = (\Omega_x, \Omega_y, \Omega_z)$, and $c$ is the speed of light.
+The terms $g_j$ determine the fraction of photons that are emitted into subgroup $j$, and $\sum_j g_j = 1$ by conservation.
+Later, we will specify $g_j$ and $\kappa_j$ so that they are consistent with the Zheleznyak photoionization model in air \cite{1982TepVT..20..423Z}, and also completely specify $\rho$.
+For now, however, we simply note that $\rho$ does not depend further on $\vec{n}$, but does depend on other physical parameters such as the electric field or the gas pressure.
+
+Formulation of a consistent one-dimensional model that incorporates the three-dimensional non-local character of radiative transfer is, unfortunately, only possible in a slab geometry.
+That is, the discharge must have an infinite transversal extent.
+This is not a realistic approximation for a developing discharge, and to avoid solving for a full 3D discharge, we impose a two-stream approximation that lets us -- at least qualitatively -- explore the impact of photoionization and photoemission.
+We only track photons that propagate along rays $\pm x$, and we ignore photons that propagate in other directions.
+This is only a reasonable assumption in a homogeneous field where the photons that propagate transverse to the drift direction would mostly yield seed electrons on the side of the developing discharge, possibly leading to broadening.
+In a strongly inhomogeneous field, however, the transverse photons may cause photoionization in nearby field lines that later curve back into the discharge inception region, and these photons will then also contribute to discharge growth.
+In the two-stream approximation, we cannot assume that all generated photons are emitted along two beams only, since this overestimates the number of ionizing photons that propagate along the two rays.
+To compensate, we introduce a conical angle $\Delta\Omega$, and assume that only the photons that are emitted into this solid angle contributes to discharge growth along the field line where the discharge evolves.
+The radiative transfer equation is then approximated by the two-stream equations with a compensated source term:
+
+\begin{equation}
+  \label{eq:two_stream}
+  \frac{1}{c}\partial_t\Psi_j^{\pm} \pm\partial_x\Psi_j^{\pm} = -\kappa_j\Psi_j^{\pm} + \left(\frac{\Delta\Omega}{4\pi}\right)g_j\rho\vec{u}_\e^\intercal \vec{n},
+\end{equation}
+where the factor $\Delta\Omega/(4\pi)$ indicates roughly the fraction of photons that propagate in directions $\pm x$.
+There is substantial uncertainty in the precise specification of this angle since it depends on the geometry of the discharge, but it is useful to leave it as a free parameter at the moment, and then study its sensitivity later.
+We recall that $\Psi_j^\pm$ are photon fluxes and that $\kappa_j\Psi_j^0 = \kappa_j\left(\Psi_j^+ + \Psi^-_j\right)$ is the number of photons absorbed per unit volume and time, which provides the coupling term in equation~\eqref{eq:drift_reaction}.
+The boundary conditions on the two streams are $\Psi_j^+ = 0$ at the lower $x$-boundary, and $\Psi_j^- = 0$ on the upper $x$-boundary.
+
+%% In the above, we have assumed the usage of a the first-order Eddington approximation for radiative transfer \cite{Larsen2002}, where the closure relation on the photon flux is $F_j = -\frac{c}{3\kappa_j}\partial_x\Psi_j$.
+%% The radiative transfer equation for a single monochromatic component $j$ takes the form of a Helmholtz equation \cite{Marskar2019a}:
+
+%% \begin{equation}
+%%   \label{eq:photoi_helm}
+%%   \partial_x^2\Psi_j - 3\kappa_j^2\Psi_j = -\frac{3\kappa_j}{c}\eta_j\vec{u}_\e^\intercal\vec{n},
+%% \end{equation}
+%% Here, $\Psi_j$ is the number of photons per unit volume, $\kappa_j$ is the absorption coefficient, and $\eta_j$ is a source term factor.
+%% We have assumed that the production of photons occurs only as a result of free electrons, $n_\e = \vec{u}_\e^\intercal \vec{n}$, where $\vec{u}_\e$ is the electron unit vector in the space defined by $\vec{n}$.
+%% I.e., $\vec{u}_\e^\intercal$ has a value of one on the row corresponding to the electrons and is zero everywhere else.
+%% The term $\eta_j\vec{u}_\e^\intercal\vec{n}$ therefore describes the number of ionizing photons that are produced per unit volume and time.
+%% We will specify $\eta_j$ in completeness later and for now we only remark that $\eta_j$ does not depend further on other species densities, but can depend on other physical parameters such as the electric field or the gas pressure.
+%% The closure relation on the photons also makes it possible to write the above equations in terms $\xi_j(c\kappa_j)\Psi_j$, which is the number of photoionization events per unit volume and time from photon group $j$.
+%% This has some notational benefit for equations~\eqref{eq:drift_reaction} and~\eqref{eq:photoi_helm}, but blurs the specification of SEE fluxes from photon bombardment.
+
+We have ignored charged-species diffusion, on the grounds that diffusion is mostly relevant in the presence of sufficiently strong gradients that cause substantial corrections to the charged-species flux.
+Inclusion of diffusion is thus relevant for plasma sheaths, but not in the bulk of a growing discharge.
+It is possible that diffusion losses of charged species to the walls, or back-diffusion of electrons to the cathode, would lead to corrections in the predictions of our model.
+While accounting for diffusion is possible, including it would also come at the cost of additional difficulties, and require more sophisticated numerical treatment \cite{Ferreira2019, Almeida2020, Ferreira2021}.
+
+To obtain an inception condition for the coupled system of charged species and photons, we use an eigenvalue approach \cite{Ferreira2019} and reduce the problem analytically as far as we can.
+First, let $\vec{n}(x,t)\rightarrow\vec{n}(x)e^{\lambda t}$ and $\vec{\Psi}(x,t) \rightarrow \vec{\Psi}(x)e^{\lambda t}$, which can be done without loss of generality since the system consisting of equations~\eqref{eq:drift_reaction} and~\eqref{eq:two_stream} is homogeneous and linear.
+Collect the photon fluxes into column vectors $\vec{\Psi}^\pm = (\Psi_1^\pm,\Psi_2^\pm,\ldots)^\intercal$, and define $\vec{g} = \left(g_1, g_2, \ldots\right)^\intercal$.
+Equations~\eqref{eq:drift_reaction} and~\eqref{eq:two_stream} become
+
+\begin{align}
+  \partial_x\vec{y} &= \left(\bm{R}-\lambda\bm{I}\right)\bm{V}^{-1}\vec{y} + \sum_j\vec{\beta}_j\xi_j\kappa_j\left(\Psi_j^+ + \Psi_j^-\right),\\
+  \partial_x\vec{\Psi}_j^\pm &= \mp\left(\bm{\kappa}+\frac{\lambda}{c}\bm{I}\right)\vec{\Psi}_j^\pm \pm \frac{\Delta\Omega}{4\pi}\rho\vec{g}\vec{u}_\e^\intercal \bm{V}^{-1}\vec{y},
+\end{align}
+where $\vec{y} = \bm{V}\vec{n}$ is the charged-species flux vector and $\bm{I}$ is the identity matrix.
+The block matrices are
+\begin{align}
+  &\bm{A} = \left(\bm{R}-\lambda\bm{I}\right)\bm{V}^{-1},\\
+  &\bm{B} = \begin{bmatrix}\vec{\beta}_1\xi_1\kappa_1 & \vec{\beta}_2\xi_2\kappa_2 & \cdots\end{bmatrix},\\
+    &\bm{C} = \frac{\Delta\Omega}{4\pi}\rho\vec{g}\vec{u}_\e^\intercal\bm{V}^{-1},\\
+    &\bm{D} = \bm{\kappa} + \frac{\lambda}{c}\bm{I}\\
+    &\bm{\kappa} = \diag(\kappa_1, \kappa_2, \ldots).
+\end{align}
+When the system consists of $N_s$ charged species and $N_\gamma$ photon species, the block matrices have dimensions $\dim \bm{A} = N_s\times N_s$, $\dim \bm{B} = N_s\times N_\gamma$, $\dim \bm{C}= N_\gamma\times N_s$, and $\dim\bm{\kappa} = N_\gamma\times N_\gamma$.
+Collecting equations yields
+
+\begin{equation}
+  \label{eq:augmented_ode}
+  \partial_x
+  \begin{bmatrix}
+    \vec{y} \\ \vec{\Psi}^+ \\ \vec{\Psi}^-
+  \end{bmatrix}
+  =
+  \underbrace{
+  \begin{bmatrix}
+    \bm{A} & \bm{B} & \bm{B} \\
+    \bm{C} & -\bm{D} & \bm{0} \\
+    -\bm{C} & \bm{0} & \bm{D} \\
+  \end{bmatrix}
+  }_{\bm{\mathcal{A}}}
+  \begin{bmatrix}
+    \vec{y} \\ \vec{\Psi}^+ \\ \vec{\Psi}^-
+  \end{bmatrix},
+\end{equation}
+where the augmented matrix has dimension $\dim \bm{\mathcal{A}} = (N_s+2N_\gamma)\times(N_s+2N_\gamma)$.
+This system is linear, and $\bm{\mathcal{A}}$ is trivially definable from the plasma chemistry and photoionization, and essentially only depends on the reduced electric field, gas pressure, and temperature.
+
+\subsubsection{Formal solution}
+Define the flux vector $\vec{\theta} = \left(\vec{y}, \vec{\Psi}^+,\vec{\Psi}^-\right)^\intercal$.
+The formal solution to equation~\eqref{eq:augmented_ode} is
+
+\begin{equation}
+  \label{eq:theta_soln}
+  \begin{split}
+    \vec{\theta}(x) = \mathcal{P}\exp\left(\int_0^x \bm{\mathcal{A}}(s)\diff s\right)\vec{\theta}(0)
+    &= \bm{M}(x)\vec{\theta}_0,
+  \end{split}
+\end{equation}
+where $\mathcal{P}\exp\left(\ldots \right)$ is a path-ordered matrix exponential, which in general also depends on $\lambda$, and $\vec{\theta}_0 = \vec{\theta}(x=0)$.
+In uniform gaps, $\bm{\mathcal{A}}$ is position-independent and then $\bm{M}(x) = e^{\bm{\mathcal{A}}x}$.
+We consider a domain $x\in[0,d]$, so $\vec{\theta}_0$ must be constructed so that $\vec{\theta}(x)$ satisfies boundary constraints on both $x=0$ and $x=d$.
+Zero-flux constraints are imposed on the negative ions at $x=0$ and on the positive ions at $x=d$.
+The SEE flux on $x=0$ is a sum of fluxes due to ion and photon bombardments.
+For the photons, we use open boundaries with no influx so the appropriate boundary conditions are $\Psi_j^+(0) = 0$ and $\Psi_j^-(d) = 0$.
+
+The above constraints can be written as separate block systems on the cathode and the anode.
+Let $\Pim$, $\Pip$ and $\Pie$ be the row selection matrices that pick out the rows for the negative ions, positive ions, and electrons.
+Note that $\Pie$ is just a row vector.
+Similarly, define row selection matrices $\Pir$ and $\Pil$ that pick out the subvectors $\vec{\Psi}^+$ and $\vec{\Psi}^-$.
+On the cathode, the zero-flux condition on the negative ions is $\Pim\vec{\theta}_0 = \vec{0}$, and for the photon fluxes we have $\Pir\vec{\theta}_0 = \vec{0}$.
+Let $\vec{\gamma}_\p = \vec{\gamma}_\p(E)$ be a column vector of SEE efficiencies due to ion bombardment, and similarly let $\vec{\gamma}_\Psi$ be efficiencies due to photon bombardment.
+The SEE flux is then
+
+\begin{equation}
+  \label{eq:see_condition}
+  \Pie\vec{\theta}_0 = -\vec{\gamma}_\p^\intercal\Pip\vec{\theta}_0 + \vec{\gamma}_\Psi^\intercal\Pil\vec{\theta}_0.
+\end{equation}
+The cathode boundary conditions can be written as a block system $\bm{Q}_0\vec{\theta}_0 = \vec{0}$, where
+
+\begin{equation}
+  \bm{Q}_0 = \begin{bmatrix}
+    \Pie + \vec{\gamma}_\p^\intercal\Pip - \vec{\gamma}_\Psi^\intercal\Pil\\
+    \Pim \\
+    \Pir \\
+  \end{bmatrix},
+\end{equation}
+and where all the matrices are trivially definable from the plasma-photon chemistry.
+
+On the anode, boundary conditions are imposed in the same way.
+The positive ions are trivial: $\Pip\vec{\theta}(d) = \vec{0}$, which can be written $\Pip\bm{M}(d)\vec{\theta}_0 = \vec{0}$ following equation~\eqref{eq:theta_soln}.
+Assuming no incoming photons from the anode, we similarly have $\Pil\bm{M}(d)\vec{\theta}_0 = \vec{0}$ for the photon flux.
+The anode BCs are written as a linear system $\bm{Q}_d\vec{\theta}_0 = \vec{0}$, where
+
+\begin{equation}
+  \bm{Q}_d = \begin{bmatrix}
+    \Pip\bm{M}(d) \\
+    \Pil\bm{M}(d).
+  \end{bmatrix}
+\end{equation}
+The complete specification of the boundary value problem is thus
+
+\begin{equation}
+  \bm{Q}(\lambda)\vec{\theta}_0 = \begin{bmatrix} \bm{Q}_0 \\ \bm{Q}_d \end{bmatrix} \vec{\theta}_0 = \vec{0}.
+\end{equation}
+A non-trivial solution exists if (and only if)
+
+\begin{equation}
+  \label{eq:det_criterion}
+  \det\bm{Q}(\lambda) = 0,
+\end{equation}
+and we furthermore note that $\lambda > 0$ indicates discharge growth, and that $\lambda < 0$ indicates decay.
+The inception threshold is given by $\lambda = 0$, i.e. $\det \bm{Q}(0) = 0$.
+One may also use equation~\eqref{eq:det_criterion} in order to extract the temporal growth rate of the discharge by fixing the applied voltage and considering $\lambda$ to be a free parameter.
+
+Equation~\eqref{eq:det_criterion} is, in essence, a field-line criterion for the inception of electrical discharges, accounting for primary and secondary ionization processes in the gas.
+Compared to fully three-dimensional discharge models \cite{Marskar2019a}, the criterion is computationally simple to solve, and it also numerically cheap.
+
+
+%% The procedure above can be used also in non-uniform gaps by using the method of characteristics along electric field lines.
+%% In this case, one may reduce the three-dimensional equations to one-dimensional equations along a field line, provided that variations transverse to the field line are small compared to other characteristic scales in the model.
+%% For example, it requires that photon absorption lengths are long compared to transverse spatial variations.
+%% Ultimately, one may expect that such one-dimensional simplifications along characteristics might break in strongly inhomogeneous fields, as the transverse character of the discharge growth should then be accounted for.
+%% In practice, we therefore expect such an approach to hold mostly for uniform or weakly non-uniform field distributions, such as in motor windings \cite{Farber2023} or sphere-plane gaps.
+
+%% \subsection{Effective ionization coefficient}
+%% The solution equation~\eqref{eq:augmented_ode} can also be written as a sum of eigenmodes
+
+%% \begin{equation}
+%%   \vec{\theta}\left(x\right) = \sum c_i\vec{l}_ie^{k_i x},
+%% \end{equation}
+%% where $\vec{l}_i,k_i$ are eigenvector and eigenvalue pairs of $\bm{\mathcal{A}}$, and $c_i$ are some unimportant constants confined by boundary constraints.
+%% The spatial growth modes are determined by $k_i$, and if any $k_i > 0$ then there is net spatial growth in the asymptotic limit $x\rightarrow\infty$.
+%% The eigenmode with the largest positive eigenvalue therefore defines the effective Townsend ionization coefficient, so we may define
+
+%% \begin{equation}
+%%   \widetilde{\alpha} = \max\left(k_1, k_2, \ldots \right).
+%% \end{equation}
+%% In practice, $\widetilde{\alpha}$ is always positive unless there is a permanent sink of electrons (such as a completely stable negative ion).
+%% This is not to suggest that electrons always multiply exponentially over any gap size since decay modes $k_j < 0$ with $|k_j| \gg |\widetilde{\alpha}|$ completely dominate the evolution at lengths $|\widetilde{\alpha}|x \ll 1$.
+
+\subsubsection{Standard Paschen law}
+We now proceed by showing that equation~\eqref{eq:det_criterion} recovers known expressions.
+Let $M$ denote a neutral molecule and $M^\pm$ its cations and anions, and describe the charged-species dynamics by three reactions: $\e \xrightarrow{k_1} \e + \e + \M^+$, $\e \xrightarrow{k_2}\M^-$, and $\M^-\xrightarrow{k_3} \M + \e$.
+Let $\vec{y} = (y_\e, y_\p, y_\m)$ denote electron, positive-ion, and negative-ion fluxes.
+Also define $\alpha = k_1/v_\e$ and $\eta = k_2/v_\e$ as the standard Townsend ionization and attachment coefficients, and $\delta = k_3/v_\m$ as the detachment coefficient.
+Photoionization is ignored, so the full system is a $3\times3$ linear system.
+The inception criterion is given by $\lambda=0$, so $\bm{\mathcal{A}} = \bm{R}\bm{V}^{-1}$, where
+
+\begin{equation}
+  \label{eq:A_3x3}
+  \bm{\mathcal{A}}
+  =
+  \begin{bmatrix}
+    \alpha - \eta & 0 & \delta \\
+    \alpha & 0 & 0 \\
+    \eta & 0 & -\delta \\
+  \end{bmatrix}.
+\end{equation}
+The row selection operators are simply $\Pie = (1, 0, 0)$, $\Pip = (0, 1, 0)$, $\Pim = (0,0,1)$, and the SEE efficiency vector is just a scalar $\gamma$.
+The matrix exponential can be calculated analytically, and multiplying through all the required terms when computing the determinant yields
+
+%% \begin{equation}
+%%   \label{eq:expA_3x3}
+%%   \bm{M}(d) =
+%%   \begin{bmatrix}
+%%     e^{\left(\alpha-\eta\right)d} & 0  & 0 \\
+%%     \frac{\alpha}{\alpha-\eta}\left(e^{\left(\alpha-\eta\right)d} - 1\right) & 1 & 0\\
+%%     \frac{\eta}{\alpha-\eta}\left(e^{\left(\alpha-\eta\right)d} - 1\right) & 0 & 1\\
+%%   \end{bmatrix},\qquad
+%%   \bm{Q}(0) =
+%%   \begin{bmatrix}
+%%     1 & \gamma & 0 \\
+%%     0 & 0 & 1 \\
+%%     \frac{\alpha}{\alpha-\eta}\left(e^{(\alpha -\eta)d}-1\right) & 1 & 0
+%%   \end{bmatrix}.
+%% \end{equation}
+%% The solution that satisfies $\det \bm{Q}(0) = 0$ is
+
+%% \begin{equation}
+%%   \label{eq:standard_paschen}
+%%   \left(\alpha-\eta\right)d = \ln\left(1 + \frac{1}{\gamma}\frac{\alpha-\eta}{\alpha}\right).
+%% \end{equation}
+%% This is a well-known form of the attachment-corrected Paschen law (see e.g. \cite{Kuffel2000, Raizer1991, Almeida2023}), and further reduces to the standard Paschen law $\alpha d = \ln\left(1 + \gamma^{-1}\right)$ when $\alpha \gg \eta$ or $\eta = 0$.
+%% The solution to this equation when $\alpha>\eta$ is interpreted as the threshold of the conventional attachment-corrected Townsend discharge onset, which describes an exponentially growing number of electron avalanches.
+%% Equation~\eqref{eq:standard_paschen} also has solutions in the attachment region $\alpha < \eta$, which requires only a slight reinterpretation of the main charge carriers.
+%% When $\eta>\alpha$, electrons released from the cathode by ion bombardment are more likely to attach than to ionize, and so the plasma density decays as $e^{(\alpha-\eta)x}$.
+%% Cathode-emitted electrons can nonetheless produce a sufficiently large number of positive ions before the avalanches terminate.
+%% For distances $x$ not too far from the cathode, the main charge carriers in this regime are electrons and positive ions.
+%% Further away from the cathode at distances $(\eta-\alpha)x \gg 1$, the main charge carrier is negative ions, which were produced by electron attachment in the vicinity of the cathode region.
+%% One may show that, in the limit $x\rightarrow\infty$, the number of positive ions that are produced per emitted cathode electron is $\alpha/(\eta-\alpha) > 0$, and the number of SEE electrons is $\gamma\alpha/(\eta-\alpha)$, which may exceed 1.
+%% Particularly, let $\eta = \alpha\left(1 + \varepsilon\right)$ where $\varepsilon>0$, in which case the gain condition is $\alpha d = -\frac{1}{\varepsilon}\ln\left(1 - \frac{\varepsilon}{\gamma}\right)$.
+%% In practice, cathode yields are in the range $\gamma\sim\numrange[range-exponents=individual]{E-2}{E-6}$ and since $\varepsilon \lesssim \gamma$ for a solution to exist, the condition is in practice $\eta\approx\alpha$ \cite{Wen1988, Pancheshnyi2013}.
+
+%% Inclusion of electron detachment is essentially equivalent to adding a source that regenerates electrons as a result of drifting negative ions that may detach their electrons before reaching the anode.
+%% If the negative ions drift too fast or the gap is too short, electron detachment must provide a negligible correction to the standard Paschen curve.
+%% To quantify the role of detachment, one may add a reaction that describes collisional detachment from negative ions, $\M^- \xrightarrow{k_3} \M + \e$ and modify equation~\eqref{eq:A_3x3} accordingly to the form:
+
+%% \begin{equation}
+%%   \label{eq:A_3x3}
+%%   \bm{\mathcal{A}}
+%%   =
+%%   \begin{bmatrix}
+%%     \alpha - \eta & 0 & \delta \\
+%%     \alpha & 0 & 0 \\
+%%     \eta & 0 & -\delta \\
+%%   \end{bmatrix},
+%% \end{equation}
+%% where $\delta = k_3/v_\m$ is the detachment length.
+%% Although we omit the details, it remains possible to compute the matrix exponential, and the resulting inception criterion takes the form
+
+\begin{equation}
+  \label{eq:generalized_paschen}
+  \gamma\alpha\left[\frac{c_+}{\lambda_+}\left(e^{\lambda_+ d} - 1\right) + \frac{c_-}{\lambda_-}\left(e^{\lambda_- d} - 1\right)\right] = 1.
+\end{equation}
+The coefficients are
+
+\begin{align}
+  \lambda_\pm &= \frac{\alpha-\eta-\delta \pm \Delta}{2},\\
+  c_\pm &= \frac{\Delta \mp (\alpha-\eta +\delta)}{2\Delta}, \\
+  \Delta &= \sqrt{\left(\alpha-\eta-\delta\right)^2 + 4\alpha\delta}.
+\end{align}
+Here, $\lambda_+$ is the largest eigenvalue of $\bm{R}\bm{V}^{-1}$, and defines the apparent effective ionization coefficient \cite{Pancheshnyi2013}, and further reduces to $\lambda_+ \rightarrow \alpha-\eta$ when $\delta=0$.
+Equation~\eqref{eq:generalized_paschen} does not have a closed-form solution for $d$ and needs to be solved numerically in the general case.
+When $\delta = 0$ the above expression reduces to
+
+\begin{equation}
+  \label{eq:standard_paschen}
+  \gamma \frac{\alpha}{\alpha-\eta}\left(e^{(\alpha-\eta)d} - 1\right) = 1,
+\end{equation}
+which is the attachment-corrected Paschen curve.
+This has an explicit solution
+
+\begin{equation}
+  (\alpha-\eta)d = \ln\left(1 + \frac{1}{\gamma}\frac{\alpha-\eta}{\alpha}\right).
+\end{equation}
+If $\eta = 0$ or $\alpha \gg \eta$, this further reduces to the most commonly quoted form of the Paschen law: $\alpha d = \ln\left(1 + \gamma^{-1}\right)$.
+The solution to equation~\eqref{eq:standard_paschen} in the regime $\alpha>\eta$ is interpreted as the threshold of the conventional attachment-corrected Townsend discharge onset, which describes an exponentially growing number of electron avalanches.
+However, $\alpha > \eta$ is not a requirement for growth, and equation~\eqref{eq:standard_paschen} possesses solutions also when $\alpha \leq \eta$, requiring a slight reinterpretation of the main charge carriers.
+When $\eta>\alpha$, electrons released from the cathode by ion bombardment are more likely to attach than to ionize, and so the plasma density decays as $e^{(\alpha-\eta)x}$.
+Cathode-emitted electrons can nonetheless produce a sufficiently large number of positive ions before the avalanches terminate.
+For distances $x$ not too far from the cathode, the main charge carriers in this regime are electrons and positive ions.
+Further away from the cathode at distances $(\eta-\alpha)x \gg 1$, the main charge carrier is negative ions, produced by electron attachment in the vicinity of the cathode region.
+One may show that, when $\left(\eta -\alpha\right)d \gg 1$, the number of positive ions that are produced per emitted cathode electron is $\alpha/(\eta-\alpha) > 0$, and the number of SEE electrons is $\gamma\alpha/(\eta-\alpha)$, which may exceed 1.
+%Particularly, let $\eta = \alpha\left(1 + \varepsilon\right)$ where $\varepsilon>0$, in which case the gain condition is $\alpha d = -\frac{1}{\varepsilon}\ln\left(1 - \frac{\varepsilon}{\gamma}\right)$.
+%In practice, cathode yields are in the range $\gamma\sim\numrange[range-exponents=individual]{E-2}{E-6}$ and since $\varepsilon \lesssim \gamma$ for a solution to exist, the condition is in practice $\eta\approx\alpha$ \cite{Wen1988, Pancheshnyi2013}.
+The limit $\alpha\rightarrow\eta$ yields the solution $\alpha d = \gamma^{-1}$.
+This follows from the fact that although there is no net growth electron flux throughout the gap, positive ions still grow at a spatial rate of $\alpha$, and negative ions at a spatial rate of $\eta$.
+With common values for $\gamma$, one may see that the gap size needs to exceed a few hundred to a few thousand avalanche lengths to trigger a discharge.
+For gases where both $\alpha$ and $\eta$ are large, such as for $\text{SF}_6$ or $\text{C}_4\text{F}_7\text{N}$, the corresponding gap distance can become quite short (centimeter or less).
+%In the next section, we will show that these conditions are fundamentally modified when electron detachment is included.
+
+Beyond these elementary considerations, the usefulness of the above textbook forms of the Paschen law remains limited.
+In particular, equation~\eqref{eq:generalized_paschen} does not account for conversion between different types of negative ions -- out of which only a subset may be unstable.
+One may consider, for example, that electron attachment initially produces a \emph{stable} negative-ion species that later converts to an unstable ion.
+This is the case in air, for example, where dissociative attachment at elevated electric fields leads to formation of $\Ominus$, which can later (through charge exchange) lead to formation of $\Otwom$ or $\Othreem$, where the latter ($\Othreem$) is a comparatively stable anion.
+
+\subsubsection{A minimal scheme for dry air}
+\label{sec:air_model}
+
+In this section we consider a basic plasma-kinetic scheme for dry air (\SI{79}{\percent} $\Ntwo$ and \SI{21}{\percent} $\Otwo$).
+We consider the reactive scheme in table~\ref{tab:reactions}, and track electrons and the following ion types: $\Ntwop$, $\Otwop$, $\Ominus$, $\Otwom$, and $\Othreem$.
+Electron transport coefficients and the rates for reactions $k_1$, $k_2$, and $k_3$ are computed using BOLSIG+\cite{Hagelaar2005a}.
+We use the IST-Lisbon \cite{lisbon} cross sections for calculating the electron swarm data, but will also compare against calculations using other cross-section sets \cite{phelps,trinity,biagi}.
+The Townsend ionization and attachment coefficients kareas
+
+\begin{align}
+  \label{eq:alpha_air}
+  \frac{\alpha}{N} &= \frac{\nu_{\Ntwo}k_1 + \nu_{\Otwo}k_2}{\mu_\e E},\\
+  \label{eq:eta_air}
+  \frac{\eta}{N} &= \frac{\nu_{\Otwo}(k_3 + \nu_{\Otwo}k_4N)}{\mu_\e E},
+\end{align}
+where $\nu_{\Ntwo}=0.79$ and $\nu_{\Otwo}=0.21$ are molar fractions.
+For the positive ions, we use a constant reduced ion mobility of $\mu_{\textrm{ion}} N = \SI{5E21}{\per\meter\per\second\per\volt}$ \cite{Bhringer1987}.
+The mobilities for the negative ions are tabulated as a function of field up to $E/N = \SI{160}{\townsend}$ \cite{Bhringer1987}.
+Reactions 1-9 define the electron-ion dynamics of the system, and include the formation of stable ions ($\Othreem$) and unstable ions ($\Otwom$).
+Note that formation of $\Otwom$ occurs by attachment to vibrationally excited $\Otwo$ molecules, which may either autodetach or stabilize through collisional energy exchange with $\Otwo$.
+A similar process occurs for the stabilization of $\Othreem$, hence the three-body representations of these processes.
+
+\begin{table}[ht!]
+  \caption{
+    Plasma chemistry scheme used for studying the inception voltage in dry air.
+    We assume a gas temperature of $T = \SI{300}{\kelvin}$.
+    The body $\M$ in reaction 8 represents either $\Otwo$ or $\Ntwo$, and $T_\e$ indicates the electron temperature.
+  }
+  \label{tab:reactions}
+  \small
+  \begin{tabular}{@{}l|lll}
+    \hline
+    \multicolumn{2}{@{}l}{Reaction} & Rate & Ref. \\
+    \hline
+    \multicolumn{4}{@{}l}{Impact ionization} \\
+    1 & $\e + \Ntwo \xrightarrow{k_1} \e + \Ntwop$ & BOLSIG+  & \cite{Hagelaar2005a,lisbon} \\
+    2 & $\e + \Otwo \xrightarrow{k_2} \e + \Otwop$ & BOLSIG+  & \cite{Hagelaar2005a,lisbon} \\
+    \hline
+    \multicolumn{4}{@{}l}{Attachment and detachment} \\
+    3 & $\e + \Otwo \xrightarrow{k_3} \textrm{O} + \Ominus$ & BOLSIG+  & \cite{Hagelaar2005a, lisbon} \\
+    4 & $\e + \Otwo + \Otwo \xrightarrow{k_4} \Otwom + \Otwo$ & $\num{1.4E-41}\times\frac{300}{T_\e}\exp\left(-\frac{600}{T}\right)\exp\left(\frac{700\left(T_\e - T\right)}{T_\e T}\right)$  & \cite{Kossyi1992} \\
+    5 & $\Otwom + \Otwo \xrightarrow{k_5} \e + \Otwo$ & $\num{1.24E-17}\times \exp\left[-\left(\frac{259}{14.6 + E/N}\right)^2\right]$& \cite{Goodson1974, Pancheshnyi2013} \\
+    6 & $\Ominus + \Ntwo \xrightarrow{k_6} \e + \NtwoO$ & $\num{3.98E-17}\times\left(\frac{E/N}{53}\right)^{-2.72} \exp\left[-\left(\frac{177}{E/N}\right)^2\right]$& \cite{Shuman2023,MalagonRomero2024} \\
+    \hline
+    \multicolumn{4}{@{}l}{Ion conversion} \\
+    7 & $\Ominus + \Otwo \xrightarrow{k_7} \textrm{O} + \Otwom$ & $\num{6.96E-17}\times\exp\left[-\left(\frac{198}{5.6 + E/N}\right)^2\right]$ & \cite{Pancheshnyi2013} \\
+    8 & $\Ominus + \Otwo + \M \xrightarrow{k_8} \Othreem + \M$ & $\num{1.1E-42}\exp\left[-\left(\frac{E/N}{65}\right)^2\right]$  & \cite{Pancheshnyi2013, Hsl2017} \\
+    \hline
+    \multicolumn{4}{@{}l}{Photoionization} \\
+    9 & $\e + \Ntwo/\Otwo \xrightarrow{k_{9}} \hbar\omega$ & Equation~\eqref{eq:photogeneration} & \cite{1982TepVT..20..423Z, Bourdon2007} \\
+    10 & $\hbar\omega + \Otwo \xrightarrow{\gamma_{10}} \e + \Otwop$ & $\gamma_{10} = 0.1$ & \cite{1982TepVT..20..423Z, Bourdon2007} \\
+    \hline
+    \multicolumn{4}{@{}l}{Secondary electron emission} \\
+    11 & $\Ntwop \xrightarrow{\gamma_{11}} \e + \Ntwo$ & $\gamma_{11} = 10^{-3}$ & \cite{Raizer1991} \\
+    12 & $\Otwop \xrightarrow{\gamma_{12}} \e + \Otwo$ & $\gamma_{12} = 10^{-3}$ & \cite{Raizer1991} \\
+    13 & $\hbar\omega \xrightarrow{\gamma_{13}} \e + \Otwo$ & $\gamma_{13} = 0.1$ & \cite{Raizer1991} \\
+    \hline
+  \end{tabular}
+\end{table}
+
+
+
+For the ion conversion and detachment reactions, we mainly use the data by \textcite{Pancheshnyi2013, Hsl2017}.
+Several of the attachment, detachment, and ion conversion rates were recently analyzed by \textcite{Hsl2017} and \textcite{Haefliger2018} using pulsed Townsend experiments.
+The authors showed that reference data from different publishing sources do not quantitatively agree, although they qualitatively obey the suggestions by \textcite{Pancheshnyi2013}.
+The rate for associative detachment reaction $\Ominus + \Ntwo \rightarrow \e + \NtwoO$ is taken from \cite{MalagonRomero2024} rather than those suggested by \textcite{Pancheshnyi2013}, as it was recently discovered that the original experimental determination of this rate \cite{Rayment1978} is inaccurate \cite{Shuman2023}.
+%% We note that the selection of an electron-ion scheme for the discharge is subject to uncertainty.
+%% On the one hand, the measurements by \textcite{Hsl2017} yield the most up-to-date coefficients, and provide corrections to the rates given by \textcite{Pancheshnyi2013}.
+%% On the other hand, these measurements were fitted to a lumped scheme that does not include three-body attachment, nor conversion between distinct types of ions as they transit the gap.
+%% Hence, the derived rates are lumped rates, and they are thus incompatible with schemes that explicitly describe negative-ion conversion.
+%% For this reason, we choose to work with the rates given by \textcite{Pancheshnyi2013}, and in passing note that some of these rates have some uncertainty.
+
+Although we treat attachment to $\Otwom$ as a three-body process, we point out that this formation occurs via sequential two-body processes known as the Bloch-Bradbury mechanism:
+
+\begin{align}
+  \e + \Otwo &\xrightarrow{k_c} \Otwoms,\\
+  \Otwoms &\xrightarrow{k_\tau} \e + \Otwo,\\
+  \Otwoms + \Otwo &\xrightarrow{k_d} \e + \Otwo + \Otwo,\\
+  \Otwoms + \Otwo &\xrightarrow{k_s} \Otwom + \Otwo.\\
+\end{align}
+Here, $\Otwoms$ represents vibrationally excited $\Otwo$, $k_c$ is the electron capture rate, $k_\tau$ the auto-detachment rate, $k_s$ the collisional stabilization rate, and $k_d$ a collisional detchment rate $\Otwoms$.
+Formation of stable $\Otwom$ thus occurs via attachment to a vibrationall excited state, which may detach its electron via auto-ionization or collisional detachment.
+Stabilization occurs through collisions with a third body, and one may show that the above process can be represented as a three-body process
+
+\begin{equation}
+  \e + \Otwo + \Otwo \xrightarrow{k_a} \Otwom + \Otwo,
+\end{equation}
+where
+
+\begin{equation}
+  k_a = \frac{k_c k_s}{k_\tau + \left(k_s + k_d\right)\left[\Otwo\right]}.
+\end{equation}
+If collisional stabilization dominates ($k_\tau \gg \left(k_s + k_d\right)\left[\Otwo\right]$), then the process is effectively a two-body process $\e + \Otwo \rightarrow \Otwom + \Otwo$ with a rate $k_c \frac{k_s}{k_s + k_d}$.
+In the opposite limit when auto-detachment dominates ($k_\tau \gg \left(k_s + k_d\right)\left[\Otwo\right]$), then $k_a\approx k_c k_s/k_\tau$ and the dynamics are effectively three-body.
+\textcite{Kossyi1992} reports the three-body rate
+
+\begin{equation}
+  \label{eq:three_body_rate}
+  k_a\approx \frac{k_c k_s}{k_\tau} = \num{1.4E-41}\times\frac{300}{T_\e}\exp\left(-\frac{600}{T}\right)\exp\left(\frac{700\left(T_\e - T\right)}{T_\e T}\right)
+\end{equation}
+where $T_\e$ is the electron temperature, which is the reaction rate we use in the models.
+To determine if three-body dynamics represent reasonable dynamics in our regime, we may consider the saturation pressure $k_\tau \sim  \left(k_s + k_d\right)\left[\Otwo\right]$.
+\textcite{Aleksandrov1988} reports $\left(k_s + k_d\right) \sim \SI{E-15}{\cubic\meter\per\second}$ and $k_\tau\sim\SI{E10}{\per\second}$.
+From this, we find that the three-body dynamics exhibit substantial two-body dynamics already around a pressure of \SI{1}{\bar}, which is at the bottom of our investigated pressure range.
+Unfortunately, individual values of the collisional rates $k_s$, $k_d$ are not known, and the temperature-dependent expressions from \textcite{Kossyi1992} are the best that we can do at the moment.
+We speculate, nonetheless, that we are indeed overestimating the formation of $\Otwom$ due to deficiencies in the three-body approximation.
+A similar conclusion might apply also to the formation of $\Othreem$, whose three-body dynamics relies on a similar transition region between autodetachment and collisional stabilization.
+This reaction is, of course, of substantial importance as it is the only reaction that becomes a permanent electron sink in our model.
+
+The energy threshold for free electron liberation from $\Othreem$ indicates that this ion is comparatively stable.
+%Conversion of $\Othreem$ was not included in earlier studies \cite{Ferreira2019, Almeida2020, Ferreira2021,Pasko2023}, although one may certainly conjecture that this ion can begin to dissociate at moderate electric fields of \SIrange{70}{100}{\townsend}.
+Collisional electron detachment $\Othreem \rightarrow \Othree + \e$ has an energy barrier of around \SI{2.1}{\electronvolt}, while the dissociation pathway $\Othreem \rightarrow \Ominus + \Otwo$ has a lower energy barrier of approximately \SIrange{1.6}{1.8}{\electronvolt}.
+These barriers are substantially higher than the expected mean negative-ion energies, typically in the range of \SIrange{0.1}{0.2}{\electronvolt} at $E/N = \SI{100}{\townsend}$ \cite{Pancheshnyi2013}.
+Possibly, $\Othreem$ might be stable only in a moderate sense, and begin to contribute to the attachment-detachment cycle only when the gap distance becomes very long.
+We are not aware of any experimental measurements of these rate coefficients.
+Measurements or explicit inclusion in curve-fitting of pulsed Townsend experiments \cite{Hsl2017} would benefit predictive accuracy and understanding of the role of $\Othreem$.
+
+%% We use a reconstructed two-body formulation of attachment formation of $\Otwom$, which proceeds via the reaction $\e + \Otwo \xrightarrow{k_4} \Otwoms$.
+%% The excited $\Otwoms$ ion may either autodetach via $\Otwoms \xrightarrow{k_5} \e + \Otwo$, or stabilize through energy exchange via molecular oxygen, $\Otwoms + \Otwo \xrightarrow{k_6} \Otwom + \Otwo$.
+%% It is common to write this process as a three-body reaction $\e + \Otwo + \Otwo \xrightarrow{k_a} \Otwom + \Otwo$, with a three-body rate given by
+
+%% \begin{equation}
+%%   k_a = \frac{k_4k_6}{k_5 + k_6 [\Otwo]}.
+%% \end{equation}
+%% In the limit $k_5 \gg k_6\left[\Otwo\right]$, the dynamics are effectively three-body with $k_a = k_4k_6/k_5$.
+%% In the opposite limit $k_5 \ll k_6\left[\Otwo\right]$, the dynamics are dominated by collisional stabilization, and the autodetaching back-reaction can effectively be ignored.
+%% The attachment dynamics can then be represented by a single two-body reaction $\e + \Otwo \xrightarrow{k_4} \Otwom + \Otwo$.
+%% One should note that $k_5 \sim k_6\left[\Otwo\right]$ around $p = \SIrange{0.5}{1}{\bar}$, which determines the transition to effective two-body attachment dynamics.
+%% For the purposes of covering all pressures without extrapolating beyond the validity of the three-body simplification, we do not simplify the attachment dynamics with a three-body reaction, but use the reactions as given in the table.
+
+%% The rates $k_4$, $k_8$, and $k_9$ are reconstructed from effective three-body reaction rates by reverse engineering the known three-body rates \cite{Aleksandrov1988, Pancheshnyi2013}, assuming an auto-detachment rate of \SI{E10}{\per\second}.
+
+%% \begin{align}
+%%   \label{eq:k4}
+%%   k_4(E/N) &= \ldots \\
+%%   \label{eq:k9}
+%%   k_9(E/N) &= \ldots \\
+%%   \label{eq:k12}
+%%   k_{12}(E/N) &= \ldots
+%% \end{align}
+
+
+
+
+%Both $\alpha/N$ or $\eta/N$ are uncorrected, i.e., they do not account for collisional detachment or auto-detachment, both of which are also sources of free electrons.
+
+
+The photoionization terms are computed using a multigroup two-stream approximation fitted to the Zheleznyak absorption model \cite{1982TepVT..20..423Z}.
+The physical number of photons that is produced per electron is
+
+\begin{equation}
+  \label{eq:photogeneration}
+  \rho = \nu_{\text{exc}}\frac{p_q}{p_q + p}\left(k_1\nu_{\Ntwo} + k_2\nu_{\Otwo}\right)N,
+\end{equation}
+where $p_q = \SI{40}{\milli\bar}$ is a quenching pressure and $\nu_{\text{exc}}=0.6$ is a relative excitation efficiency.
+We consider a six-group two-stream reconstruction with parameters that are fit to the Zheleznyak absorption function \cite{1982TepVT..20..423Z,Liu2004,Bourdon2007}.
+Details regarding the fitting constant are given in Appendix~\ref{sec:zheleznyak_fit}.
+The photoionization and photoemission efficiencies are taken as $\xi_j = 0.1$ and $\gamma_{13}=0.1$ for all two-stream groups.
+By default, we use a two-stream cone angle of 45 degrees, so that $\Delta\Omega/(4\pi) = 1/4$.
+We explicitly point out that we are only considering photons that are capable of causing photoionization, which typically have energies $>\SI{12}{\electronvolt}$.
+The wider photon spectrum down to the work function of the cathode is not included.
+As this spectrum might be broader and not absorbed as rapidly in the gas, one might expect substantial corrections to the photoemission terms if this spectrum is included.
+The ion-induced SEE processes are defined by reactions 15 and 16 that describe ion bombardment, and we use an SEE efficiency of $\gamma_{11} = \gamma_{12} = \num{E-3}$.
+There is some uncertainty in the selection of these constants, and we study the sensitivity to this modeling parameter later in the paper.
+
+For a given reduced field $E/N$, the negative-ion velocity $v_\m$ is essentially independent of pressure, and the negative-ion transit time $d/v_\m$ is thus pressure-independent.
+The collisional detachment rates (reaction 5 and 7) scale with $N$ and therefore $p$, so the average number of collisional detachment reactions as the ions transit the gap is essentially proportional to the product $pd$.
+As $pd$ increases, either due to increased pressure (which decreases the detachment time) or increased distance (which increases the negative-ion transit time), negative ions are increasingly likely to detach their electrons.
+Detached electrons can then contribute further to electron impact ionization (reactions 1 and 2), which leads to a self-sustained and growing discharge current in the gap.
+
+%% \section{Theoretical Paschen curves for dry air in uniform fields}
+%% \label{sec:dry_air}
+
+%% In this section we consider theoretical Paschen curves for dry air in uniform fields, using the scheme in section~\ref{sec:air_model}.
+
+%% \subsection{Pressure scaling and role of photoemission}
+
+%% \begin{figure}[h!t!b!]
+%%   \centering
+%%   \includegraphics{PressureCurves}
+%%   \caption{
+%%     a) and b): Paschen curves using the chemistry scheme in table~\ref{tab:reactions}, where a) shows the breakdown voltage and b) shows the corresponding reduced electric field.
+%%     c) and d): Paschen curves similar to a) and b), but without photoemission on the cathode.
+%%     Each curve was computed as a function of $d$ for a specific $p$ (given in the legend), and the results were then plotted as a function of $pd$.
+%%   }
+%%   \label{fig:PressureCurves}
+%% \end{figure}
+
+%% Figure~\ref{fig:PressureCurves}a) shows the inception voltage curves for pressures $p = \SIrange{E-3}{10}{\bar}$, while figure~\ref{fig:PressureCurves}b) shows the corresponding reduced electric field.
+%% The data are computed using the full chemistry scheme, and show that the curves do align at either the lower or the upper $pd$ ranges.
+%% Near the upper end, the deviation between the curves is primarily due to three-body effects.
+%% At lower pressure, collisional stabilization of $\Otwoms$ and $\Othreems$ is effectively lower, which puts a larger number of free electrons back in circulation from autodetachment (reaction 5).
+%% Lack of $\Othreem$ stabilization (reaction 11) also contributes in the same way.
+%% At high pressure, collisional stabilization completely dominates over the autodetaching back-reactions 5 and 11.
+%% We demonstrate this directly figures~\ref{fig:PressureCurves}c) and d), which show the same data as in a) and b), but with photoemission effectively turned off.
+%% In these figures the deviation at high $pd$ persists, while the deviations at lower $pd$ effectively disappear.
+%% The lack of importance of three-body effects at small $pd$ is explained by the field conditions, where $E/N$ is sufficiently large to guarantee $\alpha \gg \eta$ in the gap, so that attachment hardly matters for the breakdown condition.
+%% The collapse of all curves at $pd < \SI{0.1}{\bar\milli\meter}$ when photoemission is disabled is thus explained by means of the relative contribution of ionizing photons with respect to the number of impact ionization events.
+%% We have used a SEE efficiency for the ions of \num{E-6}, whereas the SEE efficiency for the photons is \SI{10}{\percent}.
+%% Although there is some uncertainty in these numbers, one may note that at lower pd, most of the generated photons are not absorbed in the gas but strike the cathode.
+%% Equation~\eqref{eq:photogeneration} shows that there are approximately $0.6$ ionizing photons generated per impact ionization event at pressures substantially below $p_q$.
+%% Consequently, even when we only account for just \SI{0.2}{\percent} of the photons in the two-stream approximation, SEE fluxes due to photon bombardment outweigh SEE fluxes from ion bombardment by over a factor of 100 at small $pd$.
+%% There is, of course, some uncertainty in these numbers, since we have assumed a rather low value of the ion bombardment efficiency.
+%% As $pd$ increases, a larger fraction of the generated photons are absorbed in the gas before they reach cathode.
+%% The importance of ionizing photons is then best contrasted against the electron impact ionization term, as these two mechanisms are the only ones that generate positive ions.
+%% However, the photoionization term is substantially smaller than impact ionization term, owing to both its efficiency, quenching, and three-dimensional characteristics.
+%% Thus, the relative contribution of ionizing photons decreases as $pd$ increases.
+
+%% The horizontal dashed line in figures~\ref{fig:PressureCurves}b) and d) indicate the value of $E/N$ where there is net balance between electron impact ionization and dissociative attachment, i.e., $\alpha=\eta$ which occurs at $E/N\approx \SI{120}{\townsend}$.
+%% Independent of pressure, every curve crosses beneath this line at $pd = \SIrange{10}{20}{\bar\milli\meter}$.
+%% The physical reason this happens is due to electron detachment from $\Otwom$, which acts as a delayed source of electrons.
+%% It is useful, first, to understand the $pd$ scaling of the detachment process.
+
+
+%% \subsection{Role of negative-ion kinetics}
+
+%% Figure~\ref{fig:DetachmentCurves}a) shows the Paschen curves for $p=\SI{1}{\bar}$ for the full chemistry scheme, and for three modified schemes:
+%% \begin{enumerate}
+%% \item Without collisional detachment (reaction 7 turned off).
+%% \item No collisional dissocation of $\Othreem$ (no reaction 12).
+%% \item No $\Othreem$ formation (reaction 9 turned off).
+%% \end{enumerate}
+%% We find that disregard of electron detachment leads to substantial errors starting from $pd=\SI{1}{\bar\milli\meter}$ where the error is \SI{1}{\percent}.
+%% At larger gaps of $pd = \SI{E4}{\bar\milli\meter}$, the error is above \SI{40}{\percent}.
+%% Similarly, we find that the assumption of stable $\Othreem$ ions is valid over a large $pd$ range, where significant errors occur when $pd\approx\SI{E2}{\bar\milli\meter}$.
+%% In practice, we do not expect $\Othreem$ to be fundamentally since the energy barrier for reaction 12 is only \SI{0.5}{\electronvolt}.
+%% As $pd$ increases further beyond this range, the relevance of gradual conversion of $\Othreem$ into $\Otwom$ is of increasing importance, and leads to corrections of \SI{10}{\percent} at $pd=\SI{E4}{\bar\milli\meter}$.
+
+%% \begin{figure}[h!t!b!]
+%%   \centering
+%%   \includegraphics{DetachmentCurves}
+%%   \caption{
+%%     a) Inception fields using the full scheme, and some modified schemes (indicated by their labels).
+%%     b) Error in the predicted inception voltage for the modified schemes compared to the full scheme.
+%%   }
+%%   \label{fig:DetachmentCurves}
+%% \end{figure}
+
+\subsection{Experiments}
+\label{sec:experiments}
+
+\subsubsection{Experimental setup}
+We compare the predictions of the theoretical model against experiments, using the experimental setup shown in figure~\ref{fig:ExperimentalSetup}.
+It consists of a cascaded $\pm\SI{1.2}{\mega\volt}$ DC HighVolt GPM voltage source with a $<\SI{3}{\percent}$ ripple.
+A damping resistor is placed in series with the voltage source, and the voltage is transferred to a pressure cell through a \SI{400}{\kilo\volt}-rated \SF-filled bushing.
+Due to the limitations of the bushing, all experiments were performed at $U \leq \SI{400}{\kilo\volt}.$
+The discharge gap consists of a sphere electrode with a \SI{10}{\centi\meter} diameter and a plane electrode with a \SI{20}{\centi\meter} diameter.
+Both electrodes are made of aluminum and are comparatively smooth with only minor surface defects.
+The electrode setup is housed in a pressure cell rated to $\SI{14}{\bar}$ absolute pressure.
+The predictions of the one-dimensional model was tested for gap distances $d = \SI{10}{\milli\meter}$ and $d=\SI{20}{\milli\meter}$, for gaps up to $pd = \SI{160}{\bar\milli\meter}$.
+The field distribution is weakly non-uniform for both gaps, where the maximum field exceeds the average field by about \SI{25}{\percent} for the \SI{20}{\milli\meter} gap, and by \SI{12}{\percent} for the \SI{10}{\milli\meter} gap.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{ExperimentalSetup}
+  \caption{Sketch of the experimental setup consisting of a pressure vessel (dashed lines), test gap, and HVDC source.
+    The photograph shows a breakdown arc at $d=\SI{20}{\milli\meter}$.
+  }
+  \label{fig:ExperimentalSetup}
+\end{figure}
+
+Our experiments provide the average breakdown voltage $U_{\text{BD}}$ rather than the inception voltage $U_{\text{inc}}$ given by equation~\eqref{eq:det_criterion}.
+As breakdown does not happen without inception, the inequality $U_{\text{BD}} \geq U_{\text{inc}}$ always holds.
+Furthermore, in quasi-uniform gaps, the breakdown voltage is normally quite close to the inception voltage and then $U_{\text{BD}} \approx U_{\text{inc}}$.
+
+\subsubsection{Experimental procedure}
+The experimental procedure consisted of the following steps:
+The electrodes were cleaned with isopropanol and the pressure vessel was evacuated to \SI{8}{\milli\bar}.
+The vessel was then pressurized to an absolute pressure of \SI{14}{\bar} with synthetic air, consisting of \SI{79}{\percent} $\Ntwo$ and \SI{21}{\percent} $\Otwo$ with \SI{99.999}{\percent} purity.
+We only measured the temperature and pressure the gas outlet, which was consistently \SI{20(1)}{\celsius}, with a pressure uncertainty of \SIrange{5}{10}{\milli\bar} for each breakdown series.
+A DC voltage was applied with a ramp rate of \SI[per-mode=symbol]{20}{\kilo\volt\per\second} up to \SI{75}{\percent} of the expected breakdown voltage, and continued at \SI[per-mode=symbol]{5}{\kilo\volt\per\second} until breakdown.
+If breakdown did not occur, the voltage was held at \SI{400}{\kilo\volt} for 2 minutes and then reduced to zero.
+If breakdown did occur, the voltage was first reduced to zero and the ramp-up procedure was then repeated until 10 breakdowns occurred.
+We always began with the negative-polarity tests (10 breakdowns), followed by the positive polarity tests (another 10 breakdowns).
+After testing both polarities at one pressure, the pressure was reduced by \SI{1}{\bar} and the tests were repeated for the lower pressure.
+There was no gas flushing or forced gas circulation between breakdown events, and we can therefore not rule out accumulation of byproducts in the discharge gap.
+
+The time between each breakdown event ranged between \SIrange{30}{120}{\second}, mostly determined by the recharge time of the HVDC source.
+We have not measured the temperature on the surface of the electrodes and we thus do not know if there is a temperature rise in the air gap after the gas recovers from a spark.
+The vessel is sealed with no measurable leakage over a 24 hour period, so apart from byproduct formation there is no temperature-dependency on the neutral density itself.
+After 20 BD events had occured (10 at each polarity), the pressure was reduced by \SI{1}{\bar}, which also causes convective mixing of the gas within the pressure cell.
+At the end of the \SI{20}{\milli\meter} test series we also performed additional measurements using a reverted test procedure where we started at the lowest pressure and gradually increased pressure.
+These measured breakdown voltages were virtually identical to the original measurements.
+
+\subsubsection{Field distribution}
+Calculating the breakdown curves requires a reasonable approximation to the electric field between the sphere and the plate.
+We approximate our setup by an ideal sphere-plane gap, in which case the field distribution can be computed exactly as a series expansion in bispherical coordinates.
+The formal solution to equation~\eqref{eq:theta_soln} then requires that the propagator $\bm{M}(d)$ is path-ordered, i.e., it can no longer be computed as a single matrix exponential.
+We achieve this by decomposing the domain $x=[0,d]$ on a one-dimensional grid with adaptive resolution.
+The propagator on each interval is computed independently using a two-term Magnus series with Gauss-Legendre quadrature points, which yields fourth order accuracy.
+The total propagator is then obtained by path-ordered multiplication of the interval propagators.
+We point out that the predicted inception voltage in non-uniform fields are different for positive and negative polarity.
+
+
+
+
+\section{Results}
+\label{sec:results}
+
+
+\subsection{Comparison between predictions and experiments}
+Figure~\ref{fig:ExperimentalComparison}a) shows a comparison between the experimentally measured breakdown voltages and the theoretical predictions with a gap distance $d = \SI{20}{\milli\meter}$.
+Figure~\ref{fig:ExperimentalComparison}b) shows the same comparison for $d = \SI{10}{\milli\meter}$.
+In these calculations, we keep the gap length $d$ constant and vary the pressure $p$.
+We find good agreement between the predictions and the measurements over the whole $pd$ range for both gap distances.
+This includes, also, the prediction of a polarity effect in the positive/negative breakdown voltages, which manifests at $pd > \SI{60}{\bar\milli\meter}$.
+In figures~\ref{fig:ExperimentalComparison}a) and~b), we include curves that show the theoretical results without electron detachment.
+These curves are essentially the standard Paschen law where all negative ions are permanent electron sinks, and are the inhomogeneous analogue of equation~\eqref{eq:standard_paschen}.
+Figure~\ref{fig:ExperimentalComparison} also contains curves corresponding to the streamer criterion, using a streamer constant of \num{18}.
+There is substantial disagreement between these curves and the experimental data points, particularly at $pd$ values exceeding \SIrange{30}{40}{\bar\milli\meter}.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{ExperimentalComparison}
+  \caption{Comparison between theoretical predictions and breakdown measurements.
+    a) Gap size $d = \SI{20}{\milli\meter}$.
+    b) Gap size $d = \SI{10}{\milli\meter}$.
+    For reference, we have included calculations without electron detachment, shown as a black dashed line, also plotted against the left $y$-axis.
+    The dotted line shows the predictions of the streamer criterion, using a streamer constant of 18.
+  }
+  \label{fig:ExperimentalComparison}
+\end{figure}
+
+To infer about the nature of the inception mechanism, we consider calculations of the effective ionization integral and the apparent effective ionization integral.
+The effective ionization integral is defined as
+
+\begin{equation}
+  \label{eq:ionization_integral}
+  I_\alpha = \int_0^d\max\left(\alpha-\eta,0\right)\diff x,
+\end{equation}
+while the apparent effective ionization integral is defined as
+
+\begin{equation}
+  \label{eq:apparent_ionization_integral}
+  I_\lambda = \int_0^d\max\left(\lambda_{\text{max}},0\right)\diff x,
+\end{equation}
+where $\lambda_{\text{max}}$ is the largest eigenvalue of $\bm{R}\bm{V}^{-1}$.
+The two terms differ in the sense that $I_{\alpha}$ only considers electron impact ionization as a source to free electrons, whereas $I_\lambda$ also account for ion conversion, transport, electron detachment, and photoionization.
+There can be some uncertainty in the selection of $\alpha$ and $\eta$ owing to the swarm data measurements.
+Electron swarm data is usually determined by curve fitting to pulsed Townsend experiments \cite{Vemulapalli2025}, and the electron cross-sections are then later fitted for consistency with the swarm data.
+Cross-section fitting is not unique, and multiple cross section sets can therefore reproduce the same swarm data, which directly translates into an inherent data uncertainty in our calculations.
+To examine the impact of the selection of electron transport data, we calculate $I_\alpha$ and $I_\lambda$ using cross sections from the Phelps database \cite{phelps}, the IST-Lisbon database \cite{lisbon}, the Biagi database \cite{biagi}, and the Trinity database \cite{trinity}.
+Figure~\ref{fig:IonizationIntegrals} shows both ionization integrals using the four databases, calculated for $d = \SI{10}{\milli\meter}$, $p=\SI{10}{\bar}$.
+We find that the calculated values of $I_\alpha$ are too small to explain the breakdown process in terms of a streamer criterion.
+At positive polarity, we find that the Biagi database produces a value $I_\alpha\approx 5$ and all other databases produce $I_\alpha< 1$ at the positive mean breakdown voltage.
+At negative polarity all databases produce $I_\alpha < 1$ at the negative mean breakdown voltage.
+On the other hand, $I_\lambda$ is greater for all cross-section sets, with values ranging between \numrange{2}{8} at negative polarity and \numrange{6}{11} at positive polarity.
+In our experiments, asserting a purely streamer-dominated breakdown process is questionable, as the values of $I_\alpha$ are too low.
+The largest calculated value is $I_\alpha\approx 5$ for the Biagi database, which corresponds to approximately $I_\alpha = \num{148}$ electrons.
+On the other hand, the calculated values of $I_\lambda$ indicates an effective growth that exceeds impact ionization growth by several orders of magnitude.
+Hence, the breakdown process must be substantially assisted by electron-detachment processes in the gap, where collisionally detached electrons produce additional charge carriers before they eventually reattached to reform a negative ion.
+One may conjecture that an improved streamer criterion can be obtained by using $I_\lambda$ in place of $I_\alpha$ as the basis for the streamer constant.
+However, this may lead to both quantitative and qualitative mispredictions.
+First, both the experiments and the improved inception criterion \eqref{eq:det_criterion} exhibit a polarity dependence in the discharge inception voltage, which can not be recovered from $I_\lambda$.
+Second, $I_\lambda$ can be substantial even though $I_\alpha < 0$, indicating discharge inception can occur also when $\alpha < \eta$, i.e., in a regime where conventional streamer formation is not possible.
+Hence, $I_\lambda$ can not be fundamentally associated with streamers.
+
+%% In this regime, the streamer mechanism can not operate since it relies on fast development of space charge layers, which is not possible unless electrons greatly outnumber positive ions.
+%% We conclude, therefore, that the streamer mechanism does not explain the breakdown process for $pd > \SI{20}{\bar\milli\meter}$ in these experiments.
+%% %Rather, the breakdown process proceeds via the attachment-detachment cycle where collisionally detached electrons produce additional charge carriers before they eventually reattach to reform a negative ion.
+%% That is, the breakdown process is substantially determined by the kinetics of negative ions rather than just the electrons.
+%Finally, we would like to remark on the usage of the streamer criterion, with similar conclusions as \textcite{Teich1991} and \textcite{Hosl2019}.
+%From figure~\ref{fig:ExperimentalComparison} we observe that while the streamer criterion overpredicts the breakdown voltage, the disagreement is relatively modest.
+%One could, of course, attempt to improve agreement by considering the streamer constant to be a fitting parameter.
+%Another approach is to replace the integrand in the streamer criterion by the apparent ionization coefficient $\alpha_{\text{eff}}$ \cite{Pancheshnyi2013}, also taking electron detachment into account.
+%This coefficient is easily obtained as a function of $E/N$ from the eigenvalues of $\bm{R}\bm{V}^{-1}$.
+%However, in a uniform gap, the corresponding criterion might become qualitatively incorrect.
+%% Its failure is due to the a priori assumption that a streamer might emerge as a consequence of a sufficiently large value of $\alpha_{\text{eff}} d$.
+%% However, streamers only emerge due to rapid electron-ion charge separation which requires electrons to be a dominant charge carrier.
+%% In other words, emergence of streamers can occur when $\alpha > \eta$, which is not necessarily fulfilled when $\alpha_{\text{eff}} > 0$.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{IonizationIntegrals}
+  \caption{Calculated values of the ionization integrals $I_\alpha$ and $I_\lambda$ for the sphere-plane gap with $d = \SI{10}{\milli\meter}$ and $p=\SI{10}{\bar}$.
+    The markers $\pm U_{\text{bd}}$ indicate the experimentally determined breakdown voltages.
+  }
+  \label{fig:IonizationIntegrals}
+\end{figure}
+
+%% Figure~\ref{fig:SensitivityX} shows the predictions for the \SI{20}{\milli\meter} gap for the different cross sections, and shows that the model predictions still agree surprisingly well with experiments.
+%% The Trinity database \cite{trinity} leads to the highest breakdown voltage prediction, and the Biagi database \cite{biagi} yields the lowest predicted voltage.
+%% Results computed with these two databases show that the Trinity database predicts voltages that are approximately \SIrange{4}{5}{\percent} higher than predictions using the Biagi database.
+%% For comparison, we have included the streamer criterion and detachmentless curves from figure~\ref{fig:ExperimentalComparison}; we note that the deviation between the streamer criterion and the inception criterion has the same relative magnitude for all selections of cross sections.
+%% Hence, errors due to potential inaccuracies in the transport data are essentially smaller than modeling errors arising from invocation of the streamer criterion or failure to account for electron detachment.
+
+%% For example, in figure~\ref{fig:ExperimentalComparison}a) this difference is almost \SI{100}{\kilo\volt} at $pd = \SI{160}{\bar\milli\meter}$, where the experimentally determined breakdown voltage was \SIrange{350}{375}{\kilo\volt}.
+%% Figures~\ref{fig:ExperimentalComparison}a) and b) also include the values of the ionization integral for both gaps, which is defined by
+
+
+%% where $\alpha$ and $\eta$ were given by equations~\eqref{eq:alpha_air} and~\eqref{eq:eta_air}; we also include the streamer criterion, obtained by solving equation~\eqref{eq:ionization_integral} for a streamer constant of 10 (used throughout the paper).
+%% These curves show that the ionization integral is less than 5 over almost the entire measured $pd$ range -- in the conventional streamer-criterion sense corresponding to approximately \num{148} electrons.
+%% It is possible that streamers form for $pd = \SI{10}{\bar\milli\meter}$ where the ionization integral is $> 5$, although this remains speculative without further investigation of the breakdown process.
+%% However, the ionization integral drops to zero for $pd > \SI{60}{\bar\milli\meter}$ for the \SI{20}{\milli\meter} gap and for $pd > \SI{30}{\bar\milli\meter}$ for the \SI{10}{\milli\meter} gap, indicating that $\alpha < \eta$ beyond these two $pd$ ranges.
+%% In this regime, the streamer mechanism can not operate since it relies on fast development of space charge layers, which is not possible unless electrons greatly outnumber positive ions.
+%% We conclude, therefore, that the streamer mechanism does not explain the breakdown process for $pd > \SI{20}{\bar\milli\meter}$ in these experiments.
+%% Rather, the breakdown process proceeds via the attachment-detachment cycle where collisionally detached electrons produce additional charge carriers before they eventually reattach to reform a negative ion.
+%% That is, the breakdown process is substantially determined by the kinetics of negative ions rather than just the electrons.
+
+
+\subsection{Sensitivity to cross sections}
+\label{sec:SensitivityX}
+To further examine the impact of the selection of electron transport data, we now consider a direct comparison between the experimental results and curves calculated using cross sections from the four databases.
+Figure~\ref{fig:SensitivityX} shows the predictions for the \SI{20}{\milli\meter} gap for the different cross sections, and shows that the model predictions agree fairly well with experiments for all four databases.
+The Trinity database \cite{trinity} leads to the highest breakdown voltage prediction, and the Biagi database \cite{biagi} yields the lowest predicted voltage.
+For comparison, we have included the streamer criterion and detachmentless curves from figure~\ref{fig:ExperimentalComparison}; we note that the deviation between the streamer criterion and the inception criterion has the same relative magnitude for all cross section sets.
+In summary, errors due to potential inaccuracies in the transport data are substantially smaller than modeling errors arising from invocation of the streamer criterion or failure to account for electron detachment.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{SensitivityX}
+  \caption{Comparison between the positive-polarity breakdown voltages for the \SI{20}{\milli\meter} gap with predictions using various electron collision cross section data sets.
+    The curves show calculations performed using the Trinity \cite{trinity}, Phelps \cite{phelps}, IST-Lisbon \cite{lisbon}, and Biagi \cite{biagi} cross sections as input to BOLSIG+.
+  }
+  \label{fig:SensitivityX}
+\end{figure}
+
+\subsection{Sensitivity to ion-conversion processes}
+\label{sec:SensitivityIon}
+In this section we consider a comparison of the experimental results to theoretical curves with modified negative-ion kinetics.
+The case without $\Otwom$ detachment was already presented in the previous sections, so we consider the remaining modified schemes:
+
+\begin{enumerate}
+\item No conversion from $\Ominus$ to $\Otwom$.
+\item No conversion from $\Ominus$ to $\Othreem$.
+\end{enumerate}
+Figure~\ref{fig:SensitivityIons}a) and b) show the comparison between the experimental results in both gaps and the predictions of the above modified schemes.
+We observe, in general, that the curves show agreement for gaps $pd < \SI{20}{\bar\milli\meter}$.
+There are two reasons why the negative-ion chemistry does not matter in short gaps.
+1) The negative-ion residence time generally decreases for smaller $pd$, as discussed earlier, so conversion processes followed by detachment have limited time to operate.
+2) The electric field is higher and $\alpha > \eta$, at least for $pd < \SI{30}{\bar\milli\meter}$, so electron impact ionization outweighs electron detachment.
+The curves for $pd > \SI{20}{\bar\milli\meter}$ show increasing disagreement with experiments, which is explained as follows:
+
+\begin{enumerate}
+\item  Ignoring the formation of ozone via $\Ominus + \Otwo \rightarrow \Othreem$ leads to underprediction of the breakdown values for both gap sizes.
+  The reason for this is that the two destruction pathways of $\Ominus$ yield formation of either $\Otwom$ or $\Othreem$, and the latter is a more stable ion that does not cause direct detachment.
+  Turning off the $\Othreem$ formation pathway leads to numerical overabundance of $\Ominus$ and thus also $\Otwom$, which can readily detach its electron and seed further discharge growth.
+%% \item Ignoring the dissociation pathway of $\Othreem$ ions into $\Ominus$ does not lead to substantial disagreement with experiments or calculations that included this reaction (figure~\ref{fig:ExperimentalComparison}).
+%%   We note that $\Othreem$ contributes to free electrons only through several conversion steps: $\Othreem \rightarrow \Ominus \rightarrow \Otwom \rightarrow \e$, and the efficiency of this compound conversion pathway does not substantially influence the breakdown values in our experiments.
+%%   However, the meta-stability of $\Othreem$ in our experiments must be considered to be an effect of the gap length, and we can not ascertain that its stability is a general feature of discharge in air.
+%%   In longer gaps, dissociation of $\Othreem$ through multi-step conversion to $\Otwom$ can occur within the residence time of the negative ion, and in this case $\Othreem$ conversion becomes an increasingly relevant source of free electrons.
+\item Ignoring conversion $\Ominus\rightarrow\Otwom$ causes substantial overprediction of the breakdown value, at a level comparable to disregard of collisional detachment.
+  There are two pathways that lead to $\Otwom$ formation, where one is through effective three-body attachment which is mostly efficient at low electric fields.
+  The other is through dissociative attachment of $\Otwo$, followed by conversion of $\Ominus$ to $\Otwom$ via charge exchange.
+  At moderate fields of \SIrange{70}{100}{\townsend}, this pathway is the main formation mechanism of $\Otwom$, and thus also a major source of free electrons.
+\end{enumerate}
+In summary, we find that the experimental results can only be explained by including negative-ion conversion from $\Ominus$ to both $\Othreem$ and $\Otwom$.
+%% It is possible that $\Othreem$ is sufficiently slow to convert to $\Otwom$ within its residence time that it can be considered a marginally stable ion in our experiments.
+%% However, we'd like to reiterate that we do not expect this stability to be a universal feature of this ion.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics{SensitivityIons}
+  \caption{Model sensitivity to modified negative-ion conversion schemes, where some of the ion conversion pathways are ignored.
+    a) \SI{20}{\milli\meter} gap.
+    b) \SI{10}{\milli\meter} gap.
+  }
+  \label{fig:SensitivityIons}
+\end{figure}
+
+\subsection{Sensitivity to SEE parameters}
+\label{sec:SensitivitySEE}
+In this section we present calculations using different values of the ion-induced SEE yield as well as the photoionization coupling.
+These calculations are intended to illustrate the sensitivity of these parameters in the modeling work, and to quantitatively benchmark the influence of these parameters relative to the role of electron detachment.
+Figure~\ref{fig:SensitivitySEE}a) shows the theoretical curves using SEE ion yields of \numrange{E-4}{E-2}, compared against negative-polarity experiments.
+First, we find that there is some variation in the predicted discharge voltage as we vary this parameter.
+However, this variation shifts the predicted curves by only \SIrange{6}{7}{\percent} when this factor varies by two orders of magnitude.
+%The insensitivity to the ion yield at larger $pd$ is, essentially, due to the increasingly larger amount of net charge that is produced when $pd$ increases.
+Comparison with the detachment-less curve shows that the sensitivity of the predictions to the ion yield is substantially smaller than the error that arises from ignoring electron detachment, which is as high as \SI{25}{\percent}.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics{SensitivitySEE}
+  \caption{a) Model sensitivity to the second Townsend ionization coefficient.
+    b) Sensitivity to the photon production rate.
+    The dashed line shows the theoretical curves without detachment, i.e., the same curve as in figure~\ref{fig:ExperimentalComparison}.
+  }
+  \label{fig:SensitivitySEE}
+\end{figure}
+
+Figure~\ref{fig:SensitivitySEE}b) shows a comparison between the positive-polarity breakdown values for the \SI{20}{\milli\meter} gap with various photoionization couplings.
+We have varied the two-stream cone angle between \SIrange{0}{90}{\degree}, where the lower end indicates no photoionization, and the upper end indicates that all produced photons propagate along $\pm x$.
+This latter regime is clearly non-physical, although we point out that these two limits together minimize and maximize the strength of the photon-coupling in the model, and thus act to indicate the sensitivity of the breakdown voltage to the photoionization parameters.
+The curves show no significant dependence on photoionization.
+This can be understood from the magnitude of the photoionization term, which is smaller than the impact ionization source term by a factor $\nu_{\text{exc}}\frac{p_q}{p_q+p}\gamma_{10} \sim \mathcal{O}\left(\num{E-3}\right)$, so impact ionization substantially outweighs photoionization in these gaps.
+
+%% It is worth pointing out that, in a more inhomogeneous gap, the roles of direct photoionization and negative-ion production can reverse.
+%% In our experiments, the field in the gap is comparatively uniform and close to \SIrange{80}{100}{\townsend}.
+%% At such fields, a single electron released from the cathode plane will enter the attachment-detachment cycle, and thus contribute to production of a significant number of charge carriers as it drifts towards the anode.
+%% For a more inhomogeneous field such as a needle-plane gap, the electric field is much more enhanced close to the needle and also much lower in the remainder of the gap.
+%% Detachment efficiencies drop dramatically below \SI{70}{\townsend}, so cathode-emitted electrons then attach to form negative ions which are comparatively stable throughout the majority of the gap.
+%% These ions do not detach their electrons until they reach the high-field region around the anode.
+%% Consequently, substantially fewer charge carriers are generated by the attachment-detachment cycle, and this process therefore gradually turns off as the inhomogeneity of the discharge geometry increases.
+%% For substantially inhomogeneous fields, impact ionization will also exceed electron attachment ($\alpha > \eta$).
+%% In this regime, electrons will substantially outweigh negative ions, and it is reasonable to conjecture that streamers will then form as a result of rapid formation of space-charge layers.
+%% We conjecture, therefore, that there exists a gradual transition from detachment-assisted breakdown in uniform fields to streamer-dominated breakdown in strongly non-uniform fields.
+
+\subsection{Comparison with canonical data sources}
+\label{sec:CanonicalComparison}
+In this section we consider a comparison between the computer model and the measurements from \textcite{Dakin1974} and IEC 60052 international standard \cite{IEC60052}, where the latter is used for voltage calibration by means of standard air gaps.
+The discharge geometry in \cite{IEC60052} is a sphere-sphere gap with a sphere radius $R=\SIrange{5}{100}{\centi\meter}$.
+The field between two such spheres can be computed using bispherical coordinates and takes the form of a series expansion, eliminating the need for numerical field calculations at each gap distance.
+This form of the electric field does not take into account the influence of the surroundings.
+
+Figure~\ref{fig:IEC60052} shows a comparison between the computer model and the tabulated results from the IEC 60052 standard.
+We also include curves from calculations that ignore detachment, as well as the voltage corresponding to the streamer criterion.
+Both of these curves are computed with sphere diameter $D=\SI{200}{\centi\meter}$.
+%The general trend in the calculations is that they predict a slightly higher voltage than the standard at $pd\leq \SI{10}{\bar\milli\meter}$, and a slightly lower voltage at larger $pd$.
+Typically, agreement is within $\pm\SI{10}{\percent}$.
+The streamer criterion, and the calculations without electron detachment, show a consistently higher voltage than the experiments, particularly at large $pd$.
+The errors at large $pd$ are typically in the excess of \SI{30}{\percent}, which translates into errors of several hundred \si{\kilo\volt}.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{IEC60052}
+  \caption{Comparison of theoretical predictions versus the IEC60052 standard \cite{IEC60052}.
+  }
+  \label{fig:IEC60052}
+\end{figure}
+
+Figure~\ref{fig:Electra} shows a comparison between the theoretical calculations and the compilation of breakdown experiments in dry air from \textcite{Dakin1974}.
+The experiments in \cite{Dakin1974} were performed by different groups using different field configurations, and then compiled into a single Paschen curve.
+For ease of presentation, our calculations use a sphere-sphere gap with sphere radii of \SI{100}{\centi\meter} as the basis for our curves, with a fixed pressure $p=\SI{1}{\bar}$.
+Figure~\ref{fig:Electra}a) shows the predictions of the full scheme, the detachment-less case, and the streamer criterion.
+Similarly, figure~\ref{fig:Electra}b) shows the corresponding average electric field across the gap, as a function of $pd$.
+Our calculations slightly underpredict the experimental data points by about \SI{5}{\percent} at $pd > \SI{1}{\bar\milli\meter}$, and overpredict near the Paschen minimum.
+To show the deviations at large $pd$ in closer detail, the insets in figures~\ref{fig:Electra}a) and~b) show the calculations, experiments, and streamer criteria on a linear scale for $pd > \SI{100}{\bar\milli\meter}$.
+Again, we find that usage of the streamer criterion leads to overprediction of the breakdown voltage across the entire $pd$ range.
+The greatest deviations appear at low $pd$, e.g., at $pd=\SI{2E-2}{\bar\milli\meter}$ the streamer criterion overpredicts the experiments by a factor of $2$, whereas equation~\eqref{eq:det_criterion} agrees to within a few percent of the experimental results.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{Electra}
+  \caption{
+    Comparison between theoretical predictions and the compilation of plane-plane, sphere-plane, and sphere-sphere gap breakdown experiments in \textcite{Dakin1974}.
+  }
+  \label{fig:Electra}
+\end{figure}
+
+%% \subsection{Implications of the meta-stability of \Othreem}
+%% \label{sec:ozone_stability}
+%% As mentioned earlier in the paper, we do not consider $\Othreem$ to be fundamentally stable.
+%% There are two dissociation pathways that can lead to destruction of $\Othreem$:
+
+%% \begin{align}
+%%   \Othreem + \Otwo + \SI{1.7}{\electronvolt} &\xrightarrow{k_{15}} \Ominus + \Otwo + \Otwo,\\
+%%   \Othreem + \Otwo + \SI{2.1}{\electronvolt} &\xrightarrow{k_{16}} \e + \Otwo + \Otwo.
+%% \end{align}
+%% The energy thresholds of these reactions are best contrasted against the conversion threshold of $\Otwom$, which is around \SI{0.5}{\electronvolt}.
+%% Given the significant role of $\Otwom$ in the breakdown threshold at large $pd$, it seems reasonable to further investigate the potential implications of unstable $\Othreem$ ions.
+%% Unfortunately, we have not been able to pinpoint rate coefficients or cross sections for the above reactions.
+%% Since an experimentally determined rate is not available, we proceed by considering the above two reactions with Arrhenius-type rates $k = k_0\exp\left(-\frac{\Delta E}{\epsilon}\right)$, where $\Delta E$ is the energy barrier and $\epsilon$ is mean ion energy.
+%% We consider a similar prefactor as for the other reactions, and take $k_0 = \SI{E-17}{\per\cubic\meter\per\second}$.
+
+\subsection{Plasma simulations}
+\label{sec:plasma_simulation}
+In this section we present computer calculations of the evolution of the discharge corresponding to the experimental series with $d=\SI{20}{\milli\meter}$ and $p=\SI{8}{\bar}$.
+The computer simulations use a simplified representation of the experimental geometry, shown in figure~\ref{fig:SimulationSetup}.
+The computational domain is a rectangular region of size $\SI{1}{\meter}\times\SI{0.5}{\meter}\times\SI{1}{\meter}$.
+On the top $y$-face we use a homogeneous Neumann boundary condition $E_y = 0$, whereas homogeneous Dirichlet (i.e., zero potential) boundary conditions are used on the remaining faces.
+A few starting electrons are placed at the cathode at either polarity, and we then follow the discharge evolution.
+The plasma simulations do not invoke the two-stream approximation, but samples the Zheleznyak model directly \cite{Bagheri_2019, Marskar2020}.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{SimulationSetup}
+  \caption{
+    Geometry and boundary conditions used in the plasma simulations.
+    The diameter of the sphere is $\SI{10}{\centi\meter}$ and the diameter of the sphere holder is \SI{7.2}{\centi\meter}.
+    The disk diameter is \SI{24}{\centi\meter}.
+    a) Geometry and field distribution.
+    Zero-potential boundary conditions are applied on all domain faces except the upper $y$-face, where we use a homogeneous Neumann boundary condition $\left(E_y = 0\right)$.
+    b) Field distribution on the sphere-plane centerline.
+  }
+  \label{fig:SimulationSetup}
+\end{figure}
+
+Our simulations use the \ito-KMC formalism as described by \textcite{Marskar2024ItoKMC}, with further details given in \cite{Marskar2023,Marskar2024ItoKMCCO2,Marskar2025}.
+We use the chombo-discharge \cite{chombo-discharge} code for running the computer simulations, accounting for the reactions in table~\ref{tab:reactions}.
+Specifically, our discretization uses a first-order Euler-Maruyama scheme for charged-species transport, which is semi-implicitly coupled to the electric field \cite{Marskar2023}.
+The reactions are resolved using a hybrid algorithm \cite{Marskar2023}, using a second-order (midpoint) tau-leaping scheme \cite{Gillespie2007}.
+The advantages of using the \ito-KMC formalism for this problem are mostly due particle discreteness, as well as the absence of a Courant-Friedrichs-Lewy (CFL) condition on the time step, which would otherwise impose a stringent criterion on the time step in our calculations.
+This is a substantial improvement compared to a fluid approach \cite{Marskar2019a, Marskar2019}, where the CFL condition on the electrons is not only even stricter -- it scales with mesh size, and must be obeyed at every time step to maintain numerical stability.
+Here, the time step is physics-based and essentially equal to the inverse impact ionization rate.
+Our formulation is compatible with Cartesian adaptive mesh refinement (AMR), and the mesh is remapped every two time steps.
+Mesh refinement is not very important in the initial ramp-up stage of the discharge, but becomes essential once the discharge evolves into a streamer.
+The refinement criterion is based on $\alpha\Delta x > c_1$, where $\Delta x$ is the local mesh resolution and $c_1 = 1$ is a refinement constant.
+The mesh is coarsened if $\alpha \Delta x < c_2$ where $c_2 = 0.2$.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{0dEvolution}
+  \caption{Evolution of the number of positive ions ($\Ntwop$ and $\Otwop$) in a uniform electric field at $E/N=\SI{110}{\townsend}$ at $p=\SI{8}{\bar}$.
+    Every line represents a realization of the kinetic Monte Carlo solution \cite{Marskar2024ItoKMC}, showing the number of positive ions produced by an initial electron.
+  }
+  \label{fig:0dEvolution}
+\end{figure}
+
+At our conditions, the onset of a discharge is affected by stochastic evolution of the initial electron.
+To illustrate this, figure~\ref{fig:0dEvolution} shows the evolution of the number of positive ions produced for single initiatory electrons in a field $E/N = \SI{110}{\townsend}$.
+The curves show different realizations of the reactive-only problem, and exhibits large statistical spread in the terminal number of positive ions.
+This spread is due to realizations of the pathway $\e \rightarrow \Ominus \rightarrow \Othreem$, in which case the discharge stops growing.
+One may conclude, therefore, that the \emph{onset} of a discharge under these conditions also exhibits stochastic features, where only some of the initial electrons cause a discharge.
+For pragmatic reasons, we want to ensure that at least one initial electron is not permanently lost to $\Othreem$ formation, and so we therefore use 10 startings electrons as the initial condition in the 3D simulations.
+
+Figure~\ref{fig:SimulationEvolution} shows snapshots of the charged-species distribution during the initial evolution of the discharge using an applied voltage $U=-\SI{375}{\kilo\volt}$ at the sphere.
+All panels show the distribution of the charged species prior to onset of space-charge effects, with simulation times shown above each column.
+For reference, the drift time of the electrons across the gap is approximately \SI{150}{\nano\second}, and for the ions it is approximately \SIrange{25}{35}{\micro\second}.
+The ion rows show $\Otwop$ and $\Ntwop$ for the positive ion-row, and $\Ominus$, $\Otwom$, and $\Othreem$ for the negative-ion row.
+\todo{Stuff below here needs to be rewritten when the simulations end}
+All rows in figure~\ref{fig:SimulationEvolution} shows that the charged-species distributions extend downward from the sphere as time increases.
+Since the positive ions drift upward, an extension of the positive-ion front towards towards the anode plane can only be explained by impact ionization rather than drift or diffusion.
+The downward-extending positive ion is thus a result of negative-ion detachment where free electrons detach, further ionize the gas, and then reattach to form new negative ions.
+An analogous computer simulation without inclusion of electron detachment shows that the initial electrons attach to form negative ions after only a few hundred nanoseconds, and that the ions then eventually neutralize at the anode surface.
+Figure~\ref{fig:SimulationEvolution} shows that positive ions and free electrons do not exist below $y\approx\SI{10}{\milli\meter}$, whereas negative ions clearly do.
+The absence of electrons and positive ions below this coordinate is a result of the field-dependent negative-ion conversion and detachment rates.
+In particular, the efficiency of $\Otwom$ detachment drops by about a factor of \num{100} from $E/N = \SI{100}{\townsend}$ to $E/N = \SI{70}{\townsend}$.
+Hence, the lower part of the gap does not contribute to the attachment-detachment growth mechanism.
+Rather, the $\Otwom$ ions in this part of the gap can be considered stable at this gap length.
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{SimulationEvolution}
+  \caption{Snapshots of the charged-species distributions before the onset of space-charge fields.
+    The top row shows the electrons, the middle row the positive ions, and the bottom row shows the negative ions.
+    Times are indicated above each column.
+  }
+  \label{fig:SimulationEvolution}
+\end{figure}
+
+\section{Summary}
+\label{sec:summary}
+We have derived a formalism for computing generalized Paschen curves in non-uniform gaps, accounting for negative-ion chemistry, photoionization, and secondary electron emission.
+The approach is based on an eigenvalue analysis of a coupled drift-reaction system for charged species, supplemented by a two-stream approximation for photoionization.
+The inception criterion is comparatively simple and includes most SEE mechanisms, including ion bombardment and photoemission, and was shown to reduce to the standard attachment-corrected Paschen law when the chemistry is appropriately truncated.
+%In particular, when only a single unstable negative-ion species and collisional detachment are included, the inception criterion yields equation~\eqref{eq:generalized_paschen}, which recovers both the standard Paschen law and the attachment-corrected form as limiting cases.
+
+The theoretical predictions were then compared against DC breakdown measurements in dry air, using a sphere-plane gap for pressures up to \SI{14}{\bar} and at gap distances of $d = \SI{10}{\milli\meter}$ and $d = \SI{20}{\milli\meter}$, covering values up to $pd = \SI{160}{\bar\milli\meter}$.
+Agreement between theory and experiment was only found when the full negative-ion chemistry was incorporated, and neglect of electron detachment led to substantial overprediction of the breakdown voltage.
+Measured breakdown voltages were found to lie below the critical field $\alpha = \eta$ for virtually all tested conditions, suggesting that breakdown occurred via a detachment-assisted ionization mechanism rather than a conventional avalanche-to-streamer transition.
+Small polarity asymmetries of \SIrange{5}{10}{\percent} were observed, further suggesting that even modest field non-uniformity influences the attachment and detachment dynamics in the discharge gap.
+Comparison of the experiments with theoretical curves with exaggerated SEE yields and photon production rates demonstrated a remarkable insensitivity to these factors.
+On the other hand, the calculations show that the inclusion of negative-ion conversion pathways and detachment is essential, and that satisfactory agreement with experiments was only found when these processes were all accounted for.
+The results were interpreted as follows: At low values of $pd$, negative-ion conversion and detachment processes are negligible, owing to the rapid transit time of the negative ions relative to their detachment times.
+As $pd$ increases beyond approximately $\SI{1}{\bar\milli\meter}$, the negative-ion residence time becomes comparable to and eventually exceeds the detachment time, and collisional detachment from $\Ominus$ and $\Otwom$ then become an additional sources of free electrons.
+The detached electrons re-enter the ionization cycle and lead to generation of additional charge carriers.
+Crucially, the detachment process enables discharge onset even when $\alpha < \eta$, i.e., in the subbreakdown regime where direct avalanche growth in the classical sense is not possible.
+
+\todo{[PLACEHOLDER: Summary of discharge simulation results to be added once section~\ref{sec:plasma_simulations} is complete.]}
+
+Some limitations and potential extensions of this work are worth noting.
+The accuracy of the predictions is tied to the quality of the rate coefficients, and as discussed in this paper, several of these carry non-negligible uncertainty.
+Of immediate importance is the validity of three-body attachment to $\Otwom$ and three-body conversion to $\Othreem$, which we speculate are effectively two-body at our conditions.
+Improved measurements of detachment and dissociation pathways would also benefit predictive accuracy.
+Calculations were performed for dry synthetic air; humidity introduces additional ion conversion and electron detachment dynamics.
+Our direct comparison with experiments performed in large gaps in uncontrolled atmospheres, such as the IEC60052 standard \cite{IEC60052}, is thus inherently uncertain.
+In general, the influence of humidity at large $pd$ remains to be quantified.
+Furthermore, the contribution of free electrons from $\Othreem$ is not known, as measurements of these processes are not available.
+As mentioned in the paper, $\Othreem$ dissociation into $\Ominus$ requires overcoming an energy barrier of $\sim \SIrange{1.6}{1.8}{\electronvolt}$.
+This ion is thus stable only in a marginal sense and for sufficiently long gaps, it can potentially dissociative into $\Ominus$ and then contribute to the attachment-detachment cycle.
+
+Our results show that electric breakdown in long and weakly non-uniform air gaps is substantially influenced by negative-ion kinetics, in contrast to the conventionally assumed underlying dynamics of avalanche-to-streamer dominated breakdown.
+This result is not fundamentally new \cite{Frommhold1964,Teich1991, Hosl2019}, but its importance for long gap air discharges in quasi-uniform gaps is quantified here for the first time.
+Of some importance is the finding that textbook breakdown criteria such as Paschen's law (in the conventional sense) and the streamer criterion are inadequate predictors of the breakdown voltage --- both quantitatively and qualitatively.
+In air, the breakdown process in quasi-uniform gaps is preceded also by negative-ion dynamics, where the segregation into pure categories like Townsend avalanches or streamer discharges no longer applies.
+Ultimately, the discharge type \emph{evolves} into a streamer -- but the formation of streamers is seeded by negative-ion attachment and detachment processes rather than a single avalanche-to-streamer process.
+
+\section*{Acknowledgements}
+This project has received funding from the European Union's Horizon Europe research and innovation programme under grant agreement No 101135484 (EU Project MISSION).
+The three-dimensional computer simulations were performed on resources provided by UNINETT Sigma2 -- the National Infrastructure for High Performance Computing and Data Storage in Norway.
+We are grateful to Karsten J\"{u}hre at Siemens Energy for valuable feedback on the modeling and experiments.
+We also thank Siemens Energy for providing the pressure cell and bushing used in the experiments.
+
+\appendix
+
+\section{Fitting the two-stream approximation to the Zheleznyak model}
+\label{sec:zheleznyak_fit}
+In air, the absorption coefficient of $\Otwo$ can be approximated as a function
+
+\begin{equation}
+  \label{eq:zheleznyak_frequency}
+  k_f = \left(\chi_1p_{\Otwo}\right)\left(\frac{\chi_2}{\chi_1}\right)^u
+\end{equation}
+where $u\in[0,1]$, $p_{\Otwo}$ is the $\Otwo$ partial pressure, $\chi_1 = \SI{2.625E-2}{\per\meter\per\pascal}$, and $\chi_2 = \SI{1.5}{\per\meter\per\pascal}$.
+In this case, one may show that the absorption curve in air is given by \cite{Liu2004}
+
+\begin{equation}
+  \label{eq:zheleznyak_curve}
+  \varphi\left(r\right) = \frac{\exp\left(-\chi_1 p_{\Otwo} r\right) - \exp\left(-\chi_2 p_{\Otwo} r\right)}{r\ln \chi_2/\chi_1}.
+\end{equation}
+
+\begin{figure}[h!t!b!]
+  \centering
+  \includegraphics{ZheleznyakFit}
+  \caption{Six-term reconstruction of the two-stream equations and its comparison against equation~\eqref{eq:zheleznyak_curve}.
+    a) Comparison between absorption curves and individual groups. Note that we show the pressure-reduced absorption curves, i.e., $\varphi(r)/p_{\Otwo}$.
+    b) Relative error of the six-group reconstruction.
+  }
+  \label{fig:ZheleznyakFit}
+\end{figure}
+
+To fit the two-stream solution to the Zheleznyak absorption curve, we numerically consider a proxy source term $\rho$, and calculate the Zheleznyak solution using the absorption curve $\varphi(r)$, as well as the two-stream solutions.
+A non-negative linear least squares routine is used to fit the constants $g_j, \kappa_j$, by minimizing the error between the two solutions.
+We find that using a six-term fit provides reasonable accuracy with errors smaller than \SI{1}{\percent} across the relevant absorption range.
+Figure~\ref{fig:ZheleznyakFit} shows a comparison between the absorption curve in equation~\eqref{eq:zheleznyak_curve} and the six-term reconstruction.
+For completeness, the fitting parameters are given in table~\ref{tab:photoionization_parameters}.
+
+\begin{table}[h!t!b!]
+  \centering
+  \caption{
+    Six-group parameters for fitting the two-stream equations to the Zheleznyak absorption function.
+  }
+  \label{tab:photoionization_parameters}
+  \small
+  \begin{tabular}{@{}lll|lll}
+    \hline
+    $j$ & $g_j\,\left(\si{\per\pascal\per\meter}\right)$ & $\kappa_j/p_{\Otwo}\,\left(\si{\per\pascal\per\meter}\right)$ &     $j$ & $g_j\,\left(\si{\per\pascal\per\meter}\right)$ & $\kappa_j/p_{\Otwo}\,\left(\si{\per\pascal\per\meter}\right)$ \\
+    \hline
+    1 & \num{1.59E-2} & \num{2.69E-2} & 4 & \num{2.51E-1} & \num{1.00E-1} \\
+    2 & \num{5.43E-2} & \num{3.06E-2} & 5 & \num{3.06E-1} & \num{3.18E-1} \\
+    3 & \num{1.43E-1} & \num{4.48E-2} & 6 & \num{2.29E-1} & \num{1.01} \\
+  \end{tabular}
+\end{table}
+
+%% Let's write the two-stream equations in terms of the photon intensity $\psi = \Psi/c$, which for the right-moving intensity takes the stationary form
+
+%% \begin{equation}
+%%   \partial_x\psi_j(x) = -\kappa_j\psi_j(x) + g_j\rho(x),
+%% \end{equation}
+%% where we now use $\rho$ as a placeholder for some arbitrary source term.
+%% Considering no oncoming photons, the solution for a single group is
+
+%% \begin{equation}
+%%   \psi_j(x) = \frac{g_j\rho}{\kappa_j}\left(1 - e^{-\kappa_jx}\right),
+%% \end{equation}
+%% and for multiple groups
+
+%% \begin{equation}
+%%   \psi(x) = \sum_j \frac{g_j\rho}{\kappa_j}\left(1 - e^{-\kappa_jx}\right).
+%% \end{equation}
+
+\printbibliography
+
+\end{document}

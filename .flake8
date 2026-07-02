@@ -1,0 +1,18 @@
+[flake8]
+# Compatible with black: https://black.readthedocs.io/en/stable/guides/using_black_with_other_tools.html
+max-line-length = 88
+extend-ignore =
+    E203, E501, W503,
+    # The codebase deliberately hand-aligns assignments/parameters/keywords
+    # in places (e.g. `self._eref   = eref`); these are purely cosmetic and
+    # are not part of the style black/flake8 disagree on above.
+    E221, E251, E272, E127, E128,
+    # Scripts and mechanism files use `sys.path.insert(...)` immediately
+    # before the import it enables, since there is no package/src layout
+    # (see CLAUDE.md); this is intentional, not an ordering mistake.
+    E402
+exclude =
+    .git,
+    __pycache__,
+    Docs/_build,
+    Docs/_build/*

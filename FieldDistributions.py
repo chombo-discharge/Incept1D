@@ -33,6 +33,7 @@ import matplotlib.pyplot as plt
 
 # ── Bispherical image-charge series ──────────────────────────────────────────
 
+
 def _sphere_sphere_axial_field(xi, alpha, a_focal, d):
     """
     Exact normalised on-axis field between two equal spheres at ±U/2.
@@ -53,10 +54,11 @@ def _sphere_sphere_axial_field(xi, alpha, a_focal, d):
     sinh_na = np.sinh(na)
     z_n = a_focal * np.cosh(na) / sinh_na
     q_n = 0.5 * a_focal / sinh_na
-    return float(np.sum(q_n * (1.0 / (z_n - z)**2 + 1.0 / (z_n + z)**2))) * d
+    return float(np.sum(q_n * (1.0 / (z_n - z) ** 2 + 1.0 / (z_n + z) ** 2))) * d
 
 
 # ── Step-count helpers (kept for backward compatibility / plot_sphere_plane.py) ──
+
 
 def _compute_n_steps(field_func, field_tol, max_steps=2000):
     """Return minimum N so that the relative field change across the first step ≤ field_tol."""
@@ -82,13 +84,20 @@ def _n_steps_sphere_cached(alpha, is_plane, field_tol, max_steps):
     cosh_a = math.cosh(float(alpha))
     a_norm = sinh_a / (2.0 * (cosh_a - 1.0))
     if is_plane:
-        def _f(xi): return _sphere_sphere_axial_field(0.5 * xi, float(alpha), a_norm, 1.0)
+
+        def _f(xi):
+            return _sphere_sphere_axial_field(0.5 * xi, float(alpha), a_norm, 1.0)
+
     else:
-        def _f(xi): return _sphere_sphere_axial_field(xi, float(alpha), a_norm, 1.0)
+
+        def _f(xi):
+            return _sphere_sphere_axial_field(xi, float(alpha), a_norm, 1.0)
+
     return _compute_n_steps(_f, field_tol, max_steps)
 
 
 # ── Field distribution class ──────────────────────────────────────────────────
+
 
 @dataclasses.dataclass
 class FieldDistribution:
@@ -106,21 +115,22 @@ class FieldDistribution:
     sphere_R : float or None
         Sphere radius in metres.  None for uniform field.
     """
+
     field_type: str
-    sphere_R:   Optional[float] = None
+    sphere_R: Optional[float] = None
 
     @property
     def is_symmetric(self) -> bool:
         """True when both polarities give the same inception result."""
-        return self.field_type in ('uniform', 'sphere-sphere')
+        return self.field_type in ("uniform", "sphere-sphere")
 
     @property
     def label(self) -> str:
         """Human-readable description for plot titles and file headers."""
-        if self.field_type == 'uniform':
-            return 'uniform field'
+        if self.field_type == "uniform":
+            return "uniform field"
         R_mm = self.sphere_R * 1e3
-        return f'{self.field_type}, R = {R_mm:.4g} mm'
+        return f"{self.field_type}, R = {R_mm:.4g} mm"
 
     def build(self, d: float) -> Callable[[float], float]:
         """
@@ -139,30 +149,38 @@ class FieldDistribution:
             / far sphere.  Satisfies ∫₀¹ f(xi) dxi = 1.
             For uniform field, f(xi) = 1.0 everywhere.
         """
-        if self.field_type == 'uniform':
+        if self.field_type == "uniform":
             return lambda xi: 1.0
 
-        if self.field_type == 'sphere-plane':
+        if self.field_type == "sphere-plane":
             alpha = float(np.arccosh(1.0 + d / self.sphere_R))
-            a     = self.sphere_R * np.sinh(alpha)
+            a = self.sphere_R * np.sinh(alpha)
+
             def f_sp(xi, _alpha=alpha, _a=a, _d=d):
                 return _sphere_sphere_axial_field(0.5 * xi, _alpha, _a, 2.0 * _d)
+
             return f_sp
 
         # sphere-sphere
         alpha = float(np.arccosh(1.0 + d / (2.0 * self.sphere_R)))
-        a     = self.sphere_R * np.sinh(alpha)
+        a = self.sphere_R * np.sinh(alpha)
+
         def f_ss(xi, _alpha=alpha, _a=a, _d=d):
             return _sphere_sphere_axial_field(xi, _alpha, _a, _d)
+
         return f_ss
 
 
 # ── CLI utilities ─────────────────────────────────────────────────────────────
 
+
 def add_field_argument(parser: argparse.ArgumentParser) -> None:
     """Add --field SPEC argument to an argparse.ArgumentParser."""
     parser.add_argument(
-        '--field', nargs='+', default=['uniform'], metavar='SPEC',
+        "--field",
+        nargs="+",
+        default=["uniform"],
+        metavar="SPEC",
         help=(
             "Field distribution.  'uniform' (default): spatially uniform field.  "
             "'sphere-plane R_mm': sphere-plane gap with sphere radius R_mm in mm.  "
@@ -172,7 +190,7 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def parse_field_spec(spec: list, parser=None) -> 'FieldDistribution':
+def parse_field_spec(spec: list, parser=None) -> "FieldDistribution":
     """
     Parse a --field token list into a FieldDistribution.
 
@@ -188,19 +206,20 @@ def parse_field_spec(spec: list, parser=None) -> 'FieldDistribution':
     -------
     FieldDistribution
     """
+
     def _err(msg):
         if parser is not None:
             parser.error(msg)
         raise ValueError(msg)
 
     field_type = spec[0]
-    if field_type == 'uniform':
-        return FieldDistribution(field_type='uniform')
+    if field_type == "uniform":
+        return FieldDistribution(field_type="uniform")
 
-    if field_type in ('sphere-plane', 'sphere-sphere'):
+    if field_type in ("sphere-plane", "sphere-sphere"):
         if len(spec) < 2:
-            _err(f'--field {field_type} requires a sphere radius in mm')
-        sphere_R = float(spec[1]) * 1e-3     # mm → m
+            _err(f"--field {field_type} requires a sphere radius in mm")
+        sphere_R = float(spec[1]) * 1e-3  # mm → m
         return FieldDistribution(field_type=field_type, sphere_R=sphere_R)
 
     _err(
@@ -211,6 +230,7 @@ def parse_field_spec(spec: list, parser=None) -> 'FieldDistribution':
 
 # ── Standalone field plotter ──────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -220,21 +240,27 @@ def main():
     )
     add_field_argument(parser)
     parser.add_argument(
-        '--d', type=float, required=True, metavar='D_mm',
-        help='Gap distance in mm (required).',
+        "--d",
+        type=float,
+        required=True,
+        metavar="D_mm",
+        help="Gap distance in mm (required).",
     )
     parser.add_argument(
-        '--N', type=int, default=25, metavar='N',
-        help='Number of grid points to display (default: 25).',
+        "--N",
+        type=int,
+        default=25,
+        metavar="N",
+        help="Number of grid points to display (default: 25).",
     )
     args = parser.parse_args()
 
     fd = parse_field_spec(args.field, parser)
-    N  = args.N
-    d_mm  = args.d
-    d     = d_mm * 1e-3
-    f     = fd.build(d)
-    color = 'tab:blue'
+    N = args.N
+    d_mm = args.d
+    d = d_mm * 1e-3
+    f = fd.build(d)
+    color = "tab:blue"
 
     geom_str = f"{fd.label},  d = {d_mm} mm"
     if fd.sphere_R is not None:
@@ -247,35 +273,49 @@ def main():
     print()
 
     xi_plot = np.linspace(0.0, 1.0, 2000)
-    f_plot  = np.array([f(xi) for xi in xi_plot])
-    x_plot  = xi_plot * d_mm
+    f_plot = np.array([f(xi) for xi in xi_plot])
+    x_plot = xi_plot * d_mm
 
     fig, ax = plt.subplots(figsize=(8, 5))
     fig.suptitle(f"{geom_str},  N = {N}", fontsize=13)
 
-    ax.plot(x_plot, f_plot, 'k-', lw=1.8, zorder=3, label='$f(\\xi)$ (exact)')
-    ax.axhline(1.0, color='gray', lw=0.8, ls='--', zorder=1, label='uniform ($f=1$)')
+    ax.plot(x_plot, f_plot, "k-", lw=1.8, zorder=3, label="$f(\\xi)$ (exact)")
+    ax.axhline(1.0, color="gray", lw=0.8, ls="--", zorder=1, label="uniform ($f=1$)")
 
     for k in range(N + 1):
-        ax.axvline(k / N * d_mm, color=color, lw=0.7, ls=':', alpha=0.6, zorder=2)
+        ax.axvline(k / N * d_mm, color=color, lw=0.7, ls=":", alpha=0.6, zorder=2)
 
     xi_mids = (np.arange(N) + 0.5) / N
-    f_mids  = np.array([f(xi) for xi in xi_mids])
-    ax.plot(xi_mids * d_mm, f_mids,
-            'o', color=color, ms=6, zorder=5, label=f'cell midpoints (N={N})')
+    f_mids = np.array([f(xi) for xi in xi_mids])
+    ax.plot(
+        xi_mids * d_mm,
+        f_mids,
+        "o",
+        color=color,
+        ms=6,
+        zorder=5,
+        label=f"cell midpoints (N={N})",
+    )
     for i in range(N):
-        ax.hlines(f_mids[i], i / N * d_mm, (i + 1) / N * d_mm,
-                  color=color, lw=2.5, alpha=0.55, zorder=4)
+        ax.hlines(
+            f_mids[i],
+            i / N * d_mm,
+            (i + 1) / N * d_mm,
+            color=color,
+            lw=2.5,
+            alpha=0.55,
+            zorder=4,
+        )
 
-    ax.set_xlabel('$x$  (mm)', fontsize=11)
-    ax.set_ylabel('Normalised field  $f(\\xi) = E(x)\\,/\\,(V/d)$', fontsize=10)
+    ax.set_xlabel("$x$  (mm)", fontsize=11)
+    ax.set_ylabel("Normalised field  $f(\\xi) = E(x)\\,/\\,(V/d)$", fontsize=10)
     ax.set_xlim(-0.3, d_mm + 0.3)
-    ax.legend(fontsize=9, loc='upper right')
-    ax.grid(True, ls='--', alpha=0.35)
+    ax.legend(fontsize=9, loc="upper right")
+    ax.grid(True, ls="--", alpha=0.35)
 
     plt.tight_layout()
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
