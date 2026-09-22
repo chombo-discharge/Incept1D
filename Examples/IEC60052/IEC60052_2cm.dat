@@ -1,0 +1,17 @@
+# IEC 60052:2002 -- disruptive-discharge voltages of standard sphere gaps
+# Sphere diameter D = 2 cm, one sphere earthed, dry air at 20 C and 1013 mbar.
+# Columns: p*d (bar.mm, = gap spacing in mm at 1 bar)   disruptive-discharge voltage (kV, peak)
+#
+   0.5    2.8
+   1.0    4.7
+   1.5    6.4
+   2.0    8.0
+   2.5    9.6
+   3.0   11.2
+   4.0   14.4
+   5.0   17.4
+   6.0   20.4
+   7.0   23.2
+   8.0   25.8
+   9.0   28.3
+  10.0   30.7

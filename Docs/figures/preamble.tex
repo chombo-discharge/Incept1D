@@ -1,0 +1,29 @@
+% Shared preamble for the pgfplots figures of the Incept1D documentation.
+% Each figure is a standalone document; the page is cropped to the plot.
+\usepackage{pgfplots}
+\usepackage{amsmath, amssymb, bm, siunitx}
+\usepgfplotslibrary{colorbrewer}
+\usetikzlibrary{shadows}
+\pgfplotsset{compat=newest}
+
+\DeclareSIUnit\townsend{Td}
+\DeclareSIUnit\bar{bar}
+
+\newlength{\figwidth}
+\newlength{\figheight}
+
+% Legend box with rounded corners and a drop shadow (used by all figures).
+\pgfplotsset{
+  boxedlegend/.style={
+    legend cell align=left,
+    legend style={thick, rounded corners=3pt, cells={align=center},
+      /tikz/every even column/.append style={column sep=2em},
+      append after command={
+        \pgfextra{
+          \draw[rounded corners=3pt, drop shadow]
+            (\tikzlastnode.south west) rectangle (\tikzlastnode.north east);
+        }
+      }
+    }
+  }
+}
