@@ -3,12 +3,16 @@
 Reference data and reproduction scripts for the worked examples in the
 documentation (`docs/source/examples/`).
 
-| Directory   | Reference (not included)                                     | Script   |
+| Directory   | Reference                                                    | Script   |
 |-------------|--------------------------------------------------------------|----------|
-| `iec60052/` | IEC 60052 standard sphere-gap voltages                       | `run.sh` |
-| `electra/`  | Dakin et al., ELECTRA 32, Table C2                           | `run.sh` |
+| `paschen/`  | closed-form Paschen law, computed alongside (self-contained) | `run.sh` |
+| `iec60052/` | IEC 60052 standard sphere-gap voltages (not included)        | `run.sh` |
+| `electra/`  | Dakin et al., ELECTRA 32, Table C2 (not included)            | `run.sh` |
 
-**The reference tables are not part of this repository.** They are copyrighted
+`paschen/` needs nothing external: it compares the solver against its own
+analytic limit.
+
+**The IEC 60052 and ELECTRA reference tables are not part of this repository.** They are copyrighted
 by the IEC and by CIGRE respectively. Each directory's `README.md` explains
 where to obtain them and what to name the file if you want the comparison
 overlay; the figures build without them.

@@ -137,29 +137,6 @@ Shipped configuration sets
 How configurations are applied
 ------------------------------
 
-The mechanism directory's ``config.py`` defines a ``Config`` dataclass that
-implements a three-step protocol used by :func:`incept1d.mechanism.load_mechanism`:
-
-.. code-block:: python
-
-   config.pre_exec_vars()      # -> dict injected into the module namespace
-                               #    BEFORE the mechanism file is executed
-   config.post_exec_init(mod)  # called AFTER execution (e.g. photoionization setup)
-   config.mechanism_params()   # -> kwargs forwarded to Mechanism(...)
-   config.label                # display label
-
-``pre_exec_vars`` is how ``cross_sections`` and the ``gamma*`` parameters
-reach the mechanism: the file reads them with ``globals().get("BOLSIG_FILE",
-default)`` etc. at import time (:ref:`Chap:NewMechanisms`).
-``post_exec_init`` calls ``init_photoionization(ngroups, cone_angle)``.
-``mechanism_params`` supplies the run-time scalings (multipliers,
-``xi_photo``, ``xi_emit``, polarity overrides) that
-:class:`incept1d.mechanism.Mechanism` applies inside its accessor methods, so no
-solver code ever sees a raw, un-configured module.
-
-.. literalinclude:: ../../../mechanisms/air/config.py
-   :language: python
-   :pyobject: Config.from_dict
-
-A new mechanism family gets its own ``config.py`` implementing the same
-protocol; copy ``mechanisms/air/config.py`` and adapt the key list.
+A configuration file is inert on its own: the mechanism directory's
+``config.py`` is what turns it into overrides.  That interface is described in
+:ref:`Chap:ConfigPy`.

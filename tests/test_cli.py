@@ -64,8 +64,19 @@ class TestWiring:
 class TestPdiv:
     def test_end_to_end_on_the_toy_mechanism(self, capsys):
         """C3: a real solve through the CLI, no plotting."""
-        rc = _run("pdiv", TOY, "--p", "1", "--pd-min", "1", "--pd-max", "50",
-                  "--pd-num", "4", "--no-plot")
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "4",
+            "--no-plot",
+        )
         out = capsys.readouterr().out
         assert rc == 0
         assert "pd (bar·mm)" in out and "E/N (Td)" in out
@@ -78,8 +89,21 @@ class TestPdiv:
         (including our own pgfplots figures) silently plots the wrong series.
         """
         out_file = tmp_path / "curve.dat"
-        rc = _run("pdiv", TOY, "--p", "1", "--pd-min", "1", "--pd-max", "50",
-                  "--pd-num", "5", "--no-plot", "--write-to-file", str(out_file))
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "5",
+            "--no-plot",
+            "--write-to-file",
+            str(out_file),
+        )
         capsys.readouterr()
         assert rc == 0 and out_file.exists()
 
@@ -91,12 +115,31 @@ class TestPdiv:
 
     def test_metadata_header_is_present(self, tmp_path, capsys):
         out_file = tmp_path / "curve.dat"
-        _run("pdiv", TOY, "--p", "1", "--pd-min", "1", "--pd-max", "10",
-             "--pd-num", "2", "--no-plot", "--write-to-file", str(out_file))
+        _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "10",
+            "--pd-num",
+            "2",
+            "--no-plot",
+            "--write-to-file",
+            str(out_file),
+        )
         capsys.readouterr()
         text = out_file.read_text()
-        for field in ("# Date:", "# Git:", "# Command:", "# Mechanism:",
-                      "# Temperature:", "# Field type:"):
+        for field in (
+            "# Date:",
+            "# Git:",
+            "# Command:",
+            "# Mechanism:",
+            "# Temperature:",
+            "# Field type:",
+        ):
             assert field in text
 
     def test_fixed_distance_header_records_the_pressures(self, tmp_path, capsys):
@@ -107,11 +150,25 @@ class TestPdiv:
         the (unused) --p list rather than the pressures actually solved.
         """
         out_file = tmp_path / "fixed_d.dat"
-        _run("pdiv", TOY, "--d", "10", "--pd-min", "1", "--pd-max", "50",
-             "--pd-num", "4", "--no-plot", "--write-to-file", str(out_file))
+        _run(
+            "pdiv",
+            TOY,
+            "--d",
+            "10",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "4",
+            "--no-plot",
+            "--write-to-file",
+            str(out_file),
+        )
         capsys.readouterr()
         line = next(
-            ln for ln in out_file.read_text().splitlines()
+            ln
+            for ln in out_file.read_text().splitlines()
             if ln.startswith("# Pressures:")
         )
         assert line.split(":", 1)[1].strip(), "header declares no pressures"
@@ -120,8 +177,21 @@ class TestPdiv:
         """C7: --field fieldline is accepted and reports the input excitation."""
         line = tmp_path / "line.dat"
         line.write_text("\n".join(f"{s} {2.0 - 0.05 * s}" for s in range(0, 21)))
-        rc = _run("pdiv", TOY, "--field", "fieldline", str(line), "mm",
-                  "--pd-min", "1", "--pd-max", "20", "--pd-num", "3", "--no-plot")
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "fieldline",
+            str(line),
+            "mm",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "20",
+            "--pd-num",
+            "3",
+            "--no-plot",
+        )
         out = capsys.readouterr().out
         assert rc == 0
         assert "U*/U_file" in out, "the scale factor column is missing"
@@ -150,7 +220,8 @@ class TestConsoleScript:
         """The packaging actually produces a working `incept1d` command."""
         r = subprocess.run(
             [sys.executable, "-m", "incept1d.cli"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             env={**os.environ, "MPLBACKEND": "Agg"},
         )
         # No subcommand given -> argparse error, but the module must import.

@@ -103,8 +103,6 @@ def solve_EN(alpha_of_EN, eta_of_EN, delta_of_EN, gamma, d, EN_lo=1.0, EN_hi=1e5
         EN = EN_lo * (EN_hi / EN_lo) ** (i / n)
         cur = f(EN)
         if prev * cur < 0.0:
-            return float(
-                scipy.optimize.brentq(f, prev_EN, EN, xtol=1e-12, rtol=1e-14)
-            )
+            return float(scipy.optimize.brentq(f, prev_EN, EN, xtol=1e-12, rtol=1e-14))
         prev_EN, prev = EN, cur
     raise RuntimeError(f"no closed-form root in [{EN_lo}, {EN_hi}] Td for d = {d} m")

@@ -84,8 +84,9 @@ class TestClosedFormLimit:
         p, T = 1.0, 293.0
         pd = pd_mm * 1e-3
         d = pd / p
-        roots = find_all_breakdown_EN(pd, paschen_air, p, T, first_only=True,
-                                      det_fn=det)
+        roots = find_all_breakdown_EN(
+            pd, paschen_air, p, T, first_only=True, det_fn=det
+        )
         assert roots, f"no inception found at pd = {pd_mm} bar·mm"
         EN = roots[0]
         a, e = paschen_air.alpha(EN, p, T), paschen_air.eta(EN, p, T)
@@ -136,8 +137,9 @@ class TestInceptionCurve:
     def test_reference_values(self, air, det, pd_mm, EN_expected):
         """A3: drift detector for the uniform-field curve at 1 bar."""
         p, T = 1.0, 293.0
-        roots = find_all_breakdown_EN(pd_mm * 1e-3, air, p, T, first_only=True,
-                                      det_fn=det)
+        roots = find_all_breakdown_EN(
+            pd_mm * 1e-3, air, p, T, first_only=True, det_fn=det
+        )
         assert roots[0] == pytest.approx(EN_expected, rel=1e-5)
 
     def test_sphere_plane_polarities_differ(self, air):
@@ -147,11 +149,19 @@ class TestInceptionCurve:
         assert not fd.is_symmetric
         kw = dict(field_dist=fd)
         pos = find_all_breakdown_EN(
-            pd, air, p, T, first_only=True,
+            pd,
+            air,
+            p,
+            T,
+            first_only=True,
             det_fn=functools.partial(inception_det, positive_polarity=True, **kw),
         )[0]
         neg = find_all_breakdown_EN(
-            pd, air, p, T, first_only=True,
+            pd,
+            air,
+            p,
+            T,
+            first_only=True,
             det_fn=functools.partial(inception_det, positive_polarity=False, **kw),
         )[0]
         assert pos != neg

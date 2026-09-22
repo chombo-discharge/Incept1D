@@ -66,8 +66,16 @@ class TestHeader:
     def test_header_mentions_the_provenance(self, raw, air_path_module):
         _, headers = generate(raw, np.logspace(1, 2, 4), 1.0, 300.0, {})
         text = build_header(
-            air_path_module, None, None, 1.0, 300.0, headers,
-            pre_exec_vars={}, EN_min=10.0, EN_max=100.0, num_EN=4,
+            air_path_module,
+            None,
+            None,
+            1.0,
+            300.0,
+            headers,
+            pre_exec_vars={},
+            EN_min=10.0,
+            EN_max=100.0,
+            num_EN=4,
             species=raw.SPECIES,
         )
         assert "air_pancheshnyi.py" in text

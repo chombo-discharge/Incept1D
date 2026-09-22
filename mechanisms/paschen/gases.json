@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "label": "Helium",
+            "gas": "helium",
+            "gamma0": 0.01
+        },
+        {
+            "label": "Argon",
+            "gas": "argon",
+            "gamma0": 0.01
+        },
+        {
+            "label": "Air",
+            "gas": "air",
+            "gamma0": 0.01
+        }
+    ]
+}

@@ -93,7 +93,11 @@ class TestMultipliers:
         """R9: the multiplier is a plain factor on the rate."""
         for m in (0.5, 2.0, 3.0):
             R = build_R(
-                self.RX, SPECIES, 100.0, 1.0, 293.0,
+                self.RX,
+                SPECIES,
+                100.0,
+                1.0,
+                293.0,
                 multipliers={"e + N2 -> 2e + N2+": m},
             )
             assert R[0, 0] == pytest.approx(5.0 * m)
@@ -101,7 +105,11 @@ class TestMultipliers:
     def test_zero_multiplier_switches_a_reaction_off(self):
         """R9b: this is how the configuration files disable reactions."""
         R = build_R(
-            self.RX, SPECIES, 100.0, 1.0, 293.0,
+            self.RX,
+            SPECIES,
+            100.0,
+            1.0,
+            293.0,
             multipliers={"e + N2 -> 2e + N2+": 0.0},
         )
         assert np.count_nonzero(R) == 0

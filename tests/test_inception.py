@@ -45,8 +45,9 @@ class TestClosedForm:
     def test_root_matches_generalized_paschen(self, toy, toy_raw, det_uniform, d_mm):
         """I1: det Q = 0 has the same E/N root as eq_generalized_paschen."""
         p, T, d = 1.0, 293.0, d_mm * 1e-3
-        roots = find_all_breakdown_EN(p * d, toy, p, T, first_only=True,
-                                      det_fn=det_uniform)
+        roots = find_all_breakdown_EN(
+            p * d, toy, p, T, first_only=True, det_fn=det_uniform
+        )
         assert roots, f"solver found no root at d = {d_mm} mm"
         expected = solve_EN(
             lambda e: toy_raw.alpha(e, p, T),
@@ -61,10 +62,10 @@ class TestClosedForm:
     def test_criterion_is_unity_at_the_root(self, toy, toy_raw, det_uniform, d_mm):
         """I1b: the closed-form LHS equals 1 at the root the solver returns."""
         p, T, d = 1.0, 293.0, d_mm * 1e-3
-        roots = find_all_breakdown_EN(p * d, toy, p, T, first_only=True,
-                                      det_fn=det_uniform)
-        lhs = generalized_paschen_lhs(*_coeffs(toy_raw, roots[0]),
-                                      toy_raw._GAMMA0, d)
+        roots = find_all_breakdown_EN(
+            p * d, toy, p, T, first_only=True, det_fn=det_uniform
+        )
+        lhs = generalized_paschen_lhs(*_coeffs(toy_raw, roots[0]), toy_raw._GAMMA0, d)
         assert lhs == pytest.approx(1.0, rel=1e-6)
 
     @pytest.mark.parametrize("d_mm", [1.0, 10.0, 50.0])
@@ -80,7 +81,9 @@ class TestClosedForm:
         assert roots
         a, e, dl = _coeffs(raw, roots[0])
         assert dl == 0.0
-        assert standard_paschen_lhs(a, e, raw._GAMMA0, d) == pytest.approx(1.0, rel=1e-6)
+        assert standard_paschen_lhs(a, e, raw._GAMMA0, d) == pytest.approx(
+            1.0, rel=1e-6
+        )
 
     @pytest.mark.parametrize("d_mm", [1.0, 10.0])
     def test_no_attachment_reduces_to_textbook_paschen(self, toy_path, d_mm):
@@ -121,7 +124,9 @@ class TestClosedForm:
         assert roots, "no root found in the attachment regime"
         a, e, _ = _coeffs(raw, roots[0])
         assert a <= e, "this configuration was meant to probe alpha <= eta"
-        assert standard_paschen_lhs(a, e, raw._GAMMA0, d) == pytest.approx(1.0, rel=1e-6)
+        assert standard_paschen_lhs(a, e, raw._GAMMA0, d) == pytest.approx(
+            1.0, rel=1e-6
+        )
         # Long-gap asymptote; loosest at the shortest gap tested.
         assert a == pytest.approx(e / (1.0 + raw._GAMMA0), rel=3e-3)
 
@@ -156,25 +161,29 @@ class TestRootFinding:
         without checking whether a lower root had appeared.
         """
         p, T, d = 1.0, 293.0, 20e-3
-        truth = find_all_breakdown_EN(p * d, toy, p, T, first_only=True,
-                                      det_fn=det_uniform)[0]
+        truth = find_all_breakdown_EN(
+            p * d, toy, p, T, first_only=True, det_fn=det_uniform
+        )[0]
         for hint in (10.0 * truth, 100.0 * truth, 1000.0 * truth):
-            got = find_all_breakdown_EN(p * d, toy, p, T, first_only=True,
-                                        det_fn=det_uniform, EN_hints=[hint])
-            assert got, f"no root returned for hint {hint}"
-            assert got[0] == pytest.approx(truth, rel=1e-8), (
-                f"stale hint {hint:.4g} Td changed the answer"
+            got = find_all_breakdown_EN(
+                p * d, toy, p, T, first_only=True, det_fn=det_uniform, EN_hints=[hint]
             )
+            assert got, f"no root returned for hint {hint}"
+            assert got[0] == pytest.approx(
+                truth, rel=1e-8
+            ), f"stale hint {hint:.4g} Td changed the answer"
 
     def test_first_only_agrees_with_min_of_all_roots(self, toy, det_uniform):
         """I6b/I7: branch 1 is exactly min(all roots), and all roots are sorted."""
         p, T = 1.0, 293.0
         for d_mm in (1.0, 10.0, 50.0):
             pd = p * d_mm * 1e-3
-            first = find_all_breakdown_EN(pd, toy, p, T, first_only=True,
-                                          det_fn=det_uniform)
-            every = find_all_breakdown_EN(pd, toy, p, T, first_only=False,
-                                          det_fn=det_uniform)
+            first = find_all_breakdown_EN(
+                pd, toy, p, T, first_only=True, det_fn=det_uniform
+            )
+            every = find_all_breakdown_EN(
+                pd, toy, p, T, first_only=False, det_fn=det_uniform
+            )
             assert every == sorted(every)
             assert first[0] == pytest.approx(min(every), rel=1e-8)
 
@@ -192,8 +201,9 @@ class TestRootFinding:
         find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=fn)
         cold = counter["n"]
         counter["n"] = 0
-        find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=fn,
-                              EN_hints=[truth * 1.05])
+        find_all_breakdown_EN(
+            pd, toy, p, T, first_only=True, det_fn=fn, EN_hints=[truth * 1.05]
+        )
         warm = counter["n"]
         assert warm < cold, f"warm start saved nothing (warm={warm}, cold={cold})"
 
@@ -201,16 +211,18 @@ class TestRootFinding:
         """I9: a root bracketed by a NaN sentinel is discarded, not reported."""
         p, T, pd = 1.0, 293.0, 20e-3
         nan_det = lambda EN, *a, **k: float("nan")  # noqa: E731
-        accepted = _accept_root(300.0, 100.0, 900.0, -1e-300, 1.0, pd,
-                                nan_det, toy, p, T)
+        accepted = _accept_root(
+            300.0, 100.0, 900.0, -1e-300, 1.0, pd, nan_det, toy, p, T
+        )
         assert accepted is False
 
     def test_accept_root_keeps_a_genuine_singularity(self, toy):
         """I9b: NaN at the root with finite brackets is the expected Q -> 0."""
         p, T, pd = 1.0, 293.0, 20e-3
         nan_det = lambda EN, *a, **k: float("nan")  # noqa: E731
-        assert _accept_root(300.0, 100.0, 900.0, 1.0, -1.0, pd,
-                            nan_det, toy, p, T) is True
+        assert (
+            _accept_root(300.0, 100.0, 900.0, 1.0, -1.0, pd, nan_det, toy, p, T) is True
+        )
 
 
 class TestInceptionCurve:
@@ -241,8 +253,9 @@ class TestInceptionCurve:
         branches = compute_inception_curve(pd_arr, toy, p, T, det_fn=det_uniform)
         br = branches[0]
         for i, pd in zip(br["idx"], br["pd"]):
-            every = find_all_breakdown_EN(pd, toy, p, T, first_only=False,
-                                          det_fn=det_uniform)
+            every = find_all_breakdown_EN(
+                pd, toy, p, T, first_only=False, det_fn=det_uniform
+            )
             assert br["EN"][list(br["idx"]).index(i)] == pytest.approx(
                 min(every), rel=1e-6
             )
@@ -251,8 +264,9 @@ class TestInceptionCurve:
         """I10: a single smooth branch stays one branch across the sweep."""
         p, T = 1.0, 293.0
         pd_arr = np.logspace(np.log10(2e-3), np.log10(100e-3), 12)
-        branches = compute_inception_curve(pd_arr, toy, p, T,
-                                           all_branches=True, det_fn=det_uniform)
+        branches = compute_inception_curve(
+            pd_arr, toy, p, T, all_branches=True, det_fn=det_uniform
+        )
         assert branches
         br = branches[0]
         order = np.argsort(br["pd"])

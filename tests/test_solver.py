@@ -75,7 +75,9 @@ class TestBuildAAug:
         D_tl, Z_tr = A_aug[n : n + 2, n : n + 2], A_aug[n : n + 2, n + 2 :]
         Z_bl, D_br = A_aug[n + 2 :, n : n + 2], A_aug[n + 2 :, n + 2 :]
 
-        assert A == pytest.approx(mod.get_R(EN, p, T) @ np.linalg.inv(mod.get_V(EN, p, T)))
+        assert A == pytest.approx(
+            mod.get_R(EN, p, T) @ np.linalg.inv(mod.get_V(EN, p, T))
+        )
         assert B1 == pytest.approx(B2)
         assert C1 == pytest.approx(-C2)
         assert D_tl == pytest.approx(-np.diag(mod.get_kappa(p, T)))
@@ -241,8 +243,9 @@ class TestAdaptiveGrid:
         """S11: a non-uniform field exercises the adaptive machinery."""
         fd = FieldDistribution("sphere-plane", 50e-3)
         diag = []
-        inception_det(120.0, 10e-3, toy, 1.0, 293.0, fd, N_min=5, N_max=200,
-                      diag_list=diag)
+        inception_det(
+            120.0, 10e-3, toy, 1.0, 293.0, fd, N_min=5, N_max=200, diag_list=diag
+        )
         assert len(diag) == 5
         assert all(entry["halvings"] for entry in diag)
 
@@ -250,8 +253,9 @@ class TestAdaptiveGrid:
         """S11b: max_depth = 0 means each segment is accepted as one step."""
         fd = FieldDistribution("sphere-plane", 50e-3)
         diag = []
-        inception_det(120.0, 10e-3, toy, 1.0, 293.0, fd, N_min=4, N_max=4,
-                      diag_list=diag)
+        inception_det(
+            120.0, 10e-3, toy, 1.0, 293.0, fd, N_min=4, N_max=4, diag_list=diag
+        )
         assert len(diag) == 4
         for entry in diag:
             assert all(h["level"] == 0 for h in entry["halvings"])
@@ -289,8 +293,9 @@ class TestDeterminant:
         from incept1d.inception import find_all_breakdown_EN
 
         p, T, pd = 1.0, 293.0, 20e-3
-        root = find_all_breakdown_EN(pd, toy, p, T, first_only=True,
-                                     det_fn=det_uniform)[0]
+        root = find_all_breakdown_EN(
+            pd, toy, p, T, first_only=True, det_fn=det_uniform
+        )[0]
         below = inception_det(root * 0.9, pd, toy, p, T, uniform)
         above = inception_det(root * 1.1, pd, toy, p, T, uniform)
         assert np.isfinite(below) and np.isfinite(above)

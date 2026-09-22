@@ -18,7 +18,6 @@ with the toy, and the physics -- lambda > 0 above threshold, growing with
 overvoltage -- is checked against the air mechanism in ``test_air.py``.
 """
 
-import numpy as np
 import pytest
 
 from incept1d.fields import FieldDistribution

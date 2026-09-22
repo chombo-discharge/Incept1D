@@ -39,10 +39,21 @@ class TestLoadMechanism:
 
     def test_required_attrs_is_the_documented_contract(self):
         """The mechanism-writing guide lists exactly these names."""
-        for name in ("SPECIES", "ELECTRON_INDEX", "get_R", "get_V", "get_B",
-                     "get_C", "get_kappa", "get_Pi_e", "get_Pi_plus",
-                     "get_Pi_minus", "get_gamma_plus", "get_gamma_plus_with",
-                     "get_gamma_Psi"):
+        for name in (
+            "SPECIES",
+            "ELECTRON_INDEX",
+            "get_R",
+            "get_V",
+            "get_B",
+            "get_C",
+            "get_kappa",
+            "get_Pi_e",
+            "get_Pi_plus",
+            "get_Pi_minus",
+            "get_gamma_plus",
+            "get_gamma_plus_with",
+            "get_gamma_Psi",
+        ):
             assert name in REQUIRED_ATTRS
 
     def test_config_dict_without_config_py_is_an_error(self, tmp_path, toy_path):
@@ -103,8 +114,11 @@ class TestMechanismWrapper:
         """
         mod = load_mechanism(
             toy_path,
-            {"gamma0": 0.1, "pos_override": {"gamma0": 0.4},
-             "neg_override": {"gamma0": 0.01}},
+            {
+                "gamma0": 0.1,
+                "pos_override": {"gamma0": 0.4},
+                "neg_override": {"gamma0": 0.01},
+            },
         )
         pos, neg = mod.resolve(True), mod.resolve(False)
         assert pos.get_gamma_plus(300.0, 1.0, 293.0) == pytest.approx([0.4])

@@ -30,7 +30,7 @@ FIGDIR := $(abspath .)
 export MPLBACKEND := Agg
 export PD_NUM
 
-FIGURES := iec60052 electra zheleznyakfit
+FIGURES := iec60052 electra zheleznyakfit paschen
 DIAMS   := 10 15 25 50 75 100 150 200
 
 # Anything that changes the physics or numerics invalidates the computed data.
@@ -66,11 +66,17 @@ $(BUILD)/electra/sim.dat: $(ROOT)/examples/electra/run.sh $(SOLVER_DEPS)
 $(BUILD)/electra/tablec2_air.dat: $(ROOT)/examples/electra/tablec2_air.dat
 	@mkdir -p $(dir $@) && cp $< $@
 
+$(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat &: \
+		$(ROOT)/examples/paschen/run.sh $(ROOT)/examples/paschen/closed_form.py $(SOLVER_DEPS)
+	@mkdir -p $(dir $@)
+	OUT=$(BUILD)/paschen bash $(ROOT)/examples/paschen/run.sh
+
 $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat: $(ROOT)/mechanisms/air/zheleznyak.py
 	@mkdir -p $(dir $@)
 	cd $(dir $@) && python3 $< --ngroups 8 --threshold 1E-6 --write-to-file zheleznyak
 
 data: $(IEC_SIM) $(IEC_REF) $(BUILD)/electra/sim.dat $(ELECTRA_REF) \
+      $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat \
       $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat
 
 # ---- 2. pgfplots + 3. outputs ---------------------------------------------------
@@ -78,6 +84,7 @@ data: $(IEC_SIM) $(IEC_REF) $(BUILD)/electra/sim.dat $(ELECTRA_REF) \
 DATA_iec60052     := $(IEC_SIM) $(IEC_REF)
 DATA_electra      := $(BUILD)/electra/sim.dat $(ELECTRA_REF)
 DATA_zheleznyakfit := $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat
+DATA_paschen      := $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat
 
 # One rule set per figure: tex + data -> PDF in the build dir -> PDF/PNG in OUT.
 define FIGURE_RULES

@@ -93,16 +93,27 @@ class TestShape:
 
 
 class TestFieldLineLayouts:
-    def test_two_four_and_six_column_layouts_agree(self, tmp_path, sphere_plane_samples):
+    def test_two_four_and_six_column_layouts_agree(
+        self, tmp_path, sphere_plane_samples
+    ):
         """F6: the same physical line, written three ways, gives one profile."""
         d, _, xi, E = sphere_plane_samples
         s = xi * d
         p2 = _write_line(tmp_path / "c2.dat", zip(s, E))
-        p4 = _write_line(tmp_path / "c4.dat", zip(s, np.zeros_like(s), np.zeros_like(s), E))
+        p4 = _write_line(
+            tmp_path / "c4.dat", zip(s, np.zeros_like(s), np.zeros_like(s), E)
+        )
         # 6-column: same |E| carried as a vector along +x
         p6 = _write_line(
             tmp_path / "c6.dat",
-            zip(s, np.zeros_like(s), np.zeros_like(s), E, np.zeros_like(s), np.zeros_like(s)),
+            zip(
+                s,
+                np.zeros_like(s),
+                np.zeros_like(s),
+                E,
+                np.zeros_like(s),
+                np.zeros_like(s),
+            ),
         )
         fds = [FieldDistribution.from_fieldline(p) for p in (p2, p4, p6)]
         assert all(fd.fieldline_length == pytest.approx(d, rel=1e-12) for fd in fds)
@@ -121,7 +132,9 @@ class TestFieldLineLayouts:
         b = FieldDistribution.from_fieldline(_write_line(tmp_path / "n.dat", rows_neg))
         assert a.fieldline_f == pytest.approx(b.fieldline_f)
 
-    @pytest.mark.parametrize("unit, scale", [("m", 1.0), ("cm", 1e-2), ("mm", 1e-3), ("um", 1e-6)])
+    @pytest.mark.parametrize(
+        "unit, scale", [("m", 1.0), ("cm", 1e-2), ("mm", 1e-3), ("um", 1e-6)]
+    )
     def test_length_units(self, tmp_path, unit, scale):
         """F7: the unit scales the arc length and leaves f(xi) untouched."""
         s = np.linspace(0.0, 10.0, 11)
@@ -140,7 +153,9 @@ class TestFieldLineLayouts:
         fd = FieldDistribution.from_fieldline(_write_line(tmp_path / "arc.dat", rows))
         assert fd.fieldline_length == pytest.approx(np.pi * R, rel=1e-5)
 
-    def test_round_trip_reproduces_the_analytic_profile(self, tmp_path, sphere_plane_samples):
+    def test_round_trip_reproduces_the_analytic_profile(
+        self, tmp_path, sphere_plane_samples
+    ):
         """
         F9: sample the exact sphere-plane profile, write it, load it back.
 
@@ -149,7 +164,9 @@ class TestFieldLineLayouts:
         """
         d, f_exact, xi, E = sphere_plane_samples
         fd = FieldDistribution.from_fieldline(
-            _write_line(tmp_path / "sp.csv", zip(xi * d * 1e3, E), header="s_mm,E", sep=",")
+            _write_line(
+                tmp_path / "sp.csv", zip(xi * d * 1e3, E), header="s_mm,E", sep=","
+            )
         )
         f = fd.build(d)
         err = max(abs(f(x) - f_exact(x)) / f_exact(x) for x in np.linspace(0, 1, 500))

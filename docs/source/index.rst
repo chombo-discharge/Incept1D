@@ -97,6 +97,20 @@ Numerics
    numerics/rootfinding
    numerics/cost
 
+Configuration files
+*******************
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Configuration files
+   :hidden:
+
+   configuration/overview
+   configuration/mechanismfile
+   configuration/configpy
+   configuration/jsonfiles
+   configuration/reactions
+
 Python modules
 **************
 
@@ -114,9 +128,6 @@ Python modules
    modules/fielddistributions
    modules/reactions
    modules/constants
-   modules/configuration
-   modules/modifyingreactions
-   modules/newmechanisms
    modules/fieldlines
 
 Examples
@@ -127,6 +138,7 @@ Examples
    :caption: Examples
    :hidden:
 
+   examples/paschen
    examples/iec60052
    examples/electra
 
