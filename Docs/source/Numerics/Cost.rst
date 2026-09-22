@@ -27,9 +27,14 @@ cost of one.  For the six-species dry-air scheme with three photon groups
    * - :math:`\det\bm{Q}`, sphere-sphere, default ``--dx``
      - ≈ 50 ms
      - adaptive midpoint, :math:`N_{\min} = 5`, :math:`N_{\max} = 200`
+   * - :math:`\det\bm{Q}`, uniform field
+     - ≈ 0.2 ms
+     - one ``expm`` and one :math:`\bm{\mathcal{A}}` assembly; exact, so
+       ``--dx`` and ``--method`` do not apply
    * - one :math:`pd` point of an inception curve
-     - 20–100 evaluations
-     - warm start ≈ 20, full scan ≈ 200 + refinement
+     - 60–250 evaluations
+     - warm start ≈ 20 + the guard scan below it, full scan ≈ 200 +
+       refinement
    * - 100-point inception curve, sphere gap, two configurations
      - minutes
      - the :ref:`Chap:Examples:IEC60052` runs

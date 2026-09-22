@@ -110,11 +110,17 @@ def find_all_breakdown_EN(
     Using n_scan=200 reduces the chance of missing a sign change when multiple
     roots are close together.
 
+    With first_only=True the value returned is always the *globally lowest*
+    root in [EN_lo, EN_hi]; all roots are returned only when first_only=False
+    (``--all-branches``).
+
     If EN_hints is supplied and first_only=True, a warm-start pass is
     attempted first: the lowest hint is bracketed by
-    [hint/hint_factor, hint*hint_factor] and refined directly with brentq,
-    bypassing the coarse scan entirely.  Falls back to the full scan if the
-    hint fails to bracket.  Warm-start is intentionally disabled when
+    [hint/hint_factor, hint*hint_factor] and refined directly with brentq.
+    The resulting root is accepted — and the coarse scan skipped — only if it
+    also brackets successfully *and* no sign change is found beneath it
+    (sampled at the same points-per-decade as the full scan); otherwise the
+    full scan runs and decides.  Warm-start is intentionally disabled when
     first_only=False (--all-branches) because new branches can appear at any
     pd step; the coarse scan is required to detect them.
 
@@ -169,10 +175,38 @@ def find_all_breakdown_EN(
         val = det_fn(EN, pd, mod, p, T)
         return val if np.isfinite(val) else -1e-300
 
-    # Warm-start: only safe when first_only=True (single-branch mode).
+    def _no_root_below(EN_ref):
+        """
+        True when the coarse scan finds no sign change in [EN_lo, EN_ref].
+
+        A warm-start root is only the *lowest* root if nothing lies below it.
+        The check samples [EN_lo, EN_ref] at the same points-per-decade as the
+        full scan over [EN_lo, EN_hi], so accepting a warm-start root is
+        exactly as reliable as running the scan it replaces — just cheaper,
+        because the interval is shorter.
+        """
+        if EN_ref <= EN_lo:
+            return True
+        per_decade = (n_scan - 1) / math.log10(EN_hi / EN_lo)
+        n_guard = max(2, int(math.ceil(per_decade * math.log10(EN_ref / EN_lo))) + 1)
+        grid = np.logspace(np.log10(EN_lo), np.log10(EN_ref), n_guard)
+        vals = np.array([scan_fn(en, pd, mod, p, T) for en in grid])
+        vals = np.where(np.isfinite(vals), vals, 0.0)  # NaN → 0, as in _scan_with
+        return not np.any(vals[:-1] * vals[1:] < 0.0)
+
+    # Warm-start: only attempted when first_only=True (single-branch mode).
     # With first_only=False (--all-branches) the coarse scan is mandatory
     # because new branches can appear at any pd point; skipping it would
     # silently miss roots not bracketed by existing hints.
+    #
+    # Even in single-branch mode the hint only says where the *previous* pd
+    # point's root was: a new, lower root may have appeared since (this is
+    # exactly what happens near the left-branch asymptote, where the lowest
+    # root drops by orders of magnitude between neighbouring pd points).
+    # Refining the hint alone would then return a root that is not the lowest,
+    # and the branch would stay locked onto the wrong one for the rest of the
+    # sweep, so the warm-start root is accepted only after _no_root_below
+    # confirms that nothing lies underneath it.
     if EN_hints and first_only:
         warm_roots = []
         all_ok = True
@@ -215,9 +249,10 @@ def find_all_breakdown_EN(
             else:
                 all_ok = False
                 break
-        if all_ok and warm_roots:
+        if all_ok and warm_roots and _no_root_below(min(warm_roots)):
             return sorted(warm_roots)
-        # Warm start incomplete — fall through to full scan.
+        # Warm start incomplete, or a lower root exists — fall through to the
+        # full scan, which is authoritative.
 
     EN_scan = np.logspace(np.log10(EN_lo), np.log10(EN_hi), n_scan)
 

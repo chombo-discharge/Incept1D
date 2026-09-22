@@ -440,8 +440,13 @@ def inception_det(
     propagator matrices, then assembles the boundary-condition matrix Q and returns
     its determinant.  Breakdown occurs when det Q = 0.
 
-    For the midpoint propagator the grid is adaptive: each of the N_min initial
-    segments is recursively halved until the relative Frobenius error between the
+    For a uniform field A_aug is constant across the gap, so M(d) = expm(A_aug·d)
+    is exact and is evaluated in a single matrix exponential; N_min, N_max, tol
+    and propagator are then ignored (there is nothing for a quadrature to
+    improve on) and every setting returns the same det Q.
+
+    For a non-uniform field with the midpoint propagator the grid is adaptive:
+    each of the N_min initial segments is recursively halved until the relative Frobenius error between the
     one-step and two-step estimates falls below tol, or the maximum refinement
     depth (floor(log2(N_max // N_min))) is reached.  Setting N_min = N_max gives
     a constant uniform grid (max_depth = 0, no halving attempted).
@@ -490,6 +495,47 @@ def inception_det(
     """
     eff = mod.resolve(positive_polarity)
     d = pd / p
+
+    # Uniform field: A_aug does not depend on x, so the path-ordered product
+    # collapses to a single matrix exponential,
+    #
+    #     M(d) = exp(A_aug · d),
+    #
+    # which is the *exact* propagator rather than a quadrature of it — there is
+    # nothing for the midpoint rule or the adaptive grid to improve on, and the
+    # N_min−1 matrix products are pure roundoff.  Magnus2 also reduces to this
+    # (its commutator term vanishes for constant A), so the shortcut applies
+    # whichever propagator was requested.  _expm_shifted drops the same scalar
+    # factor exp(λ_max·d) that the stepped product drops as N factors of
+    # exp(λ_max·h), so det Q is identical, not merely equivalent.
+    if field_dist.field_type == "uniform":
+        A_aug, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
+            EN_ref, d, eff, p, T, lam=lam
+        )
+        with np.errstate(over="ignore", invalid="ignore"):
+            M = _expm_shifted(A_aug * d)
+            if diag_list is not None:
+                diag_list.append(
+                    {
+                        "segment": 0,
+                        "x_lo": 0.0,
+                        "x_hi": d,
+                        "halvings": [
+                            {
+                                "x_lo": 0.0,
+                                "x_hi": d,
+                                "level": 0,
+                                "err": 0.0,
+                                "accepted": True,
+                                "exact": True,
+                            }
+                        ],
+                    }
+                )
+            return _assemble_det_Q(
+                M, EN_ref, eff, p, T, N_gamma_eff, aug_mask, n_aug
+            )
+
     f = field_dist.build(d)
     d_step = d / N_min
     max_depth = max(0, int(math.log2(max(1, N_max // N_min))))

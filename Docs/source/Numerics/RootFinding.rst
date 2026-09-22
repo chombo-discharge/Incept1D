@@ -43,11 +43,24 @@ Warm starts
 
 Along a :math:`pd` sweep the root moves smoothly, so in single-branch mode
 the previous root is used as a hint: the bracket
-:math:`[E/N_\mathrm{prev}/2, 2E/N_\mathrm{prev}]` is tried first and the
-coarse scan skipped when it succeeds.  If the upper end of the hint bracket
-is in the ``NaN`` region it is narrowed geometrically until a finite
-negative value is found.  Warm starts are disabled in ``--all-branches``
-mode because new branches can appear at any :math:`pd`.
+:math:`[E/N_\mathrm{prev}/2, 2E/N_\mathrm{prev}]` is tried first.  If the
+upper end of the hint bracket is in the ``NaN`` region it is narrowed
+geometrically until a finite negative value is found.  Warm starts are
+disabled in ``--all-branches`` mode because new branches can appear at any
+:math:`pd`.
+
+A hint only records where the root was at the *previous* :math:`pd` point,
+so refining it is not by itself enough: a new, lower root may have appeared
+since.  This is not hypothetical — near the left-branch asymptote the lowest
+root of the dry-air mechanism drops from :math:`2.9\times10^{5}` to
+:math:`2.4\times10^{3}` Td between two adjacent :math:`pd` points.  The
+warm-start root is therefore accepted, and the coarse scan skipped, only
+when a second scan over :math:`[E/N_\mathrm{lo}, E/N_\mathrm{warm}]` finds
+no sign change beneath it.  That scan samples at the same points per decade
+as the full scan, so accepting a warm-start root is exactly as reliable as
+running the scan it replaces — only cheaper, because the interval is
+shorter.  Without this check a single spurious root at one end of the sweep
+propagates through every subsequent :math:`pd` point.
 
 Branch tracking
 ---------------

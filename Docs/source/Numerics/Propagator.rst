@@ -20,6 +20,15 @@ For a uniform field :math:`\bm{\mathcal{A}}` is constant and
 The full augmented matrix is small (:math:`N_s + 2N_\gamma`, i.e. 6–18 for
 the air schemes), so a single ``expm`` costs microseconds.
 
+This is the *exact* propagator, not a quadrature of it, so the grid options
+have nothing to refine: ``--dx`` and ``--method`` are accepted but ignored
+for a uniform field, and every setting returns bit-for-bit the same
+:math:`\det\bm{Q}`.  :func:`incept1d.solver.inception_det` takes this
+shortcut before building the segment grid, which makes a uniform-field
+:math:`pd` sweep roughly an order of magnitude cheaper than the composed
+path below (one ``expm`` and one :math:`\bm{\mathcal{A}}` assembly per
+:math:`\det\bm{Q}`, against 15 and 16 for the five-segment default).
+
 Non-uniform field: composed propagators
 ---------------------------------------
 

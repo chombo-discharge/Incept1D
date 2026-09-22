@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore", message="Unable to import Axes3D")
 project = "Incept1D"
 copyright = "2026, SINTEF Energy Research"
 author = "Robert Marskar"
-release = "0.1.0"
+# release = "0.1.0"
 
 try:
     commit_id = (
