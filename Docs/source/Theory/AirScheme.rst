@@ -7,7 +7,7 @@ A minimal scheme for dry air
    :local:
    :depth: 1
 
-The mechanism shipped as ``Air/Air_Pancheshnyi.py`` is the reference
+The mechanism shipped as ``mechanisms/Air/Air_Pancheshnyi.py`` is the reference
 dry-air scheme used in the examples.  It tracks electrons and five ion
 species,
 
@@ -113,7 +113,7 @@ into :math:`\bm{R}`; reactions 9–10 enter through the photon blocks
 (:ref:`Chap:Photoionization`); reactions 11–13 are the cathode boundary
 condition (:ref:`Chap:SecondaryEmission`).  In the mechanism file the
 reactions 1–8 appear verbatim as strings, e.g. ``"O- + N2 -> e + N2O"``,
-and are parsed into :math:`\bm{R}` by :mod:`Reactions`
+and are parsed into :math:`\bm{R}` by :mod:`incept1d.reactions`
 (:ref:`Chap:ModifyingReactions`).
 
 For the ion-conversion and detachment reactions the data of
@@ -145,8 +145,8 @@ Positive ions use a constant reduced mobility
 [Bohringer1987]_;
 :math:`\mathrm{O}^-` uses :math:`1.2\times10^{22}`; the
 :math:`\mathrm{O}_2^-` and :math:`\mathrm{O}_3^-` mobilities are tabulated
-against :math:`E/N` from LXCat (``Air/O2m_mobility.txt``,
-``Air/O3m_mobility.txt``).
+against :math:`E/N` from LXCat (``mechanisms/Air/O2m_mobility.txt``,
+``mechanisms/Air/O3m_mobility.txt``).
 
 Three-body attachment and the Bloch-Bradbury mechanism
 ------------------------------------------------------
@@ -187,7 +187,7 @@ to :math:`\mathrm{O}_3^-` formation (reaction 8).
 
 .. admonition:: Code
 
-   ``Air/Air_2body.py`` is an alternative mechanism that keeps
+   ``mechanisms/Air/Air_2body.py`` is an alternative mechanism that keeps
    :math:`\mathrm{O}_2^{-*}` and :math:`\mathrm{O}_3^{-*}` as explicit
    tracked species (eight species in total) and represents the
    Bloch-Bradbury sequence with two-body reactions.  It shares the same
@@ -205,7 +205,7 @@ dissociation :math:`\mathrm{O}_3^- \to \mathrm{O}^- + \mathrm{O}_2` about
 0.1–0.2 eV at 100 Td.  :math:`\mathrm{O}_3^-` may therefore be stable only
 in a moderate sense and begin to contribute to the attachment-detachment
 cycle at very long gaps; no experimental rates are available.  The
-configuration set ``Air/IonSensitivity.json`` switches reactions 7 and 8
+configuration set ``mechanisms/Air/IonSensitivity.json`` switches reactions 7 and 8
 off individually to quantify their role.
 
 Pressure scaling

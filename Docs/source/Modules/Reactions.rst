@@ -1,13 +1,13 @@
 .. _Chap:Reactions:
 
-Reactions.py — declarative reactions
-====================================
+Declarative reactions — ``incept1d.reactions``
+==============================================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``Reactions.py`` assembles the reaction-rate matrix :math:`\bm{R}` of
+:mod:`incept1d.reactions` assembles the reaction-rate matrix :math:`\bm{R}` of
 :eq:`eq_drift_reaction` from a *declarative* list of reaction strings, so a
 mechanism file states its chemistry as human-readable equations,
 
@@ -87,13 +87,13 @@ handling on the hot path.  The shipped mechanisms use the compiled pair,
 since ``get_R`` is called at every :math:`E/N` sample of every integration
 step of every determinant evaluation.
 
-.. literalinclude:: ../../../Reactions.py
+.. literalinclude:: ../../../src/incept1d/reactions.py
    :language: python
    :pyobject: build_R
 
 API reference
 -------------
 
-.. automodule:: Reactions
+.. automodule:: incept1d.reactions
    :members:
    :undoc-members:

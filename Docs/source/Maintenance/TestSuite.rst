@@ -22,9 +22,9 @@ Three layers are planned:
 
 **Unit tests** of the building blocks that have an analytic answer:
 
-* :mod:`Reactions` — parsing rules, stoichiometry, multiplier
+* :mod:`incept1d.reactions` — parsing rules, stoichiometry, multiplier
   normalisation, rejection of reactions with two tracked reactants;
-* :mod:`FieldDistributions` — normalisation :math:`\int_0^1 f\,d\xi = 1`
+* :mod:`incept1d.fields` — normalisation :math:`\int_0^1 f\,d\xi = 1`
   for every geometry, symmetry flags, field-line file layouts and units;
 * the propagators — ``magnus2`` reduces to the midpoint rule for a
   constant :math:`\bm{\mathcal{A}}`; composed propagators reproduce a
@@ -44,4 +44,4 @@ Three layers are planned:
 :math:`pd` points of the :ref:`Chap:Examples:IEC60052` and
 :ref:`Chap:Examples:Electra` cases with ``--no-plot`` and compare against
 stored reference values with a relative tolerance, so that a change in the
-chemistry or the numerics that shifts the Paschen curve is caught.
+chemistry or the numerics that shifts the inception curve is caught.

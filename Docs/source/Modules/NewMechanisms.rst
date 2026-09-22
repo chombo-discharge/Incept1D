@@ -9,17 +9,17 @@ Creating a new mechanism
 
 A *mechanism file* is a plain Python module that describes one gas: its
 tracked species, reactions, transport coefficients, photoionization data,
-and cathode yields.  It is not imported as a package — :func:`Inception.load_mechanism`
+and cathode yields.  It is not imported as a package — :func:`incept1d.mechanism.load_mechanism`
 executes it with ``importlib`` after injecting configuration variables into
 its namespace — so it must be self-contained and must locate its own data
 files relative to ``__file__``.  The recommended way to write one is to copy
-``Air/Air_Pancheshnyi.py`` (or ``Air/Air_2body.py``) together with
-``Air/Config.py`` into a new directory and edit.
+``mechanisms/Air/Air_Pancheshnyi.py`` (or ``mechanisms/Air/Air_2body.py``) together with
+``mechanisms/Air/Config.py`` into a new directory and edit.
 
 Required interface
 ------------------
 
-:func:`Inception.load_mechanism` checks for the following attributes and
+:func:`incept1d.mechanism.load_mechanism` checks for the following attributes and
 refuses to load a module that lacks any of them:
 
 .. list-table::
@@ -91,15 +91,15 @@ Optional interface
    * - ``alpha(EN, p, T)``, ``eta(EN, p, T)``
      - Townsend coefficients in m\ :sup:`-1`.  Required for
        ``--plot-ionization-integral``, ``--streamer-criterion`` and
-       ``IonizationIntegral.py``.
+       ``incept1d ionization``.
    * - ``init_photoionization(ngroups, cone_angle_deg)``
      - Called by ``Config.post_exec_init`` to (re)build the photon groups.
    * - ``REACTIONS``
      - The declarative reaction list; read by
-       ``CreateChomboDischargeData.py`` to export raw rate coefficients.
+       ``incept1d chombo`` to export raw rate coefficients.
    * - ``ElectronMeanEnergy(EN)``, ``ElectronMobility(EN)``,
        ``ElectronDiffusion(EN)``, ``<Ion>Mobility(EN)`` …
-     - Transport helpers used by ``CreateChomboDischargeData.py``.
+     - Transport helpers used by ``incept1d chombo``.
 
 Configuration hooks
 -------------------
@@ -108,25 +108,25 @@ Parameters that must be known *before* the module body runs — the swarm
 data file, the SEE constants — are read from the module namespace with a
 default, so that ``Config.pre_exec_vars()`` can inject them:
 
-.. literalinclude:: ../../../Air/Air_Pancheshnyi.py
+.. literalinclude:: ../../../mechanisms/Air/Air_Pancheshnyi.py
    :language: python
    :start-at: # Ion secondary-emission coefficients
    :end-at: _BETA = globals().get
 
-.. literalinclude:: ../../../Air/Air_Pancheshnyi.py
+.. literalinclude:: ../../../mechanisms/Air/Air_Pancheshnyi.py
    :language: python
    :start-at: BOLSIG_FILE = globals().get
    :end-at: BOLSIG_FILE = globals().get
 
 Parameters that act at run time — reaction multipliers, ``xi_photo``,
 ``xi_emit``, polarity overrides — are applied by
-:class:`Inception.Mechanism` around the interface functions; the mechanism
+:class:`incept1d.mechanism.Mechanism` around the interface functions; the mechanism
 file does not need to know about them beyond honouring the ``multipliers``
 argument of ``get_R``.
 
 A new mechanism *family* (a new directory) needs its own ``Config.py``
 implementing ``pre_exec_vars`` / ``post_exec_init`` / ``mechanism_params``
-/ ``label`` (:ref:`Chap:Configuration`).  Copy ``Air/Config.py`` and adapt
+/ ``label`` (:ref:`Chap:Configuration`).  Copy ``mechanisms/Air/Config.py`` and adapt
 the key names; the solvers never import it directly.
 
 Step by step
@@ -147,13 +147,13 @@ Step by step
    Remember: exactly one tracked species on the left of every reaction.
 5. **Photoionization.**  Either implement :math:`\bm{B}`, :math:`\bm{C}`,
    :math:`\vec{\kappa}` for the gas (for air-like mixtures the Zheleznyak
-   fit in ``Air/Zheleznyak.py`` can be reused), or return zero-width
+   fit in ``mechanisms/Air/Zheleznyak.py`` can be reused), or return zero-width
    arrays.
 6. **Cathode.**  Implement ``get_gamma_plus_with`` and ``get_gamma_Psi``.
 7. **Optional helpers.**  ``alpha``/``eta`` if you want ionization
    integrals and the streamer criterion.
 8. **Test.**  Run the standalone plot (``python3 path/to/mechanism.py``),
-   then ``Eigenvalues.py``, then ``Inception.py`` with a configuration that
+   then ``incept1d eigenvalues``, then ``incept1d pdiv`` with a configuration that
    reduces the chemistry to the textbook limit and check it against
    :eq:`eq_standard_paschen`.
 

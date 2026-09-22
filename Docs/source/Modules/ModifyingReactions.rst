@@ -46,7 +46,7 @@ The reaction strings of ``Air_Pancheshnyi.py`` are:
    O- + O2 -> O + O2-
    O- + O2 + M -> O3- + M
 
-Run ``Inception.py`` once with ``--write-to-file`` and inspect the header
+Run ``incept1d pdiv`` once with ``--write-to-file`` and inspect the header
 if you are unsure which mechanism and configuration are active.
 
 2. Changing a rate coefficient
@@ -56,7 +56,7 @@ Each reaction in the mechanism file is a pair of a string and a rate
 callable, and the callables delegate to small named functions
 ``k1(EN)`` … ``k8(EN)``:
 
-.. literalinclude:: ../../../Air/Air_Pancheshnyi.py
+.. literalinclude:: ../../../mechanisms/Air/Air_Pancheshnyi.py
    :language: python
    :pyobject: k5
 
@@ -65,7 +65,7 @@ To change a rate, edit the corresponding ``k`` function.  The callable in
 two-body rate coefficient in m\ :sup:`3`/s becomes a first-order rate in
 s\ :sup:`-1`:
 
-.. literalinclude:: ../../../Air/Air_Pancheshnyi.py
+.. literalinclude:: ../../../mechanisms/Air/Air_Pancheshnyi.py
    :language: python
    :start-at: REACTIONS = [
    :end-at: ]
@@ -96,12 +96,12 @@ study, setting its multiplier to 0).
 Sanity checks after a change
 ----------------------------
 
-* ``python3 Air/Air_Pancheshnyi.py`` runs the mechanism standalone and
+* ``python3 mechanisms/Air/Air_Pancheshnyi.py`` runs the mechanism standalone and
   plots the entries of :math:`\bm{R}` vs. :math:`E/N`.
-* ``python3 Eigenvalues.py Air/Air_Pancheshnyi.py`` shows whether the
+* ``incept1d eigenvalues mechanisms/Air/Air_Pancheshnyi.py`` shows whether the
   leading eigenvalue still crosses zero where you expect it.
-* ``python3 CreateChomboDischargeData.py Air/Air_Pancheshnyi.py`` prints
+* ``incept1d chombo mechanisms/Air/Air_Pancheshnyi.py`` prints
   every rate coefficient over the :math:`E/N` grid and plots them.
-* ``python3 Inception.py Air/Air_Pancheshnyi.py Air/Paschen.json`` must
+* ``incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/Paschen.json`` must
   still reproduce the classical Paschen curve — a good regression check
   when only detachment/conversion chemistry was touched.

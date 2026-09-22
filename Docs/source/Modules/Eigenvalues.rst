@@ -1,13 +1,13 @@
 .. _Chap:Eigenvalues:
 
-Eigenvalues.py — local growth modes
-===================================
+Local growth modes — ``incept1d eigenvalues``
+=============================================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``Eigenvalues.py`` computes the eigenvalues of the *local* transport matrix
+``incept1d eigenvalues`` computes the eigenvalues of the *local* transport matrix
 :math:`\bm{A} = \bm{R}\bm{V}^{-1}` as a function of :math:`E/N` at a single
 spatial point — no gap integration, no boundary conditions.  It is the
 purely local counterpart of the full inception criterion: a positive real
@@ -22,7 +22,7 @@ Hungarian algorithm to match each eigenvalue at one :math:`E/N` sample to
 its continuation at the next (minimising total squared distance in the
 complex plane), so that plotted tracks do not jump between unrelated modes.
 
-.. literalinclude:: ../../../Eigenvalues.py
+.. literalinclude:: ../../../src/incept1d/eigenvalues.py
    :language: python
    :pyobject: compute_eigenvalues
 
@@ -31,7 +31,7 @@ Command-line interface
 
 .. code-block:: console
 
-   python3 Eigenvalues.py MECHANISM.py [CONFIG.json ...]
+   incept1d eigenvalues MECHANISM.py [CONFIG.json ...]
        [--p P] [--T T] [--EN-lo LO] [--EN-hi HI] [--EN-num N]
        [--pressure-scan] [--p-min MIN] [--p-max MAX] [--p-num N] [--eig-index IDX]
        [--write-to-file FILE]
@@ -51,19 +51,19 @@ Examples
 .. code-block:: bash
 
    # All eigenvalue tracks for the baseline and the no-detachment variant
-   python3 Eigenvalues.py Air/Air_Pancheshnyi.py Air/NoDetachment.json --EN-lo 20 --EN-hi 300
+   incept1d eigenvalues mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/NoDetachment.json --EN-lo 20 --EN-hi 300
 
    # Leading eigenvalue vs E/N for five pressures between 1 mbar and 10 bar
-   python3 Eigenvalues.py Air/Air_Pancheshnyi.py --pressure-scan --p-min 1e-3 --p-max 10 --p-num 5
+   incept1d eigenvalues mechanisms/Air/Air_Pancheshnyi.py --pressure-scan --p-min 1e-3 --p-max 10 --p-num 5
 
 .. note::
 
-   ``Eigenvalues.py`` has no ``--no-plot`` flag; on headless machines set
+   ``incept1d eigenvalues`` has no ``--no-plot`` flag; on headless machines set
    ``MPLBACKEND=Agg`` and use ``--write-to-file``.
 
 API reference
 -------------
 
-.. automodule:: Eigenvalues
+.. automodule:: incept1d.eigenvalues
    :members:
    :undoc-members:

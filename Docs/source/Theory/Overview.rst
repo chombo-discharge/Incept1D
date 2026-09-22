@@ -117,7 +117,7 @@ exists if and only if
 The **inception threshold** is the applied field at which this holds for
 :math:`\lambda = 0`; the **temporal growth rate** above threshold is the
 :math:`\lambda > 0` at which it holds for a fixed applied field.  Both are
-computed by the same routine, :func:`Inception.inception_det`.  The
+computed by the same routine, :func:`incept1d.solver.inception_det`.  The
 derivation is spread over the following pages:
 
 * :ref:`Chap:Transport` — the augmented ODE and its formal solution;

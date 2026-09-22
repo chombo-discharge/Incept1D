@@ -17,8 +17,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-MECH=Air/Air_Pancheshnyi.py
-CFG=Air/NoDetachment.json
+MECH=mechanisms/Air/Air_Pancheshnyi.py
+CFG=mechanisms/Air/NoDetachment.json
 OUT=${OUT:-Examples/IEC60052}
 PD_NUM=${PD_NUM:-100}
 mkdir -p "$OUT"
@@ -31,7 +31,7 @@ if [ ${#DIAMS[@]} -eq 0 ]; then DIAMS=(10 15 25 50 75 100 150 200); fi
 
 for D in "${DIAMS[@]}"; do
     R_mm=$(python3 -c "print($D * 10 / 2)")
-    python3 Inception.py "$MECH" "$CFG" \
+    incept1d pdiv "$MECH" "$CFG" \
         --pd-min 1 --pd-max "${PDMAX[$D]}" --pd-num "$PD_NUM" \
         --field sphere-sphere "$R_mm" \
         --streamer-criterion 18 --no-plot \

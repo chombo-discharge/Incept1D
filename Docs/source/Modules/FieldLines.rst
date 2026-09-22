@@ -62,12 +62,12 @@ so that :math:`\int_0^1 f\,d\xi = 1`.  Consequently
 * the gap length is the arc length, :math:`d = L`;
 * the reference field is the mean field along the line, :math:`E_\mathrm{ref}
   = U/L` with :math:`U = \int|E|\,ds` the voltage drop along the line;
-* every voltage reported by the scripts is this line integral.
+* every voltage reported by the commands is this line integral.
 
 Polarity
 ........
 
-The file does not say which end is the anode.  ``Inception.py`` evaluates
+The file does not say which end is the anode.  ``incept1d pdiv`` evaluates
 both polarities and labels them ``start=positive`` (the first tabulated
 point is the anode) and ``start=negative`` (the first point is the
 cathode).  Use the one that matches your electrode arrangement, or export
@@ -76,7 +76,7 @@ the line in the direction that makes ``start`` the electrode of interest.
 Sweeps
 ......
 
-* With neither ``--p`` nor ``--d``, ``Inception.py`` uses :math:`d = L`
+* With neither ``--p`` nor ``--d``, ``incept1d pdiv`` uses :math:`d = L`
   and sweeps the pressure — the natural sweep for a fixed geometry.
 * With ``--p``, the gap length :math:`d` is swept.  Since :math:`f(\xi)`
   is fixed, :math:`d \ne L` corresponds to the *same* electrode arrangement
@@ -92,7 +92,7 @@ profile.  Check the imported profile visually first:
 
 .. code-block:: bash
 
-   python3 FieldDistributions.py --field fieldline line.csv mm
+   incept1d field --field fieldline line.csv mm
 
 Limitations
 -----------
@@ -114,6 +114,6 @@ Full example
 
    # Field along a line exported from a 3-D electrostatic solver, mm units,
    # sweeping pressure from 0.1 to 10 bar at the line's own length
-   python3 Inception.py Air/Air_Pancheshnyi.py --field fieldline line.csv mm \
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --field fieldline line.csv mm \
        --pd-min 2 --pd-max 200 --pd-num 40 --streamer-criterion 18 \
-       --write-to-file line_paschen.dat
+       --write-to-file line_pdiv.dat

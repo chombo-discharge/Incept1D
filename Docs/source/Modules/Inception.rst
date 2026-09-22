@@ -1,23 +1,24 @@
 .. _Chap:Inception:
 
-Inception.py — Paschen curves
-=============================
+Inception curves — ``incept1d pdiv``
+=======================================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``Inception.py`` is the core solver.  It implements the boundary-value
-inception criterion :math:`\det\bm{Q}(\lambda) = 0` of
-:ref:`Chap:InceptionCriterion` and provides the command-line interface that
-computes generalized Paschen curves — the reduced field :math:`(E/N)^*` and
-voltage :math:`U^*` at which the criterion is met, as a function of
-:math:`pd`.
+``incept1d pdiv`` is the main command.  :mod:`incept1d.solver` implements
+the boundary-value inception criterion :math:`\det\bm{Q}(\lambda) = 0` of
+:ref:`Chap:InceptionCriterion`; :mod:`incept1d.inception` finds its roots
+and tracks them over a :math:`pd` sweep; the command computes inception
+curves (generalized Paschen curves) — the reduced field :math:`(E/N)^*` and
+inception voltage :math:`U^*` (PDIV) at which the criterion is met, as a
+function of :math:`pd`.
 
 What it does
 ------------
 
-For every point of a logarithmic :math:`pd` sweep the script
+For every point of a logarithmic :math:`pd` sweep the command
 
 1. evaluates :math:`\det\bm{Q}(0; E/N)` on a coarse logarithmic scan of
    :math:`E/N` to find every sign change,
@@ -27,8 +28,8 @@ For every point of a logarithmic :math:`pd` sweep the script
 4. converts :math:`(E/N)^*` to the breakdown voltage :math:`U^* = (E/N)^*
    N d`.
 
-Steps 1–2 are :func:`Inception.find_all_breakdown_EN`; steps 3–4 are
-:func:`Inception.compute_paschen_curve`.  The sweep can be run in two modes:
+Steps 1–2 are :func:`incept1d.inception.find_all_breakdown_EN`; steps 3–4 are
+:func:`incept1d.inception.compute_inception_curve`.  The sweep can be run in two modes:
 **fixed pressure** (``--p``, vary :math:`d`) or **fixed gap distance**
 (``--d``, vary :math:`p`); both may be combined, and several pressures or
 distances may be given.  For a non-uniform field that is not symmetric
@@ -39,7 +40,7 @@ Command-line interface
 
 .. code-block:: console
 
-   python3 Inception.py MECHANISM.py [CONFIG.json ...]
+   incept1d pdiv MECHANISM.py [CONFIG.json ...]
        [--p P [P ...]] [--d D [D ...]] [--T T]
        [--pd-min PD] [--pd-max PD] [--pd-num N]
        [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
@@ -95,31 +96,31 @@ Command-line interface
 Examples
 --------
 
-Uniform-field Paschen curve at three pressures, all branches:
+Uniform-field inception curve at three pressures, all branches:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py --p 0.1 1 10 --all-branches --plot-separate-branches
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --p 0.1 1 10 --all-branches --plot-separate-branches
 
 Fixed 10 mm gap, varying pressure, comparing the four cross-section
 databases:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py Air/Databases.json --d 10 --pd-min 0.1 --pd-max 200
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/Databases.json --d 10 --pd-min 0.1 --pd-max 200
 
 Sphere-plane gap (50 mm sphere), both polarities, second-order Magnus
 propagator on a fixed 40-step grid:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py --field sphere-plane 50 --method magnus2 --dx 40 40
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --field sphere-plane 50 --method magnus2 --dx 40 40
 
-Paschen curve with the growth-rate contour :math:`\lambda = 10^{8}` s\ :sup:`-1`:
+Inception curve with the growth-rate contour :math:`\lambda = 10^{8}` s\ :sup:`-1`:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py --lam 1e8
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --lam 1e8
 
 Output file format
 ------------------
@@ -147,56 +148,80 @@ Points where no root was found are written as ``nan``.
 Loading a mechanism
 -------------------
 
-:func:`load_mechanism` reads a mechanism ``.py`` file with ``importlib`` —
+:func:`incept1d.mechanism.load_mechanism` reads a mechanism ``.py`` file with ``importlib`` —
 mechanism files are *not* imported as packages, they are executed as
 standalone modules, with optional override variables injected into their
 namespace beforehand by a companion ``Config.py`` living next to the
 mechanism file (:ref:`Chap:Configuration`).  The loaded module is validated
 against the required interface (:ref:`Chap:NewMechanisms`) and wrapped in a
-:class:`Mechanism` object that bakes in every configuration parameter
+:class:`~incept1d.mechanism.Mechanism` object that bakes in every configuration parameter
 (photoionization/photoemission scale factors, reaction-rate multipliers,
 per-polarity SEE overrides), so every other function can treat
 ``mod.get_R(EN, p, T)`` etc. as the final, fully-configured answer.
 
-.. literalinclude:: ../../../Inception.py
+.. literalinclude:: ../../../src/incept1d/mechanism.py
    :language: python
    :pyobject: load_mechanism
 
 Assembling the augmented ODE
 ----------------------------
 
-:func:`_build_A_aug` builds :math:`\bm{\mathcal{A}}` of
+:func:`incept1d.solver._build_A_aug` builds :math:`\bm{\mathcal{A}}` of
 :eq:`eq_augmented_ode` at a given reduced field, pressure, temperature and
 :math:`\lambda`.
 
-.. literalinclude:: ../../../Inception.py
+.. literalinclude:: ../../../src/incept1d/solver.py
    :language: python
    :pyobject: _build_A_aug
 
 Boundary conditions and the determinant
 ---------------------------------------
 
-:func:`_assemble_det_Q` builds :math:`\bm{Q} = [\bm{Q}_0; \bm{Q}_d]`
+:func:`incept1d.solver._assemble_det_Q` builds :math:`\bm{Q} = [\bm{Q}_0; \bm{Q}_d]`
 (:eq:`eq_Q0`, :eq:`eq_Qd`) from the propagator :math:`\bm{M}(d)` and the
 mechanism's row selectors and SEE yields, and returns :math:`\det\bm{Q}`.
 
-.. literalinclude:: ../../../Inception.py
+.. literalinclude:: ../../../src/incept1d/solver.py
    :language: python
    :pyobject: _assemble_det_Q
 
-:func:`inception_det` ties the two together: it integrates
+:func:`incept1d.solver.inception_det` ties the two together: it integrates
 :math:`\bm{\mathcal{A}}(x)` across the gap to build :math:`\bm{M}(d)`, then
 calls ``_assemble_det_Q``.  Its root in :math:`E/N` at fixed :math:`pd` *is*
 the inception field.
 
-.. literalinclude:: ../../../Inception.py
+.. literalinclude:: ../../../src/incept1d/solver.py
    :language: python
    :pyobject: inception_det
 
 API reference
 -------------
 
-.. automodule:: Inception
+``incept1d.mechanism``
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: incept1d.mechanism
    :members:
    :undoc-members:
-   :private-members: _build_A_aug, _assemble_det_Q, _adaptive_midpoint_segment, _expm_shifted, _accept_root
+
+``incept1d.solver``
+~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: incept1d.solver
+   :members:
+   :undoc-members:
+   :private-members: _build_A_aug, _assemble_det_Q, _adaptive_midpoint_segment, _expm_shifted
+
+``incept1d.inception``
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: incept1d.inception
+   :members:
+   :undoc-members:
+   :private-members: _accept_root
+
+``incept1d.cli.pdiv``
+~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: incept1d.cli.pdiv
+   :members: add_arguments, run

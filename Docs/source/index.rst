@@ -12,10 +12,10 @@ Welcome to the ``Incept1D`` user documentation
    `GitHub <https://github.com/chombo-discharge/Incept1D>`_ together with the source
    files for this documentation.
 
-``Incept1D`` is a small collection of Python scripts, not a library.  Given a
+``Incept1D`` is a small Python package with a command-line front end.  Given a
 plasma-chemistry *mechanism file* it can
 
-* compute generalized Paschen curves (breakdown voltage and reduced field
+* compute inception curves, i.e. generalized Paschen curves (inception voltage and reduced field
   vs. :math:`pd`) for uniform, sphere-plane, sphere-sphere, or tabulated
   field-line geometries (:ref:`Chap:Inception`);
 * inspect the local eigenvalues of the reaction-transport matrix

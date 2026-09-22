@@ -15,7 +15,7 @@ parts:
 * **Numerics** — how the propagator is built, how the determinant is
   evaluated robustly, how roots are found and tracked, and what a
   calculation costs.
-* **Python modules** — what each script does, its command-line interface,
+* **Python modules** — what each module and command does, its command-line interface,
   and how to modify or write a reaction mechanism.
 * **Examples** — worked reproductions of the comparisons against the IEC
   60052 sphere-gap standard and the Dakin *et al.* (ELECTRA) breakdown

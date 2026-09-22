@@ -1,13 +1,13 @@
 .. _Chap:FieldDistributions:
 
-FieldDistributions.py — gap geometry
-====================================
+Gap geometry — ``incept1d.fields``
+==================================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``FieldDistributions.py`` abstracts the electrode geometry away from the
+``incept1d field`` abstracts the electrode geometry away from the
 solvers.  Everything downstream only ever needs a normalised field profile
 :math:`f(\xi)` on :math:`\xi \in [0, 1]` with
 
@@ -37,7 +37,7 @@ Geometries
      - Sphere of radius :math:`R` (mm) above a grounded plane.  The on-axis
        field is computed *exactly* from the bispherical image-charge series
        (:func:`_sphere_sphere_axial_field` with the plane as the mirror
-       sphere).  Not symmetric: ``Inception.py`` computes both polarities
+       sphere).  Not symmetric: ``incept1d pdiv`` computes both polarities
        (``sphere=positive`` / ``sphere=negative``).
    * - ``sphere-sphere R``
      - Two equal spheres of radius :math:`R` (mm) at :math:`\pm U/2`.
@@ -62,12 +62,12 @@ and, where applicable, the sphere radius or the tabulated profile;
 :meth:`FieldDistribution.build` turns that static description into the
 callable :math:`f(\xi)` for a specific gap length.
 
-.. literalinclude:: ../../../FieldDistributions.py
+.. literalinclude:: ../../../src/incept1d/fields.py
    :language: python
    :pyobject: FieldDistribution.build
 
 ``add_field_argument`` / ``parse_field_spec`` implement the shared
-``--field SPEC`` syntax used by every CLI script, so geometry parsing is
+``--field SPEC`` syntax used by every subcommand, so geometry parsing is
 written and tested once.
 
 Standalone use
@@ -79,13 +79,13 @@ field-line file before using it in a solve.
 
 .. code-block:: bash
 
-   python3 FieldDistributions.py --field sphere-plane 50 --d 20
-   python3 FieldDistributions.py --field fieldline line.csv mm
+   incept1d field --field sphere-plane 50 --d 20
+   incept1d field --field fieldline line.csv mm
 
 API reference
 -------------
 
-.. automodule:: FieldDistributions
+.. automodule:: incept1d.fields
    :members:
    :undoc-members:
    :private-members: _sphere_sphere_axial_field, _compute_n_steps

@@ -2,7 +2,7 @@
 Config.py — configuration class for Air mechanism files.
 
 Defines Config for use with Air_Hosl.py and Air_Pancheshnyi.py.
-Implements the config protocol expected by Inception.load_mechanism:
+Implements the config protocol expected by incept1d.mechanism.load_mechanism:
 
     config.pre_exec_vars()      → dict of {attr: value} to inject before exec
     config.post_exec_init(mod)  → called after exec (e.g. init_photoionization)

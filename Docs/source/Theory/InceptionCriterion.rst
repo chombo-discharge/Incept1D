@@ -55,7 +55,7 @@ relation between the applied voltage and the temporal growth rate:
 * The **inception threshold** is :math:`\lambda = 0`: the voltage
   :math:`U^*` (equivalently :math:`(E/N)^*` at fixed :math:`pd`) at which
   :math:`\det\bm{Q}(0) = 0`.  This is what :ref:`Chap:Inception` solves for
-  along a :math:`pd` sweep, producing a generalized Paschen curve.
+  along a :math:`pd` sweep, producing an inception curve (a generalized Paschen curve).
 * Fixing the voltage above :math:`U^*` and treating :math:`\lambda` as the
   unknown gives the **temporal growth rate** of the discharge, which is what
   :ref:`Chap:Lambda` computes.
@@ -69,14 +69,14 @@ of small matrix exponentials.
 
 .. admonition:: Code
 
-   :func:`Inception._assemble_det_Q` builds :math:`\bm{Q}` from
+   :func:`incept1d.solver._assemble_det_Q` builds :math:`\bm{Q}` from
    :math:`\bm{M}(d)`, the mechanism's row selectors and SEE yields, and
    returns :math:`\det\bm{Q}` (row-normalised, via a signed
    log-determinant, with ``NaN`` returned when :math:`\bm{Q}` is
-   ill-conditioned).  :func:`Inception.inception_det` is the end-to-end
+   ill-conditioned).  :func:`incept1d.solver.inception_det` is the end-to-end
    evaluation for given :math:`E/N`, :math:`pd`, :math:`\lambda`, and field
    geometry.  Root-finding in :math:`E/N` is done by
-   :func:`Inception.find_all_breakdown_EN`; root-finding in :math:`\lambda`
+   :func:`incept1d.inception.find_all_breakdown_EN`; root-finding in :math:`\lambda`
    by :func:`Lambda.find_lambda_for_voltage`.  See :ref:`Chap:Numerics:RootFinding`
    for how sign changes and ``NaN`` regions are handled.
 
@@ -175,7 +175,7 @@ criterion handles and the closed form does not.
    validating changes to the propagator or determinant code: a mechanism
    with only ionization, attachment, and detachment must reproduce
    :eq:`eq_generalized_paschen`, and with detachment switched off it must
-   reproduce :eq:`eq_standard_paschen`.  ``Air/Paschen.json`` configures
+   reproduce :eq:`eq_standard_paschen`.  ``mechanisms/Air/Paschen.json`` configures
    the dry-air mechanism into this limit (no detachment, no ion conversion,
    no photon feedback).
 
@@ -204,12 +204,12 @@ as an electron source, whereas :math:`I_\lambda` also accounts for ion
 conversion, transport, detachment, and photoionization.  The **streamer
 criterion** :math:`I_\alpha = C` with :math:`C \approx 18` is the customary
 engineering inception criterion for non-uniform fields; the code can solve
-for the voltage that satisfies it and overlay it on the Paschen curve.
+for the voltage that satisfies it and overlay it on the inception curve.
 
 .. admonition:: Code
 
    :func:`IonizationIntegral.aed_integral` and
    :func:`IonizationIntegral.eig_integral` evaluate :math:`I_\alpha` and
-   :math:`I_\lambda`; ``Inception.py --streamer-criterion C`` solves
+   :math:`I_\lambda`; ``incept1d pdiv --streamer-criterion C`` solves
    :math:`I_\alpha = C`.  Both require the mechanism to expose ``alpha`` and
    ``eta`` functions in addition to the required interface.

@@ -29,12 +29,12 @@ Running the calculation
 For each diameter the sphere-sphere geometry is selected with the radius
 in mm, and :math:`pd` is swept at the fixed pressure of 1 bar so that the
 gap spacing varies.  Both the full scheme and the no-detachment variant
-(``Air/NoDetachment.json``) are computed, and the streamer criterion
+(``mechanisms/Air/NoDetachment.json``) are computed, and the streamer criterion
 :math:`I_\alpha = 18` is solved alongside:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py Air/NoDetachment.json \
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/NoDetachment.json \
        --pd-min 1 --pd-max 1000 --pd-num 100 \
        --field sphere-sphere 1000 \
        --streamer-criterion 18 --no-plot \
@@ -104,7 +104,7 @@ voltage.
 Variations to try
 -----------------
 
-* ``Air/Databases.json`` instead of ``Air/NoDetachment.json`` shows the
+* ``mechanisms/Air/Databases.json`` instead of ``mechanisms/Air/NoDetachment.json`` shows the
   spread from the choice of electron cross sections.
 * ``--method magnus2 --dx 40 40`` replaces the adaptive midpoint grid by
   a fixed fourth-order grid; compare run time and the resulting curve.

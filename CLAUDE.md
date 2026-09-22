@@ -6,7 +6,7 @@ Guidance for Claude Code (or any future contributor) working in this repository.
 
 Incept1D computes the **inception (breakdown) condition** for a 1-D
 drift-reaction model of a discharge gap (electrons + positive/negative ions +
-two-stream photoionization), and derived quantities (Paschen curves,
+two-stream photoionization), and derived quantities (inception curves PDIV(p·d),
 ionization-integral curves, temporal growth rates, transport-coefficient
 tables for 3-D simulation codes).
 
@@ -19,7 +19,7 @@ from the docs):
 - `Theory/Overview.rst`, eq. `eq_drift_reaction`: the governing drift-reaction PDE.
 - `Theory/Transport.rst`, eq. `eq_augmented_ode`: the augmented first-order
   ODE `∂_x θ = A_aug θ` with block matrix `A_aug = [[A,B,B],[C,-D,0],[-C,0,D]]`
-  — this is exactly `Inception._build_A_aug`; eq. `eq_theta_soln` is the
+  — this is exactly `incept1d.solver._build_A_aug`; eq. `eq_theta_soln` is the
   propagator `M(d)`.
 - `Theory/Photoionization.rst`, eq. `eq_two_stream`: the two-stream photon
   transport supplying the `B`, `C`, `D` blocks.
@@ -27,12 +27,12 @@ from the docs):
   cathode boundary conditions.
 - `Theory/InceptionCriterion.rst`, eqs. `eq_Qd` / `eq_Q_system` /
   `eq_det_criterion`: `Q(λ) θ_0 = 0` and `det Q(λ=0) = 0` — this is
-  `Inception._assemble_det_Q` / `Inception.inception_det`, whose root in
-  `E/N` at fixed `p·d` is what `Inception.compute_paschen_curve` scans for.
+  `incept1d.solver._assemble_det_Q` / `incept1d.solver.inception_det`, whose root in
+  `E/N` at fixed `p·d` is what `incept1d.inception.compute_inception_curve` scans for.
   The `3×3` reduced model (`eq_generalized_paschen`, `eq_standard_paschen`)
   is the closed-form sanity check for the attachment/detachment physics.
 - `Theory/AirScheme.rst`, table `tab_reactions`: the reaction list
-  implemented in `Air/Air_Pancheshnyi.py` / `Air/Air_2body.py`.
+  implemented in `mechanisms/Air/Air_Pancheshnyi.py` / `mechanisms/Air/Air_2body.py`.
 - `Docs/source/Numerics/`: how the propagator, determinant and root
   finding are actually implemented.
 
@@ -41,29 +41,47 @@ refer to an external LaTeX source and have drifted. When code and docs
 disagree, the docs equations (by label, not number) are the intended
 behaviour.
 
-## Module map
+## Layout and module map
 
-All modules below live at the repo root and import each other directly
-(no package/`src` layout, no `__init__.py`). Run them from the repo root.
+The code is a Python package, `incept1d`, in `src/incept1d/` (src layout;
+`pyproject.toml` at the root). Install once per clone with
+`pip install -e .` (add `[dev]` / `[docs]` extras as needed); this provides
+the `incept1d` console command. Everything is driven through subcommands:
+
+```
+incept1d pdiv | eigenvalues | ionization | growth | field | chombo  [options]
+```
+
+Library (physics) and CLI (argparse, printing, plotting) are separate: each
+`incept1d/cli/<command>.py` exposes `HELP`, `DESCRIPTION`,
+`add_arguments(parser)` and `run(args, parser)`, and is registered in
+`incept1d/cli/__init__.py:COMMANDS`. Physics never lives in `cli/`.
 
 | Module | Role |
 |---|---|
-| `Constants.py` | Physical constants (`kB`, `Q`, `c_light`) from `scipy.constants`. Everything else imports from here instead of hardcoding constants. |
-| `Reactions.py` | Declarative reaction-string parser (`"e + N2 -> 2e + N2+"`) that assembles the reaction-rate matrix `R` (`build_R` / the pre-compiled fast path `compile_reactions` + `build_R_from_compiled`). Used by mechanism files, not by the solvers directly. |
-| `FieldDistributions.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere field profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`. Shared `--field` CLI parsing used by `Inception.py`, `IonizationIntegral.py`, `Lambda.py`. |
-| `Inception.py` | Core solver. `load_mechanism` loads a mechanism file + optional JSON config into a `Mechanism` object; `inception_det` integrates the augmented ODE across the gap and evaluates `det Q(λ)`; `compute_paschen_curve` finds and tracks all `E/N` roots (branches) over a `p·d` sweep. Also a CLI (`main`) that plots Paschen curves. |
-| `Eigenvalues.py` | Diagnostic: eigenvalues of the *local* transport matrix `A = R V⁻¹` vs `E/N` (no gap integration). A positive real eigenvalue means locally growing charge density. Imports `load_mechanism` from `Inception.py`. |
-| `IonizationIntegral.py` | Plots the classical ionization integral `∫max(α−η,0)dx` alongside `∫max(Re λ_max(RV⁻¹),0)dx` vs. applied voltage, for comparison against the full `det Q` inception criterion. |
-| `Lambda.py` | For voltages above the inception voltage `V*`, solves `det Q(λ,E/N)=0` for the temporal growth rate `λ>0` (discharge growth rate above threshold). |
-| `CreateChomboDischargeData.py` | Exports transport-coefficient / rate-coefficient tables from a mechanism file for use by the external 3-D `chombo-discharge` plasma solver (the "3D plasma simulations" mentioned in the paper). Not part of the inception solve itself. |
+| `constants.py` | Physical constants (`kB`, `Q`, `c_light`) from `scipy.constants`. Everything else imports from here instead of hardcoding constants. |
+| `reactions.py` | Declarative reaction-string parser (`"e + N2 -> 2e + N2+"`) that assembles the reaction-rate matrix `R` (`build_R` / the pre-compiled fast path `compile_reactions` + `build_R_from_compiled`). Used by mechanism files, not by the solvers directly. |
+| `fields.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere / tabulated field-line profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`. Shared `--field` CLI parsing (`add_field_argument` / `parse_field_spec`). |
+| `mechanism.py` | `load_mechanism` execs a mechanism file + optional JSON config (`read_json_configs`) into a `Mechanism` object; `REQUIRED_ATTRS` is the mechanism interface. |
+| `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping (`parse_dx_spec`, `DX_*_DEFAULT`), `_assemble_det_Q`, and `inception_det` which evaluates `det Q(λ)` for given `E/N`, `p·d`, geometry. |
+| `inception.py` | `find_all_breakdown_EN` finds the `E/N` roots of `det Q = 0`; `compute_inception_curve` tracks them (branches) over a `p·d` sweep → the inception curve PDIV(p·d). CLI: `cli/pdiv.py`. |
+| `eigenvalues.py` | Diagnostic: eigenvalues of the *local* transport matrix `A = R V⁻¹` vs `E/N` (no gap integration); `max_real_eigenvalue` is shared with `ionization`/`growth`. CLI: `cli/eigenvalues.py`. |
+| `ionization.py` | Ionization integrals `∫max(α−η,0)dx` and `∫max(Re λ_max(RV⁻¹),0)dx` across the gap, for comparison against the full `det Q` criterion. CLI: `cli/ionization.py`. |
+| `growth.py` | For voltages above the inception voltage `V*`, solves `det Q(λ,E/N)=0` for the temporal growth rate `λ>0`. CLI: `cli/growth.py`. |
+| `chombo.py` | Transport-/rate-coefficient tables from a mechanism file for the external 3-D `chombo-discharge` solver; has its own `load_raw_mechanism` because it needs the raw `REACTIONS` list. CLI: `cli/chombo.py`. |
+| `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
+| `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (e.g. `Air/Air_Pancheshnyi.py`, `Air/Air_2body.py`)
+### Mechanism files (`mechanisms/Air/Air_Pancheshnyi.py`, `mechanisms/Air/Air_2body.py`)
 
-These are **not imported as Python packages** — they are `exec`'d by
-`Inception.load_mechanism` via `importlib`, after optionally injecting
-override variables (`_GAMMA0`, `_EREF`, `BOLSIG_FILE`, ...) from a companion
-`Config.py` in the same directory (see `Air/Config.py`). A mechanism module
-must expose the fixed interface (`Inception._REQUIRED_ATTRS`):
+Mechanism files live under `mechanisms/<family>/` and are **data, not part
+of the package**: they are `exec`'d by `incept1d.mechanism.load_mechanism`
+via `importlib`, after optionally injecting override variables (`_GAMMA0`,
+`_EREF`, `BOLSIG_FILE`, ...) from a companion `Config.py` in the same
+directory (see `mechanisms/Air/Config.py`). They import the package normally
+(`from incept1d.constants import kB, Q`), so the package must be installed.
+A mechanism module must expose the fixed interface
+(`incept1d.mechanism.REQUIRED_ATTRS`):
 
 - `SPECIES` (ordered list of tracked species names), `ELECTRON_INDEX`
 - `get_R(EN, p, T, multipliers=None)` — reaction-rate matrix `R`
@@ -76,8 +94,8 @@ must expose the fixed interface (`Inception._REQUIRED_ATTRS`):
   electron emission efficiencies (ion- and photon-induced)
 
 When writing or editing a mechanism file, follow the coordinate convention
-documented at the top of `Air/Air_Pancheshnyi.py` (cathode at `x=0`, anode at
-`x=d`, sign convention for `V`). `Config.py` implements the
+documented at the top of `mechanisms/Air/Air_Pancheshnyi.py` (cathode at
+`x=0`, anode at `x=d`, sign convention for `V`). `Config.py` implements the
 `pre_exec_vars()` / `post_exec_init()` / `mechanism_params()` protocol that
 `load_mechanism` expects — copy that pattern for a new mechanism family
 rather than inventing a new config mechanism.
@@ -85,17 +103,19 @@ rather than inventing a new config mechanism.
 ### Typical call graph
 
 ```
-mechanism.py (+ Config.py) ──► Inception.load_mechanism ──► Mechanism
-                                                                │
-                        ┌───────────────────────┬──────────────┼───────────────────────┐
-                        ▼                       ▼              ▼                       ▼
-                Inception.main          Eigenvalues.main  IonizationIntegral.main  Lambda.main
-             (Paschen curves)         (local eigenvalues)   (ionization integral)   (growth rate)
+mechanism file (+ Config.py, *.json) ──► incept1d.mechanism.load_mechanism ──► Mechanism
+                                                                                  │
+                     ┌──────────────────────┬─────────────────────┬───────────────┤
+                     ▼                      ▼                     ▼               ▼
+        solver.inception_det       eigenvalues.*         ionization.*        growth.*
+        inception.* (PDIV curve)
+                     ▲                      ▲                     ▲               ▲
+             cli/pdiv.py           cli/eigenvalues.py     cli/ionization.py   cli/growth.py
 ```
 
-`Reactions.py` and `FieldDistributions.py` sit underneath everything (used by
-mechanism files and by the solvers/CLIs respectively); `Constants.py` sits
-under all of them.
+`reactions.py` and `fields.py` sit underneath everything (used by mechanism
+files and by the solvers/CLIs respectively); `constants.py` sits under all
+of them.
 
 ## Working conventions
 
@@ -113,7 +133,7 @@ under all of them.
   `sphinx-build`, which on at least one dev machine resolves to a pipx shim
   without numpy).  The build runs with `-W`: any warning fails it, and a
   `dummy` build is a pre-commit hook.  Figures are **built, not shipped**:
-  `Docs/figures/Makefile` runs `Examples/*/run.sh` and `Air/Zheleznyak.py`,
+  `Docs/figures/Makefile` runs `Examples/*/run.sh` and `mechanisms/Air/Zheleznyak.py`,
   compiles the pgfplots `.tex` sources in `Docs/figures/`, and drops
   PDF/PNG into the git-ignored `Docs/source/figures/`; `make html` triggers
   it.  The full IEC computation takes tens of minutes the first time
@@ -123,17 +143,19 @@ under all of them.
   functions that implement an equation rather than re-typing them; cite
   literature with `[Key]_` and add the entry to `ZZReferences.rst`
   (unreferenced citations fail the build).
-- **No build system yet**: there is no `setup.py`/`pyproject` package
-  metadata beyond tool config — scripts are run directly with
-  `python Inception.py ...` from the repo root, and mechanism files resolve
-  their own relative imports via `sys.path.insert(0, ...)` at the top of the
-  file. Preserve that pattern rather than introducing package-relative
-  imports.
+- **Packaging**: `pyproject.toml` (setuptools, src layout) is the single
+  source of dependencies and of the `incept1d` entry point. No
+  `sys.path.insert` hacks anywhere: package modules use absolute
+  `incept1d.*` imports, mechanism files import the installed package, tests
+  and Sphinx import the installed (editable) package. Adding a subcommand =
+  new `cli/<name>.py` + one line in `cli/__init__.py:COMMANDS` + a docs
+  page. Shared CLI options (`--field`, `--dx`) come from
+  `fields.add_field_argument` / `solver.parse_dx_spec`.
 - **Physics-affecting changes**: if you change a rate coefficient, a
   boundary condition, or the augmented-matrix assembly, cite the
   corresponding equation label / table in `Docs/source/Theory/` in the
   commit message or docstring, update the theory page if the model itself
-  changed, and check the closed-form limit with `Air/Paschen.json`.
+  changed, and check the closed-form limit with `mechanisms/Air/Paschen.json`.
 - **Examples**: `Examples/<Name>/` holds reference data with a provenance
   header and a `run.sh` that reproduces the calculation; the corresponding
   docs page lives in `Docs/source/Examples/` and its figure source in

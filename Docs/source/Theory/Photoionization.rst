@@ -84,7 +84,7 @@ so :math:`\theta_\mathrm{cone} = 45^\circ` (the default) gives
 :math:`\Delta\Omega/(4\pi) \approx 0.146`, :math:`90^\circ` gives
 :math:`1/2` (a full hemisphere), and :math:`0^\circ` switches photon
 feedback off entirely.  It is exposed as ``cone_angle`` in the JSON
-configuration (:ref:`Chap:Configuration`); ``Air/SEE.json`` contains a
+configuration (:ref:`Chap:Configuration`); ``mechanisms/Air/SEE.json`` contains a
 ready-made sensitivity sweep over it.
 
 After the eigenvalue substitution :math:`\vec{\Psi}(x,t) \to
@@ -113,7 +113,7 @@ for the growth-rate calculation in :ref:`Chap:Lambda`.
      with :math:`B_{ij} = \beta_j[i]\,\xi_j\,\kappa_j`;
    * ``get_C(EN, p, T)`` → :math:`\frac{\Delta\Omega}{4\pi}\rho\,\vec{g}\,\vec{u}_\mathrm{e}^\intercal`,
      shape :math:`(N_\gamma, N_s)`, acting on *densities*; the solver
-     multiplies by :math:`\bm{V}^{-1}` (:func:`Inception._build_A_aug`);
+     multiplies by :math:`\bm{V}^{-1}` (:func:`incept1d.solver._build_A_aug`);
    * ``get_gamma_Psi(EN, p, T)`` → photoemission yields, see
      :ref:`Chap:SecondaryEmission`.
 
@@ -214,13 +214,13 @@ parameters are listed in :numref:`tab_photo_groups`.
 .. admonition:: Code
 
    The fit is performed at import time of the mechanism by
-   ``Air/Zheleznyak.py`` (``fit_twostream(ngroups)``), called from
+   ``mechanisms/Air/Zheleznyak.py`` (``fit_twostream(ngroups)``), called from
    ``init_photoionization(ngroups, cone_angle_deg)`` in
-   ``Air/Air_Pancheshnyi.py``.  The number of groups is the ``ngroups``
+   ``mechanisms/Air/Air_Pancheshnyi.py``.  The number of groups is the ``ngroups``
    entry of the JSON configuration (default 3; six groups reproduce the
    Zheleznyak curve to better than 1 %).  Absorption coefficients scale with the O\ :sub:`2` partial
    pressure, :math:`\kappa_j = (\kappa_j/p_{\mathrm{O}_2})\,x_{\mathrm{O}_2}\,p`.
-   Running ``python3 Air/Zheleznyak.py`` standalone plots the fit;
+   Running ``python3 mechanisms/Air/Zheleznyak.py`` standalone plots the fit;
    :numref:`fig_zheleznyak_fit` is built from its ``--write-to-file``
    output by ``Docs/figures/ZheleznyakFit.tex`` during the documentation
    build.

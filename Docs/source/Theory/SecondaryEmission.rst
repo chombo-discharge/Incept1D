@@ -112,7 +112,7 @@ a constant yield).  The four parameters are exposed as ``gamma0``,
 ``gamma1``, ``eref``, ``beta`` in the JSON configuration and can be set
 independently for the two polarities of a non-symmetric gap
 (:ref:`Chap:Configuration`).  There is considerable uncertainty in these
-constants; ``Air/SEE.json`` sweeps :math:`\gamma_0` over
+constants; ``mechanisms/Air/SEE.json`` sweeps :math:`\gamma_0` over
 :math:`10^{-4}`–:math:`10^{-2}` to quantify the sensitivity.
 
 .. admonition:: Code
@@ -120,7 +120,7 @@ constants; ``Air/SEE.json`` sweeps :math:`\gamma_0` over
    ``get_gamma_plus(EN, p, T)`` returns :math:`\vec{\gamma}_\mathrm{p}` with
    the module defaults; ``get_gamma_plus_with(EN, p, T, gamma0=, gamma1=,
    eref=, beta=)`` is the same with per-call overrides.  The solver always
-   calls the latter (through :class:`Inception.Mechanism`), which is how
+   calls the latter (through :class:`incept1d.mechanism.Mechanism`), which is how
    polarity-specific overrides are applied without reloading the mechanism.
    The yields are evaluated at the *cathode* field, which for a non-uniform
    gap differs between polarities.
@@ -141,5 +141,5 @@ with ``cone_angle: 0``.
 .. admonition:: Code
 
    ``get_gamma_Psi(EN, p, T)`` returns :math:`\vec{\gamma}_\Psi`, shape
-   :math:`(N_\gamma,)`.  :class:`Inception.Mechanism` multiplies it by
+   :math:`(N_\gamma,)`.  :class:`incept1d.mechanism.Mechanism` multiplies it by
    ``xi_emit`` and the output of ``get_B`` by ``xi_photo``.

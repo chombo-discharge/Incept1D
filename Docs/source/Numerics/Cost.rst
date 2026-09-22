@@ -27,10 +27,10 @@ cost of one.  For the six-species dry-air scheme with three photon groups
    * - :math:`\det\bm{Q}`, sphere-sphere, default ``--dx``
      - ≈ 50 ms
      - adaptive midpoint, :math:`N_{\min} = 5`, :math:`N_{\max} = 200`
-   * - one :math:`pd` point of a Paschen curve
+   * - one :math:`pd` point of an inception curve
      - 20–100 evaluations
      - warm start ≈ 20, full scan ≈ 200 + refinement
-   * - 100-point Paschen curve, sphere gap, two configurations
+   * - 100-point inception curve, sphere gap, two configurations
      - minutes
      - the :ref:`Chap:Examples:IEC60052` runs
 
@@ -76,7 +76,7 @@ result:
 * **Propagator cross-check.**  ``--method midpoint`` and ``--method
   magnus2`` converge to the same answer; a persistent difference points to
   an under-resolved profile.
-* **Closed-form limit.**  ``Air/Paschen.json`` reduces the chemistry to the
+* **Closed-form limit.**  ``mechanisms/Air/Paschen.json`` reduces the chemistry to the
   case with an analytic answer (:eq:`eq_standard_paschen`).
 * **Root residual.**  The ``[det Q check]`` messages printed during a run
   flag roots whose residual is large relative to the bracket

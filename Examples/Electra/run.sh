@@ -18,7 +18,7 @@ OUT=${OUT:-Examples/Electra}
 PD_NUM=${PD_NUM:-100}
 mkdir -p "$OUT"
 
-python3 Inception.py Air/Air_Pancheshnyi.py Air/NoDetachment.json \
+incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/NoDetachment.json \
     --pd-min 5E-3 --pd-max 500 --pd-num "$PD_NUM" \
     --field sphere-sphere 1000 \
     --streamer-criterion 18 --no-plot \

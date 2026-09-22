@@ -12,11 +12,12 @@ import subprocess
 import sys
 import warnings
 
-# Make the repository root importable so autodoc can `import Inception`,
-# `import Eigenvalues`, etc. exactly as they are invoked from the command
-# line (no package/src layout is used in this project).
+# autodoc imports the `incept1d` package.  Normally it is installed in the
+# build environment (`pip install -e .`); putting `src/` first on sys.path
+# lets the docs build from a bare checkout as well and guarantees that the
+# documented code is the one in this working tree.
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, _REPO_ROOT)
+sys.path.insert(0, os.path.join(_REPO_ROOT, "src"))
 
 # Force a non-interactive matplotlib backend before autodoc imports any of
 # the project modules (several of them do `import matplotlib.pyplot as plt`
@@ -40,9 +41,7 @@ release = "0.1.0"
 
 try:
     commit_id = (
-        subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=_REPO_ROOT
-        )
+        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=_REPO_ROOT)
         .strip()
         .decode("ascii")
     )

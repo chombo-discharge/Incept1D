@@ -1,173 +1,22 @@
 """
-Eigenvalues.py — compute and plot eigenvalues of the transport matrix A = R V^{-1}.
+``incept1d eigenvalues`` — plot eigenvalues of the transport matrix A = R V⁻¹
+vs. E/N.
 
-For a given reaction mechanism the matrix A = R V^{-1} is formed at each value
-of E/N and all eigenvalues are computed.  A positive real eigenvalue at a given
-E/N means the discharge has a spatially growing mode (net ionisation exceeds
-attachment) and the electron flux amplifies as it travels from cathode to anode.
-
-Two operating modes are available:
-
-Default mode
-------------
-Plot all N eigenvalue tracks (Re λ_j / N) vs E/N for a fixed pressure.
-One subplot per configuration; subplots share the x-axis.
-
-Pressure-scan mode  (--pressure-scan)
---------------------------------------
-Plot the leading eigenvalue (or a user-selected track) vs E/N for several
-log-spaced pressures.  One subplot per configuration, one line per pressure.
-
-Usage
------
-    python Eigenvalues.py <mechanism> [CONFIG.json ...]
-                          [--p PRESSURE] [--T TEMPERATURE]
-                          [--EN-lo LO] [--EN-hi HI] [--EN-num N]
-                          [--pressure-scan] [--p-min MIN] [--p-max MAX]
-                          [--p-num N] [--eig-index IDX]
-                          [--write-to-file FILE]
-
-Arguments
----------
-mechanism
-    Path to a Python file implementing the standard mechanism interface.
-    Example: Air/Air_Hosl.py
-CONFIG.json
-    One or more JSON configuration files.  Each may contain a single object or a
-    list under a "configurations" key.  If omitted, a single baseline
-    configuration is used.  Each configuration produces one subplot.
---p
-    Gas pressure in bar used in default mode (default: 1.0).
---T
-    Gas temperature in Kelvin (default: 293.0).
---EN-lo
-    Lower E/N bound in Td (default: 10).
---EN-hi
-    Upper E/N bound in Td (default: 500).
---EN-num
-    Number of log-spaced E/N points (default: 500).
---pressure-scan
-    Activate pressure-scan mode.
---p-min
-    Minimum pressure in bar for pressure-scan mode (default: 1e-3).
---p-max
-    Maximum pressure in bar for pressure-scan mode (default: 10).
---p-num
-    Number of log-spaced pressures (default: 5).
---eig-index
-    Which eigenvalue track to show in pressure-scan mode (default: 0,
-    the leading/maximum-real mode).
---write-to-file FILE
-    Write reduced eigenvalues (Re(λ/N)) to tab-separated text file(s).
-    Default mode: one file per configuration, all N tracks.
-    Pressure-scan mode: one file per configuration, one column per pressure.
+Default mode plots all N eigenvalue tracks (Re λ_j / N) vs E/N for a fixed
+pressure, one subplot per configuration.  With ``--pressure-scan`` the
+leading (or a chosen) eigenvalue is plotted vs E/N for several log-spaced
+pressures.  See :mod:`incept1d.eigenvalues` for the computation.
 """
 
-import os
-import sys
-import argparse
 import datetime
+import os
 
 import numpy as np
-import scipy.optimize
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from Inception import _kB, load_mechanism, _read_json_configs
-
-
-def _track_step(prev, curr):
-    """
-    Reorder *curr* eigenvalues to best continue the tracks in *prev*.
-
-    Uses the Hungarian algorithm to find the permutation of *curr* that
-    minimises total squared distance in the complex plane from *prev*.
-    """
-    cost = np.abs(prev[:, np.newaxis] - curr[np.newaxis, :]) ** 2
-    _, col_ind = scipy.optimize.linear_sum_assignment(cost)
-    return curr[col_ind]
-
-
-def compute_eigenvalues(mod, EN_range, p, T):
-    """
-    Compute tracked eigenvalues of A = R V^{-1} for each value of E/N.
-
-    At each E/N the transport matrix A = R(EN) @ inv(V(EN)) is formed and all
-    N eigenvalues are computed.  Eigenvalues are continuously tracked across
-    E/N using the Hungarian algorithm to prevent spurious reordering jumps.
-    The initial ordering is by descending real part (most-growing mode in
-    slot 0).
-
-    Parameters
-    ----------
-    mod : Mechanism
-        Loaded mechanism (from Inception.load_mechanism).
-    EN_range : array-like, shape (M,)
-        E/N values in Townsend.
-    p : float
-        Gas pressure in bar.
-    T : float
-        Gas temperature in Kelvin.
-
-    Returns
-    -------
-    numpy.ndarray, shape (M, N), dtype complex
-        Tracked eigenvalues.
-    """
-    n = len(mod.SPECIES)
-    n_EN = len(EN_range)
-    eigvals = np.zeros((n_EN, n), dtype=complex)
-
-    # Scan high→low so the ionisation mode (unambiguously the largest real
-    # eigenvalue at high E/N) seeds track 0, avoiding misassignment to the two
-    # structural zero eigenvalues that exist because columns 1 and 2 of R are
-    # identically zero (N2+, O2+ have no off-diagonal source reactions).
-    for i, EN in enumerate(EN_range[::-1]):
-        R = mod.get_R(EN, p, T)
-        V = mod.get_V(EN, p, T)
-        A = R @ np.linalg.inv(V)
-        eigs = np.linalg.eigvals(A)
-
-        if i == 0:
-            eigs = eigs[np.argsort(-np.real(eigs))]
-        else:
-            eigs = _track_step(eigvals[i - 1], eigs)
-
-        eigvals[i] = eigs
-
-    return eigvals[::-1]
-
-
-def compute_pressure_scan(mod, EN_range, pressures, T, eig_index):
-    """
-    Compute Re(λ_{eig_index} / N) vs E/N for each pressure.
-
-    Parameters
-    ----------
-    mod : Mechanism
-    EN_range : array-like, shape (M,)
-    pressures : array-like, shape (P,)
-        Pressures in bar.
-    T : float
-        Gas temperature in Kelvin.
-    eig_index : int
-        Which eigenvalue track to extract.
-
-    Returns
-    -------
-    numpy.ndarray, shape (M, P)
-        Re(λ_{eig_index} / N) for each (E/N, pressure) pair, in m².
-    """
-    n_EN = len(EN_range)
-    n_p = len(pressures)
-    result = np.zeros((n_EN, n_p))
-
-    for pi, p in enumerate(pressures):
-        N_density = p * 1e5 / (_kB * T)
-        ev = compute_eigenvalues(mod, EN_range, p, T)
-        result[:, pi] = np.real(ev[:, eig_index]) / N_density
-
-    return result
+from incept1d.constants import kB as _kB
+from incept1d.eigenvalues import compute_eigenvalues, compute_pressure_scan
+from incept1d.mechanism import load_mechanism, read_json_configs
 
 
 def _write_default(
@@ -230,15 +79,17 @@ def _write_pressure_scan(
     print(f"Written: {outfile}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Plot eigenvalues of A = R V^{-1} as a function of E/N. "
-            "Positive real eigenvalues indicate net spatial growth of the "
-            "discharge (ionisation exceeds attachment).  "
-            "One subplot is produced per configuration."
-        )
-    )
+HELP = "Eigenvalues of the local transport matrix A = R V⁻¹ vs. E/N."
+DESCRIPTION = (
+    "Plot eigenvalues of A = R V^{-1} as a function of E/N. "
+    "Positive real eigenvalues indicate net spatial growth of the "
+    "discharge (ionisation exceeds attachment).  "
+    "One subplot is produced per configuration."
+)
+
+
+def add_arguments(parser):
+    """Register the command-line arguments on *parser*."""
     parser.add_argument(
         "mechanism",
         help="Path to mechanism Python file (e.g. Air/Air_Hosl.py).",
@@ -326,10 +177,12 @@ def main():
         metavar="FILE",
         help="Write eigenvalue data to tab-separated file(s).",
     )
-    args = parser.parse_args()
 
+
+def run(args, parser):
+    """Run the command with parsed *args*; *parser* is used for ``parser.error``."""
     mech_name = os.path.basename(args.mechanism)
-    raw_dicts = _read_json_configs(args.configs) if args.configs else [{}]
+    raw_dicts = read_json_configs(args.configs) if args.configs else [{}]
     mods = [load_mechanism(args.mechanism, d) for d in raw_dicts]
     n_mods = len(mods)
 
@@ -468,7 +321,3 @@ def main():
     axs[-1].set_xlabel("E/N (Td)")
     plt.tight_layout()
     plt.show()
-
-
-if __name__ == "__main__":
-    main()

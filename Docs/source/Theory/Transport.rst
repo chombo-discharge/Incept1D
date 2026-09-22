@@ -106,7 +106,7 @@ and photoionization data and depends only on :math:`E/N`, :math:`p`,
 
 .. admonition:: Code
 
-   :func:`Inception._build_A_aug` assembles :math:`\bm{\mathcal{A}}` for a
+   :func:`incept1d.solver._build_A_aug` assembles :math:`\bm{\mathcal{A}}` for a
    given :math:`E/N`, :math:`p`, :math:`T`, and :math:`\lambda` from the
    mechanism's ``get_R``, ``get_V``, ``get_B``, ``get_C``, and ``get_kappa``.
    Note that the mechanism returns :math:`\bm{C}` *without* the

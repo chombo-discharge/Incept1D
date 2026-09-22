@@ -30,7 +30,7 @@ Sphinx dummy build.  Run them on demand with
 
    pre-commit run --all-files
 
-Raw reference data under ``Air/*.txt`` and ``Air/*.dat`` (BOLSIG+ output,
+Raw reference data under ``mechanisms/Air/*.txt`` and ``mechanisms/Air/*.dat`` (BOLSIG+ output,
 LXCat tables, Zheleznyak fit data) is excluded from the whitespace hooks
 and must be left byte-for-byte as provided by its source.
 
@@ -43,7 +43,7 @@ Coding conventions
   (``from Constants import kB``).  Do not introduce package-relative
   imports or an ``src/`` layout; mechanism files resolve the root with
   ``sys.path.insert(0, ...)`` relative to their own location.
-* Physical constants come from :mod:`Constants`; never hard-code them.
+* Physical constants come from :mod:`incept1d.constants`; never hard-code them.
 * Public functions and classes carry NumPy-style docstrings (they are the
   API reference).  Private helpers are prefixed with ``_``.
 * Units: SI inside the code; bar / mm / kV / Td on the command line and in
@@ -61,7 +61,7 @@ coefficient, or the assembly of :math:`\bm{\mathcal{A}}` or
 * cite the equation of :ref:`Chap:TheoryOverview` (or the literature
   source of the new data) in the docstring and the commit message;
 * update the corresponding theory page if the model itself changed;
-* check the closed-form limit with ``Air/Paschen.json``
+* check the closed-form limit with ``mechanisms/Air/Paschen.json``
   (:eq:`eq_standard_paschen`) and re-run one of the examples;
 * extend the test suite (:ref:`Chap:TestSuite`) where the change has a
   checkable consequence.
@@ -92,4 +92,4 @@ Submitting changes
 2. Make the change with tests and documentation.
 3. Ensure ``pre-commit run --all-files`` and ``python3 -m pytest`` pass.
 4. Open a pull request describing *what* changed and *why*; for physics
-   changes include a before/after Paschen curve or equivalent evidence.
+   changes include a before/after inception curve or equivalent evidence.

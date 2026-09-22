@@ -10,7 +10,7 @@ Root finding and branch tracking
 Root finding in :math:`E/N`
 ---------------------------
 
-:func:`Inception.find_all_breakdown_EN` locates the :math:`E/N` roots of
+:func:`incept1d.inception.find_all_breakdown_EN` locates the :math:`E/N` roots of
 :math:`\det\bm{Q}(0; E/N)` at a single :math:`pd`:
 
 1. **Coarse scan.**  :math:`\det\bm{Q}` is evaluated on 200 log-spaced
@@ -24,7 +24,7 @@ Root finding in :math:`E/N`
    values are mapped to a tiny negative sentinel (:math:`-10^{-300}`) so
    that Brent's method converges *through* the singular region rather than
    failing.
-3. **Acceptance.**  :func:`Inception._accept_root` distinguishes a genuine
+3. **Acceptance.**  :func:`incept1d.inception._accept_root` distinguishes a genuine
    root (finite bracket endpoints of opposite sign; ``NaN`` at the root
    itself is then the expected consequence of :math:`\bm{Q}` being exactly
    singular) from an artefact created by the sentinel at a bracket
@@ -52,7 +52,7 @@ mode because new branches can appear at any :math:`pd`.
 Branch tracking
 ---------------
 
-:func:`Inception.compute_paschen_curve` repeats the root search over the
+:func:`incept1d.inception.compute_inception_curve` repeats the root search over the
 :math:`pd` grid and assigns each new root to an existing branch by greedy
 nearest-neighbour matching in :math:`\log(E/N)`; unmatched roots start new
 branches.  This handles saddle-node bifurcations, where a pair of new
@@ -73,4 +73,3 @@ E/N) = 0` at fixed :math:`E/N` above threshold:
    :math:`\lambda` always damps the solution, since :math:`\bm{A} =
    (\bm{R} - \lambda\bm{I})\bm{V}^{-1}`;
 3. refine :math:`[0, \lambda_\mathrm{hi}]` with Brent's method.
-

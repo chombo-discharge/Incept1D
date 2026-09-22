@@ -33,7 +33,7 @@ grid budget is reduced (``--dx 5 25 0.05``) to keep the run short:
 
 .. literalinclude:: ../../../Examples/Electra/run.sh
    :language: bash
-   :start-at: python3 Inception.py
+   :start-at: incept1d pdiv
 
 Reading the output
 ------------------
@@ -84,8 +84,8 @@ Variations to try
 * ``--all-branches --plot-separate-branches`` reveals additional roots of
   the determinant at low :math:`pd`; the lowest branch is the physical
   inception voltage.
-* ``Air/Paschen.json`` reduces the chemistry to the textbook limit
+* ``mechanisms/Air/Paschen.json`` reduces the chemistry to the textbook limit
   (:eq:`eq_standard_paschen`); the difference to the baseline isolates
   the combined effect of ion conversion, detachment and photon feedback.
-* ``Air/SEE.json`` shows the sensitivity to the cathode yield and to the
+* ``mechanisms/Air/SEE.json`` shows the sensitivity to the cathode yield and to the
   photon cone angle, which matters most near the Paschen minimum.

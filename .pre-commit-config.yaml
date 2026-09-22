@@ -2,7 +2,7 @@
 # left byte-for-byte as provided by their source -- exclude it from every
 # whitespace/EOF-rewriting hook below. Source files (.py, .json, .rst, ...)
 # are not affected.
-exclude: ^Air/.*\.(txt|dat)$
+exclude: ^mechanisms/Air/.*\.(txt|dat)$
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

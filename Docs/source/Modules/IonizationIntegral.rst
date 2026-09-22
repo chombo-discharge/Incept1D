@@ -1,13 +1,13 @@
 .. _Chap:IonizationIntegral:
 
-IonizationIntegral.py — ionization integrals
-============================================
+Ionization integrals — ``incept1d ionization``
+==============================================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``IonizationIntegral.py`` evaluates the two local surrogates of the
+``incept1d ionization`` evaluates the two local surrogates of the
 inception criterion defined in :ref:`Chap:InceptionCriterion` along the
 (possibly non-uniform) field profile and plots them against applied
 voltage:
@@ -21,16 +21,16 @@ voltage:
   (:eq:`eq_apparent_ionization_integral`), which uses the leading local
   eigenvalue in place of :math:`\alpha - \eta`.
 
-Comparing the two curves at the inception voltage found by ``Inception.py``
+Comparing the two curves at the inception voltage found by ``incept1d pdiv``
 quantifies how much the local approximation misses once negative-ion
 transit and detachment matter, and how sensitive that is to the choice of
 electron cross sections.
 
-.. literalinclude:: ../../../IonizationIntegral.py
+.. literalinclude:: ../../../src/incept1d/ionization.py
    :language: python
    :pyobject: aed_integral
 
-.. literalinclude:: ../../../IonizationIntegral.py
+.. literalinclude:: ../../../src/incept1d/ionization.py
    :language: python
    :pyobject: eig_integral
 
@@ -39,7 +39,7 @@ Command-line interface
 
 .. code-block:: console
 
-   python3 IonizationIntegral.py MECHANISM.py [CONFIG.json ...]
+   incept1d ionization MECHANISM.py [CONFIG.json ...]
        --d D [D ...] (--p P [P ...] | --data-file FILE [--pressure-column COL] [--voltage-column COL])
        [--voltage-lo V] [--voltage-hi V] [--voltage-num N] [--single-voltage V]
        [--T T] [--field SPEC] [--N N] [--no-plot] [--write-to-file FILE]
@@ -67,7 +67,7 @@ Command-line interface
      - Number of midpoint-rule quadrature steps across the gap for
        non-uniform fields (default 200).
    * - ``--field SPEC``
-     - Geometry, as for ``Inception.py``.
+     - Geometry, as for ``incept1d pdiv``.
 
 Examples
 --------
@@ -75,17 +75,17 @@ Examples
 .. code-block:: bash
 
    # Both integrals vs voltage, four cross-section sets, 10 mm gap at 10 bar
-   python3 IonizationIntegral.py Air/Air_Pancheshnyi.py Air/Databases.json \
+   incept1d ionization mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/Databases.json \
        --p 10 --d 10 --voltage-lo 100 --voltage-hi 300
 
    # Evaluate the integrals at measured breakdown voltages in a sphere-plane gap
-   python3 IonizationIntegral.py Air/Air_Pancheshnyi.py --d 20 \
+   incept1d ionization mechanisms/Air/Air_Pancheshnyi.py --d 20 \
        --data-file measurements.dat --pressure-column 0 --voltage-column 1 \
        --field sphere-plane 25
 
 API reference
 -------------
 
-.. automodule:: IonizationIntegral
+.. automodule:: incept1d.ionization
    :members:
    :undoc-members:

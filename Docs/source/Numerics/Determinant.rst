@@ -8,7 +8,7 @@ assembled and its determinant evaluated.  Only the *sign* of
 :math:`\det\bm{Q}` matters for root finding, and the evaluation is designed
 around keeping that sign reliable.
 
-:func:`Inception._assemble_det_Q` does not return ``numpy.linalg.det(Q)``
+:func:`incept1d.solver._assemble_det_Q` does not return ``numpy.linalg.det(Q)``
 directly.  It
 
 1. returns ``NaN`` if any entry of :math:`\bm{Q}` is non-finite (overflow

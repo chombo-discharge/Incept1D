@@ -1,19 +1,19 @@
 .. _Chap:Constants:
 
-Constants.py
-============
+Physical constants — ``incept1d.constants``
+===========================================
 
-``Constants.py`` centralises the physical constants (Boltzmann constant,
+:mod:`incept1d.constants` centralises the physical constants (Boltzmann constant,
 elementary charge, speed of light) used throughout the project, sourced
 from ``scipy.constants`` (CODATA 2018).  Every other module imports from
 here instead of hard-coding numeric values.
 
-.. literalinclude:: ../../../Constants.py
+.. literalinclude:: ../../../src/incept1d/constants.py
    :language: python
 
 API reference
 -------------
 
-.. automodule:: Constants
+.. automodule:: incept1d.constants
    :members:
    :undoc-members:

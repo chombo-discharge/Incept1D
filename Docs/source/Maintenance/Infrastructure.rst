@@ -46,7 +46,7 @@ the product of three committed ingredients:
 1. **Reference data** — the IEC 60052 tables and the ELECTRA compilation in
    ``Examples/``, with a header giving their provenance.
 2. **The calculation** — ``Examples/*/run.sh`` (which call
-   ``Inception.py``) and ``Air/Zheleznyak.py``, producing ``.dat`` files
+   ``incept1d pdiv``) and ``mechanisms/Air/Zheleznyak.py``, producing ``.dat`` files
    with a metadata header that records the git commit and the full
    command line.
 3. **The plot** — a pgfplots source in ``Docs/figures/`` that reads the
@@ -67,7 +67,7 @@ builder picks its format.
    PD_NUM=30 make figures       # quicker, coarser curves for a local check
 
 The computed curves are only re-run when something that can change them
-is newer: the solver modules, anything under ``Air/``, or the run scripts.
+is newer: the solver modules, anything under ``mechanisms/Air/``, or the run scripts.
 The full IEC set takes tens of minutes; in CI the computed ``.dat`` files
 are cached under a key derived from those same inputs, so a
 documentation-only change rebuilds in minutes while a physics change

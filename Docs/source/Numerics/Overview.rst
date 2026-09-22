@@ -23,7 +23,7 @@ that condition is actually evaluated and solved:
 * :ref:`Chap:Numerics:Cost` — what a calculation costs and which knobs
   trade accuracy for time.
 
-All of it lives in :mod:`Inception` (and :mod:`Lambda` for the growth
+All of it lives in :mod:`incept1d.solver` (and :mod:`incept1d.growth` for the growth
 rate); the pages cite the implementing function for every step, and the
 command-line options that control it are summarised in
 :ref:`Chap:Inception`.

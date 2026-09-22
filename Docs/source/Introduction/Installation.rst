@@ -3,9 +3,11 @@
 How to install
 ==============
 
-There is nothing to compile or install: the scripts are run directly from
-the repository root with the system Python.  Only the dependencies listed in
-:ref:`Chap:Prerequisites` must be available.
+Incept1D is a pure-Python package with a ``pyproject.toml``; there is
+nothing to compile.  An *editable* install (``-e``) is recommended: the
+``incept1d`` command then always runs the sources in your checkout, so
+pulling new commits or editing the code needs no reinstall.  The runtime
+dependencies (:ref:`Chap:Prerequisites`) are installed automatically.
 
 Using a virtual environment (recommended)
 -----------------------------------------
@@ -15,18 +17,30 @@ Using a virtual environment (recommended)
    cd Incept1D
    python3 -m venv .venv
    source .venv/bin/activate          # on Windows: .venv\Scripts\activate
-   pip install numpy scipy matplotlib
-   pip install -r Docs/requirements.txt   # only if you want to build the docs
-   pip install pre-commit pytest          # only for development
+   pip install -e .                   # runtime dependencies + the incept1d command
+   pip install -e .[docs]             # add Sphinx, only to build the docs
+   pip install -e .[dev]              # add pytest, pre-commit, black, flake8
+
+Into the user site
+------------------
+
+Without a virtual environment, ``pip install --user -e .`` installs the
+command as ``~/.local/bin/incept1d`` (make sure that directory is on your
+``PATH``).  On Debian/Ubuntu ≥ 23.04 pip refuses to install into a
+system-managed interpreter (PEP 668); either use the virtual environment
+above or add ``--break-system-packages`` — the editable install only adds a
+path file to ``~/.local`` and can be undone with ``pip uninstall incept1d``.
 
 Using system packages
 ---------------------
 
-On Debian/Ubuntu the runtime dependencies are available as
+On Debian/Ubuntu the runtime dependencies are also available as system
+packages, which pip will then leave alone:
 
 .. code-block:: bash
 
    sudo apt install python3-numpy python3-scipy python3-matplotlib
+   pip install --user --no-deps -e .
 
 .. warning::
 
@@ -45,23 +59,26 @@ From the repository root:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py --pd-num 10 --no-plot
+   incept1d --version
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --pd-num 10 --no-plot
 
-should print a small table of breakdown fields and voltages for a uniform
+should print a small table of inception fields and voltages for a uniform
 gap in dry air at 1 bar and exit without errors.  If the mechanism fails to
 load with an ``AttributeError`` mentioning ``numpy``, check the version
 mismatch note above.
 
-Running the scripts
--------------------
+Running the commands
+--------------------
 
-All scripts are run from the repository root and take a mechanism file as
-their first argument:
+Every tool is a subcommand of ``incept1d`` (``incept1d --help`` lists them).
+Mechanism and configuration files are given by path, so the commands can be
+run from any directory; the examples in this documentation assume the
+repository root:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py [CONFIG.json ...] [options]
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py [CONFIG.json ...] [options]
 
-Every script accepts ``--help``.  See :ref:`Chap:QuickStart` for a first
-walk-through and :ref:`Chap:ModulesOverview` for the full description of
-each script.
+Every subcommand accepts ``--help``.  See :ref:`Chap:QuickStart` for a
+first walk-through and :ref:`Chap:ModulesOverview` for the full description
+of each command.

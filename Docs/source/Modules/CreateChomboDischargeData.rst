@@ -1,13 +1,13 @@
 .. _Chap:CreateChomboDischargeData:
 
-CreateChomboDischargeData.py — transport tables
-===============================================
+Transport tables — ``incept1d chombo``
+======================================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``CreateChomboDischargeData.py`` is the bridge between a mechanism file and
+``incept1d chombo`` is the bridge between a mechanism file and
 the external 3-D plasma solver
 `chombo-discharge <https://github.com/chombo-discharge/chombo-discharge>`_
 [Marskar2019]_.  It does not solve the inception problem — it exports the
@@ -37,7 +37,7 @@ sanity-check figure (ionization/attachment coefficients, mean energy,
 mobilities and diffusion coefficients, rate coefficients) so a new or
 modified mechanism can be inspected before it is handed to the 3-D solver.
 
-.. literalinclude:: ../../../CreateChomboDischargeData.py
+.. literalinclude:: ../../../src/incept1d/chombo.py
    :language: python
    :pyobject: generate
 
@@ -46,12 +46,12 @@ Command-line interface
 
 .. code-block:: console
 
-   python3 CreateChomboDischargeData.py MECHANISM.py
+   incept1d chombo MECHANISM.py
        [--modifier CONFIG.json] [--config-label LABEL]
        [--min-EN TD] [--max-EN TD] [--num-EN N]
        [--pressure BAR] [--temperature K] [--write-to-file FILE]
 
-Unlike the solver scripts, this script takes a single configuration through
+Unlike the solver commands, ``incept1d chombo`` takes a single configuration through
 ``--modifier`` (a JSON file in the same format as :ref:`Chap:Configuration`)
 and ``--config-label`` (which entry to use).  The :math:`E/N` grid defaults
 to 1–10\ :sup:`6` Td with 1000 log-spaced points.
@@ -61,18 +61,18 @@ Example
 
 .. code-block:: bash
 
-   python3 CreateChomboDischargeData.py Air/Air_Pancheshnyi.py \
-       --modifier Air/Databases.json --config-label Phelps \
+   incept1d chombo mechanisms/Air/Air_Pancheshnyi.py \
+       --modifier mechanisms/Air/Databases.json --config-label Phelps \
        --min-EN 1 --max-EN 2000 --num-EN 500 --write-to-file air_phelps.dat
 
 .. note::
 
-   This script has no ``--no-plot`` flag; on headless machines set
+   This command has no ``--no-plot`` flag; on headless machines set
    ``MPLBACKEND=Agg``.
 
 API reference
 -------------
 
-.. automodule:: CreateChomboDischargeData
+.. automodule:: incept1d.chombo
    :members:
    :undoc-members:

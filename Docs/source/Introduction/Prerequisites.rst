@@ -15,7 +15,7 @@ Runtime
   ``scipy.optimize.brentq`` (root finding), ``scipy.optimize.nnls`` (the
   Zheleznyak photoionization fit), ``scipy.optimize.linear_sum_assignment``
   (eigenvalue tracking), and ``scipy.constants``.
-* **Matplotlib** ≥ 3.6 — every command-line script produces a figure by
+* **Matplotlib** ≥ 3.6 — every subcommand produces a figure by
   default.  Headless machines should set ``MPLBACKEND=Agg`` and use the
   ``--no-plot`` flag where available.
 
@@ -40,11 +40,11 @@ Contributors should also install
 Input data
 ----------
 
-The mechanism files shipped in ``Air/`` read electron swarm data from
-BOLSIG+ output files (``Air/Lisbon.txt``, ``Air/Phelps.txt``,
-``Air/Biagi.txt``, ``Air/Trinity.txt``, ``Air/Morgan.txt``) and negative-ion
-mobility tables from LXCat (``Air/O2m_mobility.txt``,
-``Air/O3m_mobility.txt``).  These are included in the repository; no
+The mechanism files shipped in ``mechanisms/Air/`` read electron swarm data from
+BOLSIG+ output files (``mechanisms/Air/Lisbon.txt``, ``mechanisms/Air/Phelps.txt``,
+``mechanisms/Air/Biagi.txt``, ``mechanisms/Air/Trinity.txt``, ``mechanisms/Air/Morgan.txt``) and negative-ion
+mobility tables from LXCat (``mechanisms/Air/O2m_mobility.txt``,
+``mechanisms/Air/O3m_mobility.txt``).  These are included in the repository; no
 external database access is needed to run the examples.  If you build a
 mechanism for another gas you will need to generate the corresponding swarm
 data yourself with `BOLSIG+ <https://www.bolsig.laplace.univ-tlse.fr>`_ or

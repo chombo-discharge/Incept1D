@@ -39,10 +39,10 @@ Usage
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import nnls, minimize
 
 # numpy >= 2.0 renamed trapz -> trapezoid; support both.
 _trapz = getattr(np, "trapezoid", None) or np.trapz
-from scipy.optimize import nnls, minimize
 
 # ---------------------------------------------------------------------------
 # Zheleznyak (1982) absorption limits for O2 in air UV window

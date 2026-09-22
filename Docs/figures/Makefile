@@ -6,18 +6,18 @@
 #   make clean      remove build products
 #
 # Pipeline, per figure:
-#   1. data:   Examples/*/run.sh (Inception.py) or Air/Zheleznyak.py write
+#   1. data:   Examples/*/run.sh (incept1d pdiv) or mechanisms/Air/Zheleznyak.py write
 #              .dat files into build/figures/<name>/, next to a copy of the
 #              reference tables from Examples/;
 #   2. pgfplots: <name>.tex is compiled with pdflatex in that directory;
 #   3. the PDF (LaTeX builder) and a 150 dpi PNG (HTML builder) are copied to
 #      Docs/source/figures/, which is ignored by git.
 #
-# The Inception.py runs are the expensive step (tens of minutes for the full
+# The incept1d pdiv runs are the expensive step (tens of minutes for the full
 # IEC set).  They are only re-run when the solver, the mechanism, or the
 # run script changes; set PD_NUM=<n> to use fewer pd points for a quick build.
 #
-# Requirements: python3 + numpy/scipy/matplotlib, pdflatex with pgfplots and
+# Requirements: the incept1d package installed (pip install -e .), pdflatex with pgfplots and
 # siunitx (TeX Live: texlive-latex-extra texlive-pictures texlive-science),
 # pdftoppm (poppler-utils).
 
@@ -33,10 +33,9 @@ FIGURES := IEC60052 Electra ZheleznyakFit
 DIAMS   := 10 15 25 50 75 100 150 200
 
 # Anything that changes the physics or numerics invalidates the computed data.
-SOLVER_DEPS := $(ROOT)/Inception.py $(ROOT)/FieldDistributions.py \
-               $(ROOT)/Reactions.py $(ROOT)/Constants.py \
-               $(wildcard $(ROOT)/Air/*.py) $(wildcard $(ROOT)/Air/*.json) \
-               $(wildcard $(ROOT)/Air/*.txt)
+SOLVER_DEPS := $(wildcard $(ROOT)/src/incept1d/*.py) $(ROOT)/src/incept1d/cli/pdiv.py \
+               $(wildcard $(ROOT)/mechanisms/Air/*.py) $(wildcard $(ROOT)/mechanisms/Air/*.json) \
+               $(wildcard $(ROOT)/mechanisms/Air/*.txt)
 
 .PHONY: all clean data $(FIGURES)
 all: $(foreach f,$(FIGURES),$(OUT)/$(f).pdf $(OUT)/$(f).png)
@@ -60,7 +59,7 @@ $(BUILD)/Electra/Sim.dat: $(ROOT)/Examples/Electra/run.sh $(SOLVER_DEPS)
 $(BUILD)/Electra/TableC2_Air.dat: $(ROOT)/Examples/Electra/TableC2_Air.dat
 	@mkdir -p $(dir $@) && cp $< $@
 
-$(BUILD)/ZheleznyakFit/zheleznyak_absorption_curve.dat: $(ROOT)/Air/Zheleznyak.py
+$(BUILD)/ZheleznyakFit/zheleznyak_absorption_curve.dat: $(ROOT)/mechanisms/Air/Zheleznyak.py
 	@mkdir -p $(dir $@)
 	cd $(dir $@) && python3 $< --ngroups 8 --threshold 1E-6 --write-to-file zheleznyak
 

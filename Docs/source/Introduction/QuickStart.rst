@@ -6,14 +6,14 @@ Quick start
 This page walks through the three most common calculations.  All commands
 are run from the repository root.
 
-A Paschen curve in a uniform field
-----------------------------------
+An inception curve in a uniform field
+-------------------------------------
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py --p 1.0 --pd-min 1e-2 --pd-max 1e3
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --p 1.0 --pd-min 1e-2 --pd-max 1e3
 
-This loads the dry-air mechanism ``Air/Air_Pancheshnyi.py`` with its default
+This loads the dry-air mechanism ``mechanisms/Air/Air_Pancheshnyi.py`` with its default
 (baseline) configuration, sweeps :math:`pd` logarithmically from
 :math:`10^{-2}` to :math:`10^{3}` bar·mm at a fixed pressure of 1 bar, and for
 every :math:`pd` finds the reduced field :math:`E/N` at which the inception
@@ -26,8 +26,8 @@ To write the curve to a file instead of (or in addition to) plotting it:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py --p 1.0 --no-plot \
-       --write-to-file paschen_air_1bar.dat
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py --p 1.0 --no-plot \
+       --write-to-file pdiv_air_1bar.dat
 
 The output is a tab-separated table with a self-describing header that
 records the date, git commit, full command line, and one column group per
@@ -38,12 +38,12 @@ Comparing configurations
 
 The physics of a mechanism can be varied without touching the Python file by
 passing one or more JSON configuration files (see :ref:`Chap:Configuration`).
-For example, ``Air/NoDetachment.json`` defines two configurations, the
+For example, ``mechanisms/Air/NoDetachment.json`` defines two configurations, the
 baseline and one with both electron-detachment reactions switched off:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py Air/NoDetachment.json \
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/NoDetachment.json \
        --p 1.0 --pd-min 1 --pd-max 1e3
 
 Both configurations are computed and plotted in the same figure, giving
@@ -58,7 +58,7 @@ streamer criterion :math:`\int\max(\alpha-\eta,0)\,dx = 18`:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py Air/NoDetachment.json \
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/NoDetachment.json \
        --pd-min 1 --pd-max 55 --pd-num 100 \
        --field sphere-sphere 50 --streamer-criterion 18
 
@@ -70,7 +70,7 @@ electrostatic solver are supported through ``--field fieldline FILE``; see
 Where to go next
 ----------------
 
-* :ref:`Chap:ModulesOverview` — what every script does and its options.
+* :ref:`Chap:ModulesOverview` — what every command does and its options.
 * :ref:`Chap:Configuration` — the JSON configuration format.
 * :ref:`Chap:Examples:IEC60052` and :ref:`Chap:Examples:Electra` — full
   comparisons against reference breakdown data.

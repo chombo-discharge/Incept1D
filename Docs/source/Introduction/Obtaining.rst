@@ -16,7 +16,7 @@ or, over HTTPS,
    git clone https://github.com/chombo-discharge/Incept1D.git
 
 The repository contains everything needed to run the examples in this
-documentation: the solver scripts, the dry-air mechanism files with their
+documentation: the ``incept1d`` package, the dry-air mechanism files with their
 swarm data, a set of ready-made configuration files, and the
 documentation sources.
 
@@ -26,15 +26,21 @@ Repository layout
 .. code-block:: text
 
    Incept1D/
-   ├── Inception.py                  Core solver and Paschen-curve CLI
-   ├── Eigenvalues.py                Local eigenvalues of R V^-1
-   ├── IonizationIntegral.py         Ionization integrals vs. voltage
-   ├── Lambda.py                     Temporal growth rate above threshold
-   ├── CreateChomboDischargeData.py  Transport tables for chombo-discharge
-   ├── FieldDistributions.py         Gap geometry / field profiles
-   ├── Reactions.py                  Reaction-string parser, R-matrix assembly
-   ├── Constants.py                  Physical constants
-   ├── Air/                          Dry-air mechanism family
+   ├── pyproject.toml                Package metadata, dependencies, `incept1d` entry point
+   ├── src/incept1d/                 The Python package
+   │   ├── solver.py                 Core solver: augmented ODE, propagators, det Q
+   │   ├── inception.py              E/N roots of det Q and inception-curve tracking
+   │   ├── mechanism.py              Mechanism / configuration loading
+   │   ├── eigenvalues.py            Local eigenvalues of R V^-1
+   │   ├── ionization.py             Ionization integrals across the gap
+   │   ├── growth.py                 Temporal growth rate above threshold
+   │   ├── chombo.py                 Transport tables for chombo-discharge
+   │   ├── fields.py                 Gap geometry / field profiles
+   │   ├── reactions.py              Reaction-string parser, R-matrix assembly
+   │   ├── constants.py              Physical constants
+   │   ├── output.py                 Metadata header of the result files
+   │   └── cli/                      `incept1d <command>` front ends
+   ├── mechanisms/Air/               Dry-air mechanism family
    │   ├── Air_Pancheshnyi.py        Three-body attachment scheme (reference)
    │   ├── Air_2body.py              Explicit Bloch-Bradbury two-body scheme
    │   ├── Config.py                 Configuration protocol for the Air family
@@ -50,6 +56,6 @@ Versioning
 
 There are no tagged releases yet; the ``main`` branch is the reference
 version and is the one exercised by continuous integration
-(:ref:`Chap:Infrastructure`).  Every data file written by the scripts records
+(:ref:`Chap:Infrastructure`).  Every data file written by the commands records
 the git commit it was produced with in its header, so results can always be
 traced back to a specific version of the code.

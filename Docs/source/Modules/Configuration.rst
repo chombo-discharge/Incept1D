@@ -7,7 +7,7 @@ Configuration files
    :local:
    :depth: 1
 
-Every solver script accepts JSON configuration files after the mechanism
+Every solver command accepts JSON configuration files after the mechanism
 path.  A configuration changes the *parameters* of a mechanism — cross
 sections, rate multipliers, photoionization and SEE settings — without
 editing the Python file, and several configurations can be run and plotted
@@ -114,31 +114,31 @@ Shipped configuration sets
 
    * - File
      - Contents
-   * - ``Air/Baseline.json``
+   * - ``mechanisms/Air/Baseline.json``
      - The reference configuration, all multipliers 1.
-   * - ``Air/NoDetachment.json``
+   * - ``mechanisms/Air/NoDetachment.json``
      - Baseline plus a variant with reactions 5 and 6 (collisional and
        associative detachment) switched off — the "no detachment" curve.
-   * - ``Air/Databases.json``
+   * - ``mechanisms/Air/Databases.json``
      - Phelps, Trinity, Biagi and Lisbon cross-section sets, plus the
        no-detachment variant.
-   * - ``Air/IonSensitivity.json``
+   * - ``mechanisms/Air/IonSensitivity.json``
      - Baseline; no :math:`\mathrm{O}^- \to \mathrm{O}_2^-` conversion; no
        :math:`\mathrm{O}^- \to \mathrm{O}_3^-` conversion; no detachment.
-   * - ``Air/SEE.json``
+   * - ``mechanisms/Air/SEE.json``
      - :math:`\gamma_0 \in \{10^{-4}, 10^{-3}, 10^{-2}\}` and
        :math:`\theta_\mathrm{cone} \in \{0^\circ, 45^\circ, 90^\circ\}`.
-   * - ``Air/Paschen.json``
+   * - ``mechanisms/Air/Paschen.json``
      - The textbook limit: no detachment, no ion conversion, no photon
        feedback.  Reproduces :eq:`eq_standard_paschen`.
-   * - ``Air/example_config.json``
+   * - ``mechanisms/Air/example_config.json``
      - Annotated example for the two-body mechanism ``Air_2body.py``.
 
 How configurations are applied
 ------------------------------
 
 The mechanism directory's ``Config.py`` defines a ``Config`` dataclass that
-implements a three-step protocol used by :func:`Inception.load_mechanism`:
+implements a three-step protocol used by :func:`incept1d.mechanism.load_mechanism`:
 
 .. code-block:: python
 
@@ -154,12 +154,12 @@ default)`` etc. at import time (:ref:`Chap:NewMechanisms`).
 ``post_exec_init`` calls ``init_photoionization(ngroups, cone_angle)``.
 ``mechanism_params`` supplies the run-time scalings (multipliers,
 ``xi_photo``, ``xi_emit``, polarity overrides) that
-:class:`Inception.Mechanism` applies inside its accessor methods, so no
+:class:`incept1d.mechanism.Mechanism` applies inside its accessor methods, so no
 solver code ever sees a raw, un-configured module.
 
-.. literalinclude:: ../../../Air/Config.py
+.. literalinclude:: ../../../mechanisms/Air/Config.py
    :language: python
    :pyobject: Config.from_dict
 
 A new mechanism family gets its own ``Config.py`` implementing the same
-protocol; copy ``Air/Config.py`` and adapt the key list.
+protocol; copy ``mechanisms/Air/Config.py`` and adapt the key list.

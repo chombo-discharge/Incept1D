@@ -1,16 +1,26 @@
 .. _Chap:ModulesOverview:
 
-Overview of the scripts
+Overview of the package
 =======================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``Incept1D`` has no package or build system.  Every module lives at the
-repository root and imports its siblings directly; every script is run from
-the repository root with ``python3 <script>.py``.  The modules fall into
-three layers:
+``Incept1D`` is a Python package, ``incept1d`` (sources in
+``src/incept1d/``), installed with ``pip install -e .`` and driven by one
+console command with subcommands:
+
+.. code-block:: console
+
+   incept1d COMMAND [options]      # COMMAND: pdiv | eigenvalues | ionization
+                                   #          | growth | field | chombo
+
+Every subcommand is a thin front end in ``incept1d.cli.<command>`` that
+parses arguments, calls the library and plots or writes tables; the physics
+lives in the library modules, which can equally be imported from your own
+scripts (``from incept1d.solver import inception_det``).  The modules fall
+into three layers:
 
 .. list-table::
    :header-rows: 1
@@ -18,65 +28,82 @@ three layers:
 
    * - Module
      - Role
-   * - :mod:`Inception`
-     - **Core solver and Paschen-curve CLI.**  Loads a mechanism, integrates
-       the augmented ODE across the gap, evaluates
-       :math:`\det\bm{Q}(\lambda)`, finds and tracks the :math:`E/N` roots
-       over a :math:`pd` sweep.  See :ref:`Chap:Inception`.
-   * - :mod:`Eigenvalues`
+   * - :mod:`incept1d.mechanism`
+     - Loads a mechanism file and its JSON configurations into a
+       :class:`~incept1d.mechanism.Mechanism`.  See :ref:`Chap:NewMechanisms`
+       and :ref:`Chap:Configuration`.
+   * - :mod:`incept1d.solver`
+     - **Core solver.**  Builds the augmented ODE, integrates it across the
+       gap with the midpoint / Magnus propagators and evaluates
+       :math:`\det\bm{Q}(\lambda)`.  See :ref:`Chap:Inception` and
+       :ref:`Chap:Numerics`.
+   * - :mod:`incept1d.inception`
+     - Finds the :math:`E/N` roots of :math:`\det\bm{Q} = 0` and tracks them
+       over a :math:`pd` sweep (inception-curve branches).  Front end:
+       ``incept1d pdiv``.  See :ref:`Chap:Inception`.
+   * - :mod:`incept1d.eigenvalues`
      - Diagnostic: eigenvalues of the *local* transport matrix
        :math:`\bm{R}\bm{V}^{-1}` vs. :math:`E/N`, no gap integration.  See
        :ref:`Chap:Eigenvalues`.
-   * - :mod:`IonizationIntegral`
+   * - :mod:`incept1d.ionization`
      - The classical ionization integral :math:`I_\alpha` and the apparent
        ionization integral :math:`I_\lambda` vs. applied voltage, for
        comparison with the full criterion.  See
        :ref:`Chap:IonizationIntegral`.
-   * - :mod:`Lambda`
+   * - :mod:`incept1d.growth`
      - Temporal growth rate :math:`\lambda > 0` vs. voltage above the
        inception voltage.  See :ref:`Chap:Lambda`.
-   * - :mod:`CreateChomboDischargeData`
+   * - :mod:`incept1d.chombo`
      - Exports transport/rate-coefficient tables from a mechanism for the 3-D
        solver ``chombo-discharge``.  Not part of the inception solve.  See
        :ref:`Chap:CreateChomboDischargeData`.
-   * - :mod:`FieldDistributions`
+   * - :mod:`incept1d.fields`
      - Gap geometry: uniform / sphere-plane / sphere-sphere / tabulated field
        line profiles :math:`f(\xi)` and the shared ``--field`` CLI parsing.
        See :ref:`Chap:FieldDistributions`.
-   * - :mod:`Reactions`
+   * - :mod:`incept1d.reactions`
      - Declarative reaction-string parser that assembles :math:`\bm{R}`.
        Used by mechanism files.  See :ref:`Chap:Reactions`.
-   * - :mod:`Constants`
+   * - :mod:`incept1d.constants`
      - Physical constants from ``scipy.constants``.  See :ref:`Chap:Constants`.
+   * - :mod:`incept1d.output`
+     - The metadata header (date, git revision, command line) shared by all
+       ``--write-to-file`` outputs.
+   * - :mod:`incept1d.cli`
+     - The ``incept1d`` console command and one module per subcommand.
 
 Call graph
 ----------
 
 .. code-block:: text
 
-   mechanism.py (+ Config.py, *.json) ──► Inception.load_mechanism ──► Mechanism
-                                                                          │
-                     ┌──────────────────────┬──────────────────┬──────────┴────────────┐
-                     ▼                      ▼                  ▼                       ▼
-             Inception.main         Eigenvalues.main   IonizationIntegral.main    Lambda.main
-           (Paschen curves)       (local eigenvalues)   (ionization integrals)   (growth rate)
+   mechanism file (+ Config.py, *.json) ──► incept1d.mechanism.load_mechanism ──► Mechanism
+                                                                                    │
+                        ┌───────────────────┬───────────────────┬───────────────────┤
+                        ▼                   ▼                   ▼                   ▼
+                incept1d.solver     incept1d.eigenvalues  incept1d.ionization  incept1d.growth
+                incept1d.inception     (local eigenvalues)  (ionization ints.)   (growth rate)
+                (inception curves)
+                        ▲                   ▲                   ▲                   ▲
+                incept1d.cli.pdiv  cli.eigenvalues       cli.ionization       cli.growth
 
-:mod:`Reactions` and :mod:`FieldDistributions` sit underneath everything;
-:mod:`Constants` sits under all of them.  :mod:`CreateChomboDischargeData`
-has its own lightweight mechanism loader since it needs the raw rate
+:mod:`incept1d.reactions` and :mod:`incept1d.fields` sit underneath everything;
+:mod:`incept1d.constants` sits under all of them.  :mod:`incept1d.chombo`
+has its own lightweight mechanism loader
+(:func:`~incept1d.chombo.load_raw_mechanism`) since it needs the raw rate
 functions rather than the :math:`\bm{R}` matrix.
 
 Common command-line conventions
 -------------------------------
 
-All four solver scripts share the same first arguments and most options:
+The four solver commands share the same first arguments and most options:
 
 .. code-block:: console
 
-   python3 <script>.py MECHANISM.py [CONFIG.json ...] [options]
+   incept1d COMMAND MECHANISM.py [CONFIG.json ...] [options]
 
 ``MECHANISM.py``
-   Path to a mechanism file, e.g. ``Air/Air_Pancheshnyi.py``
+   Path to a mechanism file, e.g. ``mechanisms/Air/Air_Pancheshnyi.py``
    (:ref:`Chap:NewMechanisms`).
 
 ``CONFIG.json ...``
@@ -104,8 +131,8 @@ All four solver scripts share the same first arguments and most options:
    curve).
 
 ``--no-plot``
-   Skip the matplotlib figure (``Inception.py``, ``IonizationIntegral.py``,
-   ``Lambda.py``).  On headless machines also set ``MPLBACKEND=Agg``.
+   Skip the matplotlib figure (``incept1d pdiv``, ``incept1d ionization``,
+   ``incept1d growth``).  On headless machines also set ``MPLBACKEND=Agg``.
 
 Units on the command line are bar, mm, kV, K and Td; the output files use
 the same units and label every column.
@@ -113,33 +140,33 @@ the same units and label every column.
 Typical workflows
 -----------------
 
-**Paschen curve for a gas** — ``Inception.py`` with a mechanism and,
+**Inception curve for a gas** — ``incept1d pdiv`` with a mechanism and,
 optionally, configuration files for sensitivity variants:
 
 .. code-block:: bash
 
-   python3 Inception.py Air/Air_Pancheshnyi.py Air/Databases.json --p 1 --pd-min 1e-2 --pd-max 1e3
+   incept1d pdiv mechanisms/Air/Air_Pancheshnyi.py mechanisms/Air/Databases.json --p 1 --pd-min 1e-2 --pd-max 1e3
 
 **Understand why the curve looks the way it does** — inspect the local
 eigenvalues and the ionization integrals:
 
 .. code-block:: bash
 
-   python3 Eigenvalues.py Air/Air_Pancheshnyi.py --p 1 --EN-lo 20 --EN-hi 300
-   python3 IonizationIntegral.py Air/Air_Pancheshnyi.py --p 10 --d 10 --voltage-lo 20 --voltage-hi 60
+   incept1d eigenvalues mechanisms/Air/Air_Pancheshnyi.py --p 1 --EN-lo 20 --EN-hi 300
+   incept1d ionization mechanisms/Air/Air_Pancheshnyi.py --p 10 --d 10 --voltage-lo 20 --voltage-hi 60
 
 **How fast does the discharge grow above threshold?**
 
 .. code-block:: bash
 
-   python3 Lambda.py Air/Air_Pancheshnyi.py --pd 10 --p 1 --v-max-factor 1.5
+   incept1d growth mechanisms/Air/Air_Pancheshnyi.py --pd 10 --p 1 --v-max-factor 1.5
 
 **Hand the chemistry to a 3-D simulation:**
 
 .. code-block:: bash
 
-   python3 CreateChomboDischargeData.py Air/Air_Pancheshnyi.py --write-to-file air_transport.dat
+   incept1d chombo mechanisms/Air/Air_Pancheshnyi.py --write-to-file air_transport.dat
 
-The remaining pages of this section document each script, the configuration format
+The remaining pages of this section document each command, the configuration format
 (:ref:`Chap:Configuration`), and how to modify or write mechanisms
 (:ref:`Chap:ModifyingReactions`, :ref:`Chap:NewMechanisms`).

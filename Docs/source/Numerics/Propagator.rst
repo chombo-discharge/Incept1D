@@ -43,7 +43,7 @@ Two local propagators are available (``--method``):
 
 It is second-order accurate in :math:`h` and, because ``expm`` handles
 arbitrary step sizes, robust for any :math:`h`.  Implemented in
-:func:`Inception.midpoint_propagator`.
+:func:`incept1d.solver.midpoint_propagator`.
 
 **Second-order Magnus** (``magnus2``) with two-point Gauss-Legendre
 quadrature, :math:`\bm{\mathcal{A}}_{1,2} = \bm{\mathcal{A}}(x_{i+1/2} \mp
@@ -61,14 +61,14 @@ correction and vanishes for a uniform field, so ``magnus2`` reduces exactly
 to the midpoint rule there.  It is fourth-order accurate but the Magnus
 series only converges when :math:`\int\|\bm{\mathcal{A}}\|\,dx < \pi`; if
 :math:`\|\bm{\Omega}_1\|_F > \pi` the code falls back to the midpoint rule
-for that segment.  Implemented in :func:`Inception.magnus2_propagator`.
+for that segment.  Implemented in :func:`incept1d.solver.magnus2_propagator`.
 ``magnus2`` uses the fixed :math:`N_{\min}` grid with no adaptation.
 
 Adaptive step halving
 ---------------------
 
 With the midpoint propagator each initial segment is refined adaptively
-(:func:`Inception._adaptive_midpoint_segment`): the one-step propagator
+(:func:`incept1d.solver._adaptive_midpoint_segment`): the one-step propagator
 :math:`\bm{P}_\mathrm{coarse}` over :math:`[x_i, x_{i+1}]` is compared with
 the two-step estimate :math:`\bm{P}_\mathrm{fine} = \bm{P}_\mathrm{r}
 \bm{P}_\mathrm{l}` over the two halves, and the segment is accepted when
@@ -97,7 +97,7 @@ Eigenvalue shifting
 
 Over a long gap :math:`e^{\bm{\mathcal{A}}d}` has entries of order
 :math:`e^{\lambda_{\max}d}`, which overflows double precision well before
-:math:`pd` reaches the range of interest.  :func:`Inception._expm_shifted`
+:math:`pd` reaches the range of interest.  :func:`incept1d.solver._expm_shifted`
 therefore evaluates :math:`\exp(\bm{\Omega} - \mu\bm{I})` with
 :math:`\mu = \max(0, \max_i\mathrm{Re}\,\lambda_i(\bm{\Omega}))`.  The
 omitted factor :math:`e^{\mu}` is a positive scalar common to every column
@@ -113,7 +113,7 @@ Photon groups whose optical depth over the gap is large,
 :math:`\kappa_j d > 12`, are re-absorbed within a small fraction of any
 integration step.  Propagating them explicitly adds stiff decay modes to
 :math:`\bm{\mathcal{A}}` without changing the physics, so
-:func:`Inception._build_A_aug` removes such groups from the augmented
+:func:`incept1d.solver._build_A_aug` removes such groups from the augmented
 system and adds their steady-state contribution
 :math:`2\vec{b}_j\vec{c}_j^\intercal/\kappa_j` directly to :math:`\bm{A}`
 (the factor 2 accounts for both streams).  The number of explicitly
