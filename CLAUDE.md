@@ -136,9 +136,13 @@ of them.
   `docs/figures/Makefile` runs `examples/*/run.sh` and `mechanisms/air/zheleznyak.py`,
   compiles the pgfplots `.tex` sources in `docs/figures/`, and drops
   PDF/PNG into the git-ignored `docs/source/figures/`; `make html` triggers
-  it.  The full IEC computation takes tens of minutes the first time
-  (`PD_NUM=30 make figures` for a quick check).  Do not add pre-rendered
-  figures or reference the manuscript.  New public functions get
+  it.  `make figures` builds only the self-contained figures (`paschen`,
+  `zheleznyakfit`) and takes seconds; the sphere-gap and ELECTRA
+  comparisons are opt-in (`OPTIONAL_FIGURES`), because their reference
+  tables are copyrighted and not in the repo and because the eight IEC
+  diameters are ~75 % of the figure cost — build one with
+  `make -C docs/figures iec60052` after supplying the data.  Do not add
+  pre-rendered figures or reference the manuscript.  New public functions get
   NumPy-style docstrings (autodoc); docs pages `literalinclude` the
   functions that implement an equation rather than re-typing them; cite
   literature with `[Key]_` and add the entry to `zzreferences.rst`

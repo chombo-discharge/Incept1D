@@ -62,20 +62,21 @@ Result
 
 As for the sphere-gap example, the figure is built during the documentation
 build from the output of ``run.sh`` and the pgfplots source
-``docs/figures/electra.tex``.  As published here it shows the computed curve
-only; supply ``tablec2_air.dat`` as described above to overlay the ELECTRA
-values.
+``docs/figures/electra.tex``.
 
-.. _fig_electra:
+As for the sphere gaps, the figure is **not built with the documentation**:
+without ``tablec2_air.dat`` there is nothing to compare against.  Supply the
+file as described above and build it explicitly:
 
-.. figure:: ../figures/electra.*
-   :width: 100%
-   :align: center
+.. code-block:: bash
 
-   a) Breakdown voltage and b) mean reduced field vs. :math:`pd` for the
-   ELECTRA compilation (symbols) and the inception criterion (line), with
-   the no-detachment calculation (dashed) and the streamer criterion
-   (dotted).  The insets show :math:`pd > 100` bar·mm on a linear scale.
+   make -C docs/figures electra
+
+which writes ``docs/source/figures/electra.pdf`` and ``.png``: a) breakdown
+voltage and b) mean reduced field vs. :math:`pd`, with the ELECTRA values as
+symbols and the inception criterion as a line, the no-detachment calculation
+dashed and the streamer criterion dotted; the insets show
+:math:`pd > 100` bar·mm on a linear scale.
 
 The calculation follows the measured curve across the whole range: it
 slightly under-predicts the data by about 5 % at :math:`pd > 1` bar·mm and

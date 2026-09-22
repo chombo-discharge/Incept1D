@@ -87,21 +87,23 @@ Result
 The figure below is not shipped with the repository: it is generated during
 the documentation build from the output of ``run.sh`` by the pgfplots source
 ``docs/figures/iec60052.tex`` (see :ref:`Chap:Infrastructure`), so it always
-reflects the current state of the solver.  As published here it shows the
-computed curves only; supply the reference tables as described above to
-overlay the IEC values.
+reflects the current state of the solver.
 
-.. _fig_iec60052:
+The comparison figure is **not built with the documentation.**  Without the
+IEC tables it would show the computed curves with nothing to compare them
+against, and the eight sphere diameters are by far the most expensive
+calculation in the repository — about three quarters of the total figure cost.
+The pgfplots source ``docs/figures/iec60052.tex`` is still maintained, so once
+you have placed the reference tables as described above you can build it:
 
-.. figure:: ../figures/iec60052.*
-   :width: 100%
-   :align: center
+.. code-block:: bash
 
-   Breakdown voltage vs. :math:`pd` for standard sphere gaps: IEC 60052
-   tables (symbols) and the inception criterion (lines) for sphere
-   diameters 10–200 cm.  The dashed and dotted lines are the
-   no-detachment calculation and the streamer criterion for
-   :math:`D = 200` cm.
+   make -C docs/figures iec60052
+
+which writes ``docs/source/figures/iec60052.pdf`` and ``.png``: breakdown
+voltage vs. :math:`pd` with the IEC values as symbols and the inception
+criterion as lines, for sphere diameters 10–200 cm, plus the no-detachment
+calculation and the streamer criterion for :math:`D = 200` cm.
 
 The calculation agrees with the standard to within about ±10 % over the
 whole :math:`pd` range.  The two reference curves show what is lost with

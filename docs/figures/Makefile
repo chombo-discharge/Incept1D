@@ -30,7 +30,23 @@ FIGDIR := $(abspath .)
 export MPLBACKEND := Agg
 export PD_NUM
 
-FIGURES := iec60052 electra zheleznyakfit paschen
+# Figures built by default: self-contained and cheap.  `paschen` verifies the
+# solver against its own closed form; `zheleznyakfit` shows the quality of the
+# two-stream fit.  Together they take seconds.
+FIGURES := paschen zheleznyakfit
+
+# Opt-in figures.  These compare against IEC 60052 and CIGRE ELECTRA reference
+# tables that are copyrighted and therefore not part of this repository (see
+# examples/*/README.md), so by default they would plot the computed curves
+# with nothing to compare them against.  They are also by far the most
+# expensive: the eight IEC sphere diameters alone are ~75 % of the total
+# figure cost.  Build one explicitly after supplying the data:
+#
+#     make -C docs/figures iec60052
+#
+OPTIONAL_FIGURES := iec60052 electra
+
+ALL_FIGURES := $(FIGURES) $(OPTIONAL_FIGURES)
 DIAMS   := 10 15 25 50 75 100 150 200
 
 # Anything that changes the physics or numerics invalidates the computed data.
@@ -38,7 +54,7 @@ SOLVER_DEPS := $(wildcard $(ROOT)/src/incept1d/*.py) $(ROOT)/src/incept1d/cli/pd
                $(wildcard $(ROOT)/mechanisms/air/*.py) $(wildcard $(ROOT)/mechanisms/air/*.json) \
                $(wildcard $(ROOT)/mechanisms/air/*.txt)
 
-.PHONY: all clean data $(FIGURES)
+.PHONY: all clean data $(ALL_FIGURES)
 all: $(foreach f,$(FIGURES),$(OUT)/$(f).pdf $(OUT)/$(f).png)
 
 # ---- 1. data -----------------------------------------------------------------
@@ -75,8 +91,8 @@ $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat: $(ROOT)/mechanisms/air/z
 	@mkdir -p $(dir $@)
 	cd $(dir $@) && python3 $< --ngroups 8 --threshold 1E-6 --write-to-file zheleznyak
 
-data: $(IEC_SIM) $(IEC_REF) $(BUILD)/electra/sim.dat $(ELECTRA_REF) \
-      $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat \
+# `data` covers the default figures only; the opt-in ones pull their own.
+data: $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat \
       $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat
 
 # ---- 2. pgfplots + 3. outputs ---------------------------------------------------
@@ -101,7 +117,7 @@ $(OUT)/$(1).png: $(BUILD)/$(1)/$(1).pdf
 # Convenience target: `make zheleznyakfit` builds one figure.
 $(1): $(OUT)/$(1).pdf $(OUT)/$(1).png
 endef
-$(foreach f,$(FIGURES),$(eval $(call FIGURE_RULES,$(f))))
+$(foreach f,$(ALL_FIGURES),$(eval $(call FIGURE_RULES,$(f))))
 
 clean:
 	rm -rf $(BUILD) $(OUT)
