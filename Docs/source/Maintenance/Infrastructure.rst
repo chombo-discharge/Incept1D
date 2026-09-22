@@ -10,9 +10,12 @@ Hosting, CI and documentation builds
 Hosting
 -------
 
-The code is hosted on GitHub at |repo|.  Issues and pull requests are
-handled there.  There is no package on PyPI; the repository is the
-distribution.
+The code is hosted on GitHub at |repo| under the ``chombo-discharge``
+organisation; issues and pull requests are handled there, and the
+documentation is deployed to
+`chombo-discharge.github.io/Incept1D <https://chombo-discharge.github.io/Incept1D/>`_.
+Contributors work on forks and open pull requests against ``main``.
+There is no package on PyPI; the repository is the distribution.
 
 Continuous integration
 ----------------------

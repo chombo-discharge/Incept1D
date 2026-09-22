@@ -111,7 +111,7 @@ mathjax3_config = {
 # Substitutions available on every page.
 rst_epilog = f"""
 .. |commit| replace:: ``{commit_id}``
-.. |repo| replace:: https://github.com/rmrsk/Incept1D
+.. |repo| replace:: https://github.com/chombo-discharge/Incept1D
 """
 
 # -- Options for HTML output -------------------------------------------------

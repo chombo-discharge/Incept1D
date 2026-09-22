@@ -25,9 +25,11 @@ parts:
 
 The documentation is built with `Sphinx <https://www.sphinx-doc.org>`_ from
 the ``Docs/source`` directory of the repository, and the API reference is
-generated directly from the NumPy-style docstrings in the code.  See
-:ref:`Chap:Infrastructure` for how to build it locally and how it is built in
-continuous integration.
+generated directly from the NumPy-style docstrings in the code.  The
+version at `chombo-discharge.github.io/Incept1D
+<https://chombo-discharge.github.io/Incept1D/>`_ is rebuilt by continuous
+integration from every commit to ``main``; see :ref:`Chap:Infrastructure`
+for how to build it locally.
 
 Notation
 --------

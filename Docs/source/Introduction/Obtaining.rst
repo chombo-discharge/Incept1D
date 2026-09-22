@@ -7,13 +7,13 @@ The source code is hosted on GitHub at |repo|.  Clone it with
 
 .. code-block:: bash
 
-   git clone git@github.com:rmrsk/Incept1D.git
+   git clone git@github.com:chombo-discharge/Incept1D.git
 
 or, over HTTPS,
 
 .. code-block:: bash
 
-   git clone https://github.com/rmrsk/Incept1D.git
+   git clone https://github.com/chombo-discharge/Incept1D.git
 
 The repository contains everything needed to run the examples in this
 documentation: the solver scripts, the dry-air mechanism files with their
