@@ -37,7 +37,7 @@ repos:
           failures, malformed RST, etc.). Uses the "dummy" builder, which
           runs the full build/autodoc/reference-resolution pipeline but
           writes no output files, so the working tree is never left dirty.
-        entry: python3 -m sphinx -b dummy -q Docs /tmp/incept1d-docs-precommit
+        entry: python3 -m sphinx -W --keep-going -b dummy -q Docs/source /tmp/incept1d-docs-precommit
         language: system
         pass_filenames: false
         files: ^(Docs/.*|.*\.py)$

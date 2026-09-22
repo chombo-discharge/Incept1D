@@ -10,32 +10,36 @@ two-stream photoionization), and derived quantities (Paschen curves,
 ionization-integral curves, temporal growth rates, transport-coefficient
 tables for 3-D simulation codes).
 
-**Before touching any of the physics code, read `concepts.tex`, section
-"Methods" → "Theoretical model" (`\subsection{Theoretical model}`, starting
-around line 184, `\label{sec:model}`).** That section is the single source of
-truth for the equations the code implements:
+**Before touching any of the physics code, read the Theory chapter of the
+documentation, `Docs/source/Theory/`.**  Those pages are the single source
+of truth for the equations the code implements (the manuscript they were
+derived from is not part of the repository and must not be referenced
+from the docs):
 
-- Eq. "drift_reaction" / "two_stream": the governing PDEs (species drift +
-  reactions + two-stream photon transport).
-- Eq. "augmented_ode": the augmented first-order ODE system `∂_x θ = A_aug θ`
-  with block matrix `A_aug = [[A,B,B],[C,-D,0],[-C,0,D]]` — this is exactly
-  `Inception._build_A_aug`.
-- Eq. "theta_soln" / the `Q_0`, `Q_d` block systems: the boundary-value
-  problem `Q(λ) θ_0 = 0` — this is exactly `Inception._assemble_det_Q`.
-- Eq. "det_criterion": `det Q(λ=0) = 0` is the inception threshold — this is
-  `Inception.inception_det`, and its root in `E/N` at fixed `p·d` is what
-  `Inception.compute_paschen_curve` / `Inception.main` scan for.
-- The `3×3` reduced model (§ "Standard Paschen law") and
-  `eq:generalized_paschen` are the closed-form sanity check for the
-  attachment/detachment physics — useful for validating changes to the
-  eigenvalue/propagator code against a case with a known analytic answer.
-- Table "reactions" (§ "A minimal scheme for dry air") is the reaction list
+- `Theory/Overview.rst`, eq. `eq_drift_reaction`: the governing drift-reaction PDE.
+- `Theory/Transport.rst`, eq. `eq_augmented_ode`: the augmented first-order
+  ODE `∂_x θ = A_aug θ` with block matrix `A_aug = [[A,B,B],[C,-D,0],[-C,0,D]]`
+  — this is exactly `Inception._build_A_aug`; eq. `eq_theta_soln` is the
+  propagator `M(d)`.
+- `Theory/Photoionization.rst`, eq. `eq_two_stream`: the two-stream photon
+  transport supplying the `B`, `C`, `D` blocks.
+- `Theory/SecondaryEmission.rst`, eqs. `eq_see_condition` / `eq_Q0`: the
+  cathode boundary conditions.
+- `Theory/InceptionCriterion.rst`, eqs. `eq_Qd` / `eq_Q_system` /
+  `eq_det_criterion`: `Q(λ) θ_0 = 0` and `det Q(λ=0) = 0` — this is
+  `Inception._assemble_det_Q` / `Inception.inception_det`, whose root in
+  `E/N` at fixed `p·d` is what `Inception.compute_paschen_curve` scans for.
+  The `3×3` reduced model (`eq_generalized_paschen`, `eq_standard_paschen`)
+  is the closed-form sanity check for the attachment/detachment physics.
+- `Theory/AirScheme.rst`, table `tab_reactions`: the reaction list
   implemented in `Air/Air_Pancheshnyi.py` / `Air/Air_2body.py`.
+- `Docs/source/Numerics/`: how the propagator, determinant and root
+  finding are actually implemented.
 
-Whenever code and manuscript disagree, treat the manuscript equation numbers
-cited in the module docstrings (e.g. "manuscript, eq. 333") as the intended
-behavior, and check whether the equation numbers just drifted (LaTeX
-renumbers on edits) before assuming the code is wrong.
+Code docstrings still cite "manuscript, eq. NNN" in places; those numbers
+refer to an external LaTeX source and have drifted. When code and docs
+disagree, the docs equations (by label, not number) are the intended
+behaviour.
 
 ## Module map
 
@@ -101,18 +105,24 @@ under all of them.
   everything. Note: the existing `.py` files predate `black` and use manual
   column alignment in places — `black` will reformat any file it touches, so
   expect a real diff the first time a given file is committed.
-- **Docs**: Sphinx sources live in `Docs/`. Build locally with
-  `python3 -m sphinx -b html Docs Docs/_build/html` (also runs as a
-  pre-commit hook so broken autodoc imports / RST are caught before commit).
-  Prefer `python3 -m sphinx` over the bare `sphinx-build` command: on at
-  least one dev machine a `sphinx-build` shim from an unrelated pipx venv
-  (missing numpy/scipy/matplotlib) shadows the one with the right
-  dependencies earlier in `PATH`. New
-  functions/classes intended for the public API should get a NumPy-style
-  docstring (the existing modules are already documented this way) so
-  `autodoc` picks them up; docs source files should `literalinclude` the
-  handful of functions that directly implement a manuscript equation rather
-  than re-typing them.
+- **Docs**: Sphinx sources live in `Docs/source/`, organised as one
+  directory per chapter (`Introduction/`, `Theory/`, `Numerics/`,
+  `Modules/`, `Examples/`, `Maintenance/`).  Build with `make html` from
+  `Docs/` (or `python3 -m sphinx -W -b html Docs/source Docs/build/html`
+  from the repo root; prefer `python3 -m sphinx` over the bare
+  `sphinx-build`, which on at least one dev machine resolves to a pipx shim
+  without numpy).  The build runs with `-W`: any warning fails it, and a
+  `dummy` build is a pre-commit hook.  Figures are **built, not shipped**:
+  `Docs/figures/Makefile` runs `Examples/*/run.sh` and `Air/Zheleznyak.py`,
+  compiles the pgfplots `.tex` sources in `Docs/figures/`, and drops
+  PDF/PNG into the git-ignored `Docs/source/figures/`; `make html` triggers
+  it.  The full IEC computation takes tens of minutes the first time
+  (`PD_NUM=30 make figures` for a quick check).  Do not add pre-rendered
+  figures or reference the manuscript.  New public functions get
+  NumPy-style docstrings (autodoc); docs pages `literalinclude` the
+  functions that implement an equation rather than re-typing them; cite
+  literature with `[Key]_` and add the entry to `ZZReferences.rst`
+  (unreferenced citations fail the build).
 - **No build system yet**: there is no `setup.py`/`pyproject` package
   metadata beyond tool config — scripts are run directly with
   `python Inception.py ...` from the repo root, and mechanism files resolve
@@ -121,5 +131,11 @@ under all of them.
   imports.
 - **Physics-affecting changes**: if you change a rate coefficient, a
   boundary condition, or the augmented-matrix assembly, cite the
-  corresponding equation/table in `concepts.tex` in the commit message or
-  docstring, the same way the existing code does.
+  corresponding equation label / table in `Docs/source/Theory/` in the
+  commit message or docstring, update the theory page if the model itself
+  changed, and check the closed-form limit with `Air/Paschen.json`.
+- **Examples**: `Examples/<Name>/` holds reference data with a provenance
+  header and a `run.sh` that reproduces the calculation; the corresponding
+  docs page lives in `Docs/source/Examples/` and its figure source in
+  `Docs/figures/<Name>.tex`.  Keep the three in sync (column indices in the
+  `.tex` follow the `--write-to-file` header layout).

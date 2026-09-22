@@ -39,6 +39,9 @@ Usage
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+
+# numpy >= 2.0 renamed trapz -> trapezoid; support both.
+_trapz = getattr(np, "trapezoid", None) or np.trapz
 from scipy.optimize import nnls, minimize
 
 # ---------------------------------------------------------------------------
@@ -162,7 +165,7 @@ def fit_twostream(n_groups, n_pts=2000, threshold=0.0, chi_hi=None):
         w = g * kappa
 
     approx = sum(w[j] * np.exp(-kappa[j] * chi) for j in range(len(kappa)))
-    scale = np.trapz(target, chi) / max(np.trapz(approx, chi), 1e-30)
+    scale = _trapz(target, chi) / max(_trapz(approx, chi), 1e-30)
     rel_rms = float(np.sqrt(np.mean(((approx * scale - target) / target) ** 2)))
 
     return kappa, g, rel_rms
@@ -248,7 +251,7 @@ def main():
     K_zh = zheleznyak(chi)
     K_2s = sum(w[j] * np.exp(-kappa[j] * chi) for j in range(n_kept))
     # scale K_2s to same integral as K_zh for visual comparison
-    scale = np.trapz(K_zh, chi) / max(np.trapz(K_2s, chi), 1e-30)
+    scale = _trapz(K_zh, chi) / max(_trapz(K_2s, chi), 1e-30)
     K_2s_scaled = K_2s * scale
 
     # --- Convolution with a Gaussian source ---

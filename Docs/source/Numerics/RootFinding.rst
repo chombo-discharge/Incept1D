@@ -1,0 +1,76 @@
+.. _Chap:Numerics:RootFinding:
+
+Root finding and branch tracking
+================================
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+Root finding in :math:`E/N`
+---------------------------
+
+:func:`Inception.find_all_breakdown_EN` locates the :math:`E/N` roots of
+:math:`\det\bm{Q}(0; E/N)` at a single :math:`pd`:
+
+1. **Coarse scan.**  :math:`\det\bm{Q}` is evaluated on 200 log-spaced
+   points between 10 Td and :math:`3\times10^5` Td and every sign change is
+   bracketed.  For non-uniform fields the scan uses a cheap proxy — a
+   single-step uniform-field determinant, with a 5-step version as fallback
+   — and the bracket is re-validated (and widened if needed) with the full
+   determinant before refinement.
+2. **Refinement.**  Each bracket is refined with
+   :func:`scipy.optimize.brentq` (``xtol=1e-8``, ``rtol=1e-14``).  ``NaN``
+   values are mapped to a tiny negative sentinel (:math:`-10^{-300}`) so
+   that Brent's method converges *through* the singular region rather than
+   failing.
+3. **Acceptance.**  :func:`Inception._accept_root` distinguishes a genuine
+   root (finite bracket endpoints of opposite sign; ``NaN`` at the root
+   itself is then the expected consequence of :math:`\bm{Q}` being exactly
+   singular) from an artefact created by the sentinel at a bracket
+   endpoint (discarded with a warning).  A finite but large residual is
+   accepted with a warning.
+4. **Hidden roots.**  A sign change lying just below the ``NaN`` boundary
+   would be invisible to the coarse scan; when the scan goes from positive
+   directly to ``NaN`` the interval is re-scanned finely with the full
+   determinant.
+
+By default only the lowest root is kept (``first_only``); with
+``--all-branches`` every root is returned.
+
+Warm starts
+...........
+
+Along a :math:`pd` sweep the root moves smoothly, so in single-branch mode
+the previous root is used as a hint: the bracket
+:math:`[E/N_\mathrm{prev}/2, 2E/N_\mathrm{prev}]` is tried first and the
+coarse scan skipped when it succeeds.  If the upper end of the hint bracket
+is in the ``NaN`` region it is narrowed geometrically until a finite
+negative value is found.  Warm starts are disabled in ``--all-branches``
+mode because new branches can appear at any :math:`pd`.
+
+Branch tracking
+---------------
+
+:func:`Inception.compute_paschen_curve` repeats the root search over the
+:math:`pd` grid and assigns each new root to an existing branch by greedy
+nearest-neighbour matching in :math:`\log(E/N)`; unmatched roots start new
+branches.  This handles saddle-node bifurcations, where a pair of new
+low-:math:`E/N` roots appears mid-sweep, without corrupting the
+pre-existing branch.  Branch 0 is the branch that first appeared at the
+lowest :math:`pd`.
+
+Root finding in :math:`\lambda`
+-------------------------------
+
+:func:`Lambda.find_lambda_for_voltage` solves :math:`\det\bm{Q}(\lambda;
+E/N) = 0` at fixed :math:`E/N` above threshold:
+
+1. evaluate :math:`\det\bm{Q}(0)` to establish the reference sign
+   (``NaN`` is treated as negative, per the convention above);
+2. expand an upper bracket geometrically, :math:`\lambda_\mathrm{hi} = 1,
+   10, 100, \ldots` s\ :sup:`-1`, until the sign flips — a large positive
+   :math:`\lambda` always damps the solution, since :math:`\bm{A} =
+   (\bm{R} - \lambda\bm{I})\bm{V}^{-1}`;
+3. refine :math:`[0, \lambda_\mathrm{hi}]` with Brent's method.
+

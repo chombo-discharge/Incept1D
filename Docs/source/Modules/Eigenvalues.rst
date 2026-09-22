@@ -1,0 +1,69 @@
+.. _Chap:Eigenvalues:
+
+Eigenvalues.py — local growth modes
+===================================
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+``Eigenvalues.py`` computes the eigenvalues of the *local* transport matrix
+:math:`\bm{A} = \bm{R}\bm{V}^{-1}` as a function of :math:`E/N` at a single
+spatial point — no gap integration, no boundary conditions.  It is the
+purely local counterpart of the full inception criterion: a positive real
+eigenvalue means that, locally, net ionization exceeds attachment/loss and
+the charge-carrier flux would grow exponentially in an infinite uniform
+medium.  As shown in :ref:`Chap:InceptionCriterion`, the largest eigenvalue
+reduces to :math:`\lambda_+` of the closed-form three-species model and is
+the *apparent effective ionization coefficient*.
+
+Because eigenvalues have no inherent ordering, :func:`_track_step` uses the
+Hungarian algorithm to match each eigenvalue at one :math:`E/N` sample to
+its continuation at the next (minimising total squared distance in the
+complex plane), so that plotted tracks do not jump between unrelated modes.
+
+.. literalinclude:: ../../../Eigenvalues.py
+   :language: python
+   :pyobject: compute_eigenvalues
+
+Command-line interface
+----------------------
+
+.. code-block:: console
+
+   python3 Eigenvalues.py MECHANISM.py [CONFIG.json ...]
+       [--p P] [--T T] [--EN-lo LO] [--EN-hi HI] [--EN-num N]
+       [--pressure-scan] [--p-min MIN] [--p-max MAX] [--p-num N] [--eig-index IDX]
+       [--write-to-file FILE]
+
+Two modes are available.  The **default mode** plots every eigenvalue track
+(:math:`\mathrm{Re}\,\lambda_j/N` vs. :math:`E/N`) at a fixed pressure, one
+subplot per configuration.  The **pressure-scan mode** (``--pressure-scan``)
+plots one selected track (``--eig-index``, default 0 = leading mode) vs.
+:math:`E/N` for several log-spaced pressures between ``--p-min`` and
+``--p-max``.  Because the three-body attachment and the detachment reactions
+scale differently with :math:`N`, the field at which the leading eigenvalue
+crosses zero is pressure dependent — the pressure scan shows this directly.
+
+Examples
+--------
+
+.. code-block:: bash
+
+   # All eigenvalue tracks for the baseline and the no-detachment variant
+   python3 Eigenvalues.py Air/Air_Pancheshnyi.py Air/NoDetachment.json --EN-lo 20 --EN-hi 300
+
+   # Leading eigenvalue vs E/N for five pressures between 1 mbar and 10 bar
+   python3 Eigenvalues.py Air/Air_Pancheshnyi.py --pressure-scan --p-min 1e-3 --p-max 10 --p-num 5
+
+.. note::
+
+   ``Eigenvalues.py`` has no ``--no-plot`` flag; on headless machines set
+   ``MPLBACKEND=Agg`` and use ``--write-to-file``.
+
+API reference
+-------------
+
+.. automodule:: Eigenvalues
+   :members:
+   :undoc-members:

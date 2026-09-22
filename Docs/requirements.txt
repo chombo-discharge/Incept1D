@@ -1,2 +1,4 @@
+# Python packages needed to build the documentation (in addition to the
+# runtime dependencies numpy, scipy, matplotlib which autodoc imports).
 sphinx>=7.0
 sphinx-rtd-theme>=2.0
