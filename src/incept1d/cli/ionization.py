@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 ``incept1d ionization`` — plot ∫ max(α−η, 0) dx and ∫ max(Re λ_max, 0) dx vs.
 applied voltage for fixed (p, d) geometries.
@@ -220,7 +224,6 @@ def run(args, parser):
     _field_str = _field_dist.label
 
     # ---- Load configurations --------------------------------------------
-    mech_dir = os.path.dirname(os.path.abspath(args.mechanism))
     mech_name = os.path.basename(args.mechanism)
 
     raw_dicts = read_json_configs(args.configs) if args.configs else [{}]
@@ -267,7 +270,6 @@ def run(args, parser):
         # Print table
         from itertools import groupby
 
-        eig_col = "  ∫max(λ_max,0)dx (m⁻¹)" if has_matrix else ""
         for lbl, rows in groupby(records, key=lambda r: r[0]):
             rows = list(rows)
             print(f"\n  {lbl}")

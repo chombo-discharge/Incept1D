@@ -11,7 +11,7 @@ ionization-integral curves, temporal growth rates, transport-coefficient
 tables for 3-D simulation codes).
 
 **Before touching any of the physics code, read the Theory chapter of the
-documentation, `Docs/source/Theory/`.**  Those pages are the single source
+documentation, `docs/source/Theory/`.**  Those pages are the single source
 of truth for the equations the code implements (the manuscript they were
 derived from is not part of the repository and must not be referenced
 from the docs):
@@ -32,8 +32,8 @@ from the docs):
   The `3×3` reduced model (`eq_generalized_paschen`, `eq_standard_paschen`)
   is the closed-form sanity check for the attachment/detachment physics.
 - `Theory/AirScheme.rst`, table `tab_reactions`: the reaction list
-  implemented in `mechanisms/Air/Air_Pancheshnyi.py` / `mechanisms/Air/Air_2body.py`.
-- `Docs/source/Numerics/`: how the propagator, determinant and root
+  implemented in `mechanisms/air/air_pancheshnyi.py` / `mechanisms/air/air_2body.py`.
+- `docs/source/Numerics/`: how the propagator, determinant and root
   finding are actually implemented.
 
 Code docstrings still cite "manuscript, eq. NNN" in places; those numbers
@@ -72,13 +72,13 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (`mechanisms/Air/Air_Pancheshnyi.py`, `mechanisms/Air/Air_2body.py`)
+### Mechanism files (`mechanisms/air/air_pancheshnyi.py`, `mechanisms/air/air_2body.py`)
 
 Mechanism files live under `mechanisms/<family>/` and are **data, not part
 of the package**: they are `exec`'d by `incept1d.mechanism.load_mechanism`
 via `importlib`, after optionally injecting override variables (`_GAMMA0`,
-`_EREF`, `BOLSIG_FILE`, ...) from a companion `Config.py` in the same
-directory (see `mechanisms/Air/Config.py`). They import the package normally
+`_EREF`, `BOLSIG_FILE`, ...) from a companion `config.py` in the same
+directory (see `mechanisms/air/config.py`). They import the package normally
 (`from incept1d.constants import kB, Q`), so the package must be installed.
 A mechanism module must expose the fixed interface
 (`incept1d.mechanism.REQUIRED_ATTRS`):
@@ -94,8 +94,8 @@ A mechanism module must expose the fixed interface
   electron emission efficiencies (ion- and photon-induced)
 
 When writing or editing a mechanism file, follow the coordinate convention
-documented at the top of `mechanisms/Air/Air_Pancheshnyi.py` (cathode at
-`x=0`, anode at `x=d`, sign convention for `V`). `Config.py` implements the
+documented at the top of `mechanisms/air/air_pancheshnyi.py` (cathode at
+`x=0`, anode at `x=d`, sign convention for `V`). `config.py` implements the
 `pre_exec_vars()` / `post_exec_init()` / `mechanism_params()` protocol that
 `load_mechanism` expects — copy that pattern for a new mechanism family
 rather than inventing a new config mechanism.
@@ -103,7 +103,7 @@ rather than inventing a new config mechanism.
 ### Typical call graph
 
 ```
-mechanism file (+ Config.py, *.json) ──► incept1d.mechanism.load_mechanism ──► Mechanism
+mechanism file (+ config.py, *.json) ──► incept1d.mechanism.load_mechanism ──► Mechanism
                                                                                   │
                      ┌──────────────────────┬─────────────────────┬───────────────┤
                      ▼                      ▼                     ▼               ▼
@@ -125,23 +125,23 @@ of them.
   everything. Note: the existing `.py` files predate `black` and use manual
   column alignment in places — `black` will reformat any file it touches, so
   expect a real diff the first time a given file is committed.
-- **Docs**: Sphinx sources live in `Docs/source/`, organised as one
+- **Docs**: Sphinx sources live in `docs/source/`, organised as one
   directory per chapter (`Introduction/`, `Theory/`, `Numerics/`,
-  `Modules/`, `Examples/`, `Maintenance/`).  Build with `make html` from
-  `Docs/` (or `python3 -m sphinx -W -b html Docs/source Docs/build/html`
+  `Modules/`, `examples/`, `Maintenance/`).  Build with `make html` from
+  `docs/` (or `python3 -m sphinx -W -b html docs/source docs/build/html`
   from the repo root; prefer `python3 -m sphinx` over the bare
   `sphinx-build`, which on at least one dev machine resolves to a pipx shim
   without numpy).  The build runs with `-W`: any warning fails it, and a
   `dummy` build is a pre-commit hook.  Figures are **built, not shipped**:
-  `Docs/figures/Makefile` runs `Examples/*/run.sh` and `mechanisms/Air/Zheleznyak.py`,
-  compiles the pgfplots `.tex` sources in `Docs/figures/`, and drops
-  PDF/PNG into the git-ignored `Docs/source/figures/`; `make html` triggers
+  `docs/figures/Makefile` runs `examples/*/run.sh` and `mechanisms/air/zheleznyak.py`,
+  compiles the pgfplots `.tex` sources in `docs/figures/`, and drops
+  PDF/PNG into the git-ignored `docs/source/figures/`; `make html` triggers
   it.  The full IEC computation takes tens of minutes the first time
   (`PD_NUM=30 make figures` for a quick check).  Do not add pre-rendered
   figures or reference the manuscript.  New public functions get
   NumPy-style docstrings (autodoc); docs pages `literalinclude` the
   functions that implement an equation rather than re-typing them; cite
-  literature with `[Key]_` and add the entry to `ZZReferences.rst`
+  literature with `[Key]_` and add the entry to `zzreferences.rst`
   (unreferenced citations fail the build).
 - **Packaging**: `pyproject.toml` (setuptools, src layout) is the single
   source of dependencies and of the `incept1d` entry point. No
@@ -153,11 +153,11 @@ of them.
   `fields.add_field_argument` / `solver.parse_dx_spec`.
 - **Physics-affecting changes**: if you change a rate coefficient, a
   boundary condition, or the augmented-matrix assembly, cite the
-  corresponding equation label / table in `Docs/source/Theory/` in the
+  corresponding equation label / table in `docs/source/Theory/` in the
   commit message or docstring, update the theory page if the model itself
-  changed, and check the closed-form limit with `mechanisms/Air/Paschen.json`.
-- **Examples**: `Examples/<Name>/` holds reference data with a provenance
+  changed, and check the closed-form limit with `mechanisms/air/paschen.json`.
+- **Examples**: `examples/<Name>/` holds reference data with a provenance
   header and a `run.sh` that reproduces the calculation; the corresponding
-  docs page lives in `Docs/source/Examples/` and its figure source in
-  `Docs/figures/<Name>.tex`.  Keep the three in sync (column indices in the
+  docs page lives in `docs/source/examples/` and its figure source in
+  `docs/figures/<Name>.tex`.  Keep the three in sync (column indices in the
   `.tex` follow the `--write-to-file` header layout).

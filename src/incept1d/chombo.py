@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Transport-coefficient tables for the external 3-D plasma solver
 `chombo-discharge`, generated from a mechanism file.

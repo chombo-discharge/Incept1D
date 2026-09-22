@@ -1,76 +1,89 @@
-# Build the documentation -- figures included -- and deploy it to GitHub Pages
-# from the build artifact.
-#
-# The expensive step is computing the example curves with `incept1d pdiv`
-# (Docs/figures/Makefile -> Examples/*/run.sh).  Their outputs are cached,
-# keyed on everything that can change the physics or the numerics, so a
-# documentation-only change rebuilds in a couple of minutes while a solver
-# change recomputes the curves.
-name: docs
+name: Deploy documentation
 
 on:
   push:
-    branches: [main]
+    branches: main
   pull_request:
   workflow_dispatch:
 
+# Allow the deploy job to publish to GitHub Pages via OIDC (no branch, no stored credentials).
 permissions:
   contents: read
   pages: write
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.ref }}-${{ github.head_ref }}-docs
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # conf.py records the commit id
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # conf.py records the commit id in the page footer
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .[docs]
-
-      - name: Install TeX Live (pgfplots, siunitx) and poppler
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            texlive-latex-base texlive-latex-extra texlive-pictures texlive-science \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-pictures \
+            texlive-science \
+            texlive-xetex \
+            texlive-fonts-extra \
+            fonts-dejavu \
+            latexmk \
             poppler-utils
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e .[docs]
 
-      - name: Restore computed example curves
-        id: curves
+      - name: Restore computed example data
         uses: actions/cache@v4
         with:
+          # The figures are computed from the solver, not committed.  Cache the
+          # expensive part -- the inception curves -- keyed on everything that
+          # can change them, so a docs-only change reuses them.
           path: |
-            Docs/build/figures/IEC60052/Sim_*.dat
-            Docs/build/figures/Electra/Sim.dat
-          key: curves-${{ hashFiles('src/incept1d/**', 'mechanisms/Air/**', 'Examples/**/run.sh') }}
+            docs/build/figures/iec60052/sim_*.dat
+            docs/build/figures/electra/sim.dat
+          key: curves-${{ hashFiles('src/incept1d/**', 'mechanisms/**', 'examples/**/run.sh') }}
 
-      - name: Build figures
+      - name: Build documentation figures
+        working-directory: ${{ github.workspace }}/docs
         env:
           MPLBACKEND: Agg
-        run: make -C Docs figures
+        run: make figures
 
-      - name: Build HTML
-        run: make -C Docs html SPHINXOPTS="-W --keep-going"
+      - name: Build HTML documentation
+        working-directory: ${{ github.workspace }}/docs
+        env:
+          MPLBACKEND: Agg
+        run: make html
 
-      - name: Upload HTML artifact
+      # NOTE: `make latexpdf` currently produces a PDF containing only the
+      # chapter headings -- the ``:hidden:`` toctrees in source/index.rst keep
+      # the referenced documents out of the LaTeX doctree.  Add a PDF step here
+      # once that is fixed.
+
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Docs/build/html
+          path: docs/build/html
 
   deploy:
+    # Pull requests build the documentation but must not publish it.
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
@@ -78,5 +91,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4

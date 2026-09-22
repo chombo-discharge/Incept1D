@@ -1,0 +1,93 @@
+% NOTE: xmode/ymode must be given per axis, not inside a /.style.
+% Paschen curve of dry air: Dakin et al. (ELECTRA 32, Table C2) vs. Incept1D.
+%
+% Data files (in the working directory when this is compiled):
+%   tablec2_air.dat   reference compilation, columns: pd (bar mm), U (kV)
+%   sim.dat           incept1d pdiv output from examples/electra/run.sh
+%
+% 0-based column indices (\thisrowno) into sim.dat; 1-based layout:
+%    1  pd_bar_mm
+%    4  EN_Td[Baseline]           5  U_kV[Baseline]
+%   14  EN_Td[No detachment]     15  U_kV[No detachment]
+%   27  EN_Td[Streamer]          28  U_kV[Streamer]
+% The mean reduced field of the measured points is U/(pd N0) with
+% N0 = 2.47e25 m^-3 bar^-1 (20 C): EN_Td = U_kV*1e3 / (pd_mm*1e-3 * N0) / 1e-21.
+\documentclass[10pt]{article}
+\input{preamble.tex}
+\usepackage[paperwidth=15cm,paperheight=13.4cm,margin=0in]{geometry}
+
+\pgfplotsset{
+  electra/.style={semithick, mark options={mark size=1.25pt, fill=white, fill opacity=0.1}},
+  panel/.style={
+    axis y line=left, axis x line=bottom, font=\small,
+    width=\figwidth, height=\figheight, grid=both,
+    minor grid style={very thin, densely dotted},
+    axis line style={thick, black}, unbounded coords=jump,
+    xmin=1E-3, xmax=400,
+    cycle list name=exotic,
+    xlabel={$pd$ (\si{\bar\milli\meter})},
+  },
+  inset/.style={
+    axis background/.style={fill=black!5},
+    axis x line=bottom, font=\scriptsize,
+    width=0.5\figwidth, height=0.65\figheight, grid=both,
+    minor x tick num=5,
+    minor grid style={very thin, densely dotted},
+    axis line style={thick, black}, unbounded coords=jump,
+    xmin=100, xmax=400,
+    cycle list name=exotic,
+    xlabel={$pd$ (\si{\bar\milli\meter})},
+  },
+}
+\setlength{\figwidth}{14cm}
+\setlength{\figheight}{6.0cm}
+
+\begin{document}
+\centering
+\begin{tikzpicture}
+  % ---- a) voltage ----------------------------------------------------------
+  \begin{axis}[panel, xmode=log, ymode=log, alias=voltages, anchor=south west, ymax=1200,
+      title={a) Inception voltage}, ylabel={$U$ (\si{\kilo\volt})},
+      boxedlegend, legend style={at={(0.98, 0.04)}, anchor=south east}]
+    \addplot+[electra, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim.dat};
+    \addplot+[electra, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {tablec2_air.dat};
+    \addplot[thick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{14}] {sim.dat};
+    \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{27}] {sim.dat};
+    \addlegendentry{Full scheme};
+    \addlegendentry{No detachment};
+    \addlegendentry{Streamer criterion};
+  \end{axis}
+
+  \begin{axis}[inset, at=(voltages.north west), anchor=north west,
+      yshift=-1.5ex, xshift=2ex, axis y line=right,
+      ymin=200, ymax=1200, minor y tick num=3,
+      restrict x to domain=0:400, restrict y to domain=0:1200,
+      ylabel={$U$ (\si{\kilo\volt})}]
+    \addplot+[electra, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim.dat};
+    \addplot+[electra, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {tablec2_air.dat};
+    \addplot[thick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{14}] {sim.dat};
+    \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{27}] {sim.dat};
+  \end{axis}
+
+  % ---- b) mean reduced field ----------------------------------------------
+  \begin{axis}[panel, xmode=log, ymode=log, alias=fields, anchor=north west, at=(voltages.south west),
+      yshift=-6em, ymin=80, ymax=1E4,
+      title={b) Average reduced field $E/N$}, ylabel={$E/N$ (\si{\townsend})}]
+    \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}/(\thisrowno{0}*2.47E25*1E-21)*1E6] {tablec2_air.dat};
+    \addplot+[electra, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{3}] {sim.dat};
+    \addplot[thick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{13}] {sim.dat};
+    \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{26}] {sim.dat};
+  \end{axis}
+
+  \begin{axis}[inset, anchor=north east, at=(fields.north east),
+      yshift=-1ex, xshift=-2ex, axis y line=left,
+      ymin=90, ymax=125, minor y tick num=4,
+      restrict x to domain=90:400, restrict y to domain=90:125,
+      ylabel={$E/N$ (\si{\townsend})}]
+    \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}/(\thisrowno{0}*2.47E25*1E-21)*1E6] {tablec2_air.dat};
+    \addplot+[electra, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{3}] {sim.dat};
+    \addplot[semithick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{13}] {sim.dat};
+    \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{26}] {sim.dat};
+  \end{axis}
+\end{tikzpicture}
+\end{document}

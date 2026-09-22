@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Core solver: the augmented ODE, its propagators and the boundary determinant
 det Q(λ).
@@ -532,9 +536,7 @@ def inception_det(
                         ],
                     }
                 )
-            return _assemble_det_Q(
-                M, EN_ref, eff, p, T, N_gamma_eff, aug_mask, n_aug
-            )
+            return _assemble_det_Q(M, EN_ref, eff, p, T, N_gamma_eff, aug_mask, n_aug)
 
     f = field_dist.build(d)
     d_step = d / N_min

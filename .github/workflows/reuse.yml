@@ -1,0 +1,35 @@
+name: REUSE compliance
+
+# Every file in the repository must declare its copyright holder and licence,
+# either through an inline SPDX header or an entry in REUSE.toml.  This matters
+# here beyond bookkeeping: the repository redistributes third-party reference
+# data (LXCat swarm data, IEC 60052 and CIGRE ELECTRA tables) that is *not*
+# covered by the project licence, and REUSE.toml is what records who owns what.
+#
+# The same check runs as a pre-commit hook, so this job should only ever fail
+# for contributors who have not installed the hooks.
+
+on:
+  push:
+    branches: main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-reuse
+  cancel-in-progress: true
+
+jobs:
+  reuse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check REUSE compliance
+        uses: fsfe/reuse-action@v5

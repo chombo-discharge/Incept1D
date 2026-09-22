@@ -2,7 +2,7 @@
 # left byte-for-byte as provided by their source -- exclude it from every
 # whitespace/EOF-rewriting hook below. Source files (.py, .json, .rst, ...)
 # are not affected.
-exclude: ^mechanisms/Air/.*\.(txt|dat)$
+exclude: ^mechanisms/air/.*\.(txt|dat)$
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -27,6 +27,15 @@ repos:
     hooks:
       - id: flake8
 
+  # REUSE (https://reuse.software): every file must declare its copyright and
+  # licence, either through an inline SPDX header or an entry in REUSE.toml.
+  # Third-party data under mechanisms/ and examples/ is covered by REUSE.toml
+  # with its real rights holder -- do not relabel it as project-owned.
+  - repo: https://github.com/fsfe/reuse-tool
+    rev: v6.1.2
+    hooks:
+      - id: reuse
+
   - repo: local
     hooks:
       - id: sphinx-build
@@ -37,7 +46,7 @@ repos:
           failures, malformed RST, etc.). Uses the "dummy" builder, which
           runs the full build/autodoc/reference-resolution pipeline but
           writes no output files, so the working tree is never left dirty.
-        entry: python3 -m sphinx -W --keep-going -b dummy -q Docs/source /tmp/incept1d-docs-precommit
+        entry: python3 -m sphinx -W --keep-going -b dummy -q docs/source /tmp/incept1d-docs-precommit
         language: system
         pass_filenames: false
-        files: ^(Docs/.*|.*\.py)$
+        files: ^(docs/.*|.*\.py)$

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Eigenvalues of the local transport matrix A = R V^{-1}.
 

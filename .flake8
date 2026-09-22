@@ -11,5 +11,5 @@ exclude =
     .git,
     __pycache__,
     build,
-    Docs/build,
-    Docs/build/*
+    docs/build,
+    docs/build/*

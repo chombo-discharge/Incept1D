@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Inception curves: locate the roots of det Q(E/N, p·d) = 0 and track them
 across a p·d sweep, giving the (partial) discharge inception voltage

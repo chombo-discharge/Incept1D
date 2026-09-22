@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Shared helpers for the tab-separated result files written by the
 ``--write-to-file`` options of the command-line tools.

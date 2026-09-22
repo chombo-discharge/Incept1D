@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 ``incept1d growth`` — temporal growth rate λ vs. voltage above inception.
 
@@ -87,7 +91,7 @@ def add_arguments(parser):
     """Register the command-line arguments on *parser*."""
     parser.add_argument(
         "mechanism",
-        help="Path to mechanism Python file (e.g. Air/Air_Pancheshnyi.py).",
+        help="Path to mechanism Python file (e.g. mechanisms/air/air_pancheshnyi.py).",
     )
     parser.add_argument(
         "configs",

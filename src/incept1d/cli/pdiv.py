@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 ``incept1d pdiv`` — compute and plot the inception curve det Q(λ=0) = 0,
 i.e. the (partial) discharge inception voltage PDIV = V*(p·d), over a p·d
@@ -48,7 +52,7 @@ def add_arguments(parser):
     """Register the ``pdiv`` command-line arguments on *parser*."""
     parser.add_argument(
         "mechanism",
-        help="Path to mechanism Python file (e.g. mechanisms/Air/Air_Pancheshnyi.py).",
+        help="Path to mechanism Python file (e.g. mechanisms/air/air_pancheshnyi.py).",
     )
     parser.add_argument(
         "configs",
@@ -261,7 +265,6 @@ def run(args, parser):
         midpoint_propagator if args.method == "midpoint" else magnus2_propagator
     )
 
-    mech_dir = os.path.dirname(os.path.abspath(args.mechanism))
     mech_name = os.path.basename(args.mechanism)
 
     # Read JSON config files as raw dicts; no gas-specific class needed here.
@@ -323,9 +326,10 @@ def run(args, parser):
         if hasattr(_ref_mod, "alpha") and hasattr(_ref_mod, "eta"):
             EN_scan = np.logspace(np.log10(10.0), np.log10(1e5), 200)
             for p in args.p:
-                f_cross = lambda EN, _p=p: _ref_mod.alpha(
-                    EN, _p, args.T
-                ) - _ref_mod.eta(EN, _p, args.T)
+
+                def f_cross(EN, _p=p):
+                    return _ref_mod.alpha(EN, _p, args.T) - _ref_mod.eta(EN, _p, args.T)
+
                 f_vals = np.array([f_cross(en) for en in EN_scan])
                 sign_changes = np.where(f_vals[:-1] * f_vals[1:] < 0)[0]
                 if len(sign_changes):

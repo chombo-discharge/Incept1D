@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 ``incept1d eigenvalues`` — plot eigenvalues of the transport matrix A = R V⁻¹
 vs. E/N.

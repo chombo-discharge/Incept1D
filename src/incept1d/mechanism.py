@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 Mechanism loading: the ``Mechanism`` wrapper, JSON configuration files and
 ``load_mechanism``.
 
-A mechanism is a plain Python file (see ``mechanisms/Air/Air_Pancheshnyi.py``)
+A mechanism is a plain Python file (see ``mechanisms/air/air_pancheshnyi.py``)
 that is executed by :func:`load_mechanism` and must expose the interface
-listed in :data:`REQUIRED_ATTRS`.  A companion ``Config.py`` in the same
+listed in :data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same
 directory (optional) implements the ``pre_exec_vars()`` /
 ``post_exec_init()`` / ``mechanism_params()`` protocol used to inject
 configuration parameters from JSON files.
@@ -175,7 +179,7 @@ def load_mechanism(path, config_dict=None):
         Absolute or relative path to the mechanism .py file.
     config_dict : dict or None
         Raw configuration dict (e.g. parsed from JSON).  If given, a Config
-        object is constructed from it by the companion Config.py that lives
+        object is constructed from it by the companion config.py that lives
         alongside the mechanism file.  Pass None for a baseline configuration.
 
     Returns
@@ -187,8 +191,8 @@ def load_mechanism(path, config_dict=None):
     if not os.path.isfile(abs_path):
         raise FileNotFoundError(f"Mechanism file not found: {abs_path}")
 
-    # Discover Config.py in the same directory as the mechanism.
-    cfg_py = os.path.join(mech_dir, "Config.py")
+    # Discover config.py in the same directory as the mechanism.
+    cfg_py = os.path.join(mech_dir, "config.py")
     if os.path.isfile(cfg_py):
         _cspec = importlib.util.spec_from_file_location("_mechconfig", cfg_py)
         _cm = importlib.util.module_from_spec(_cspec)
@@ -196,7 +200,7 @@ def load_mechanism(path, config_dict=None):
         config = _cm.Config.from_dict(config_dict or {}, mech_dir)
     elif config_dict:
         raise ImportError(
-            f"No Config.py found in {mech_dir} but a config_dict was supplied"
+            f"No config.py found in {mech_dir} but a config_dict was supplied"
         )
     else:
         config = None

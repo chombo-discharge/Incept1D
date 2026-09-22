@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 ``incept1d chombo`` — export transport-coefficient / rate-coefficient tables
 for the external 3-D solver `chombo-discharge`, and plot them.
@@ -168,7 +172,8 @@ DESCRIPTION = "Generate chombo-discharge transport data from a mechanism file."
 def add_arguments(parser):
     """Register the command-line arguments on *parser*."""
     parser.add_argument(
-        "mechanism", help="Path to mechanism Python file (e.g. Air/Air_Pancheshnyi.py)"
+        "mechanism",
+        help="Path to mechanism Python file (e.g. mechanisms/air/air_pancheshnyi.py)",
     )
     parser.add_argument("--modifier", default=None, help="Path to modifier JSON file")
     parser.add_argument(

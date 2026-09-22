@@ -1,0 +1,20 @@
+CIGRE ELECTRA reference table — terms of use
+============================================
+
+The file examples/electra/tablec2_air.dat reproduces Table C2 of
+
+    T. W. Dakin et al., "Breakdown of gases in uniform fields:
+    Paschen curves for nitrogen, air and sulphur hexafluoride",
+    ELECTRA No. 32, pp. 61-82.
+
+ELECTRA is published by CIGRE (Conseil International des Grands Reseaux
+Electriques), which holds the copyright in the article and in the table
+reproduced from it.  These values are redistributed here in good faith, as a
+small numerical extract used solely to validate this solver against a
+recognised reference, and are NOT covered by the GPL-3.0-or-later licence that
+applies to the rest of this repository.
+
+No licence to the ELECTRA article is granted by this repository.
+
+If you are the rights holder and object to this extract being redistributed,
+please open an issue and it will be removed.
