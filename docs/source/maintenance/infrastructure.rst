@@ -52,7 +52,7 @@ the product of three committed ingredients:
 3. **The plot** — a pgfplots source in ``docs/figures/`` that reads the
    ``.dat`` files by column and is compiled with ``pdflatex``.
 
-``docs/figures/Makefile`` chains them: it copies the reference data and
+``docs/figures/Makefile`` chains them: it copies any reference data and
 runs the calculations into ``docs/build/figures/<Figure>/``, compiles the
 ``.tex`` there, and places a PDF (for the LaTeX builder) and a 150 dpi PNG
 (for the HTML builder) in ``docs/source/figures/``, which is ignored by

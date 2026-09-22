@@ -15,11 +15,21 @@ This example compares the inception criterion against that compilation
 over five decades of :math:`pd`, from the Paschen minimum to the regime
 where negative-ion detachment dominates.
 
-Reference data
---------------
+Reference data (not included)
+-----------------------------
 
-``examples/electra/tablec2_air.dat`` contains the tabulated curve:
-:math:`pd` (bar·mm) and breakdown voltage (kV, crest value) at 20 °C.
+.. important::
+
+   The ELECTRA breakdown voltages are copyrighted by CIGRE and are **not
+   distributed with this repository**.  The figure below is therefore built
+   from the computed curve alone.
+
+If you have access to the article you can reproduce the full comparison
+locally.  Place ``tablec2_air.dat`` in ``examples/electra/``, with columns
+:math:`pd` (bar·mm) and breakdown voltage (kV, crest value) at 20 °C; ``#``
+comment lines are ignored.  The overlays in ``docs/figures/electra.tex`` are
+guarded by ``\IfFileExists``, so the next ``make -C docs figures`` picks the
+file up automatically.  See ``examples/electra/README.md``.
 
 Running the calculation
 -----------------------
@@ -50,9 +60,11 @@ m\ :sup:`-3` bar\ :sup:`-1` at 20 °C.
 Result
 ------
 
-As for the sphere-gap example, the figure is built during the
-documentation build from ``tablec2_air.dat``, the output of ``run.sh``, and
-the pgfplots source ``docs/figures/electra.tex``.
+As for the sphere-gap example, the figure is built during the documentation
+build from the output of ``run.sh`` and the pgfplots source
+``docs/figures/electra.tex``.  As published here it shows the computed curve
+only; supply ``tablec2_air.dat`` as described above to overlay the ELECTRA
+values.
 
 .. _fig_electra:
 

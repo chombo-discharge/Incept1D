@@ -99,7 +99,7 @@ for a guided walk-through.
 ```
 src/incept1d/        the Python package (solver, inception curves, CLI)
 mechanisms/air/      dry-air mechanism family, swarm data, configurations
-examples/            reference data and scripts for the worked examples
+examples/            scripts reproducing the worked examples
 docs/                Sphinx documentation sources
 ```
 
@@ -133,18 +133,20 @@ and the pull request template.
 holder and licence, either through an inline SPDX header or an entry in
 [`REUSE.toml`](REUSE.toml). Run `reuse lint` to check.
 
-Some redistributed reference data is **not** covered by the project licence and
-is owned by third parties:
+The electron swarm data under `mechanisms/air/*.txt` is **not** covered by the
+project licence. It is retrieved from the [LXCat](https://www.lxcat.net)
+open-access database and redistributed verbatim, with its original headers
+intact, under [`LicenseRef-LXCat`](LICENSES/LicenseRef-LXCat.txt); copyright
+rests with the contributing databases (IST-Lisbon, Phelps, Biagi, Morgan,
+TRINITI, Viehland). If you use it, cite the database named in the header of
+the file you used — that is the reference format its authors ask for.
 
-| Data | Rights holder | Terms |
-|---|---|---|
-| `mechanisms/air/*.txt` — cross sections, swarm parameters, ion mobilities | the contributing LXCat databases (IST-Lisbon, Phelps, Biagi, Morgan, TRINITI, Viehland) | [`LicenseRef-LXCat`](LICENSES/LicenseRef-LXCat.txt) |
-| `examples/iec60052/*.dat` — standard sphere-gap voltages | International Electrotechnical Commission | [`LicenseRef-IEC-60052`](LICENSES/LicenseRef-IEC-60052.txt) |
-| `examples/electra/tablec2_air.dat` — Dakin et al., ELECTRA 32, Table C2 | CIGRE | [`LicenseRef-CIGRE-ELECTRA`](LICENSES/LicenseRef-CIGRE-ELECTRA.txt) |
-
-These files are redistributed verbatim with their original headers intact. If
-you use the LXCat data, cite the database named in the header of the file you
-used — that is the reference format its authors ask for.
+The IEC 60052 sphere-gap voltages and the CIGRE ELECTRA Table C2 breakdown
+curve used by the worked examples are copyrighted by their publishers and are
+**not distributed here**. The example figures are built from Incept1D's own
+computed curves; if you hold a copy of either reference you can drop it into
+the example directory to overlay it — see `examples/iec60052/README.md` and
+`examples/electra/README.md`.
 
 ## Authors
 

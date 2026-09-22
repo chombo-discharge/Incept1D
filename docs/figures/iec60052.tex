@@ -1,8 +1,13 @@
 % Breakdown voltage of standard sphere gaps: IEC 60052 tables vs. Incept1D.
 %
 % Data files (all in the working directory when this is compiled):
-%   iec60052_<D>cm.dat   reference tables, columns: pd (bar mm), U (kV)
 %   sim_<D>cm.dat        incept1d pdiv output from examples/iec60052/run.sh
+%   iec60052_<D>cm.dat   OPTIONAL reference tables (pd in bar mm, U in kV).
+%                        The IEC 60052 values are copyrighted by the IEC and
+%                        are not distributed with this repository; see
+%                        examples/iec60052/README.md.  Each overlay is guarded
+%                        by \IfFileExists, so the figure builds without them
+%                        and shows the computed curves alone.
 %
 % Column indices below are 0-based (\thisrowno) into sim_<D>cm.dat, whose
 % layout for "incept1d pdiv MECH nodetachment.json --field sphere-sphere R
@@ -44,29 +49,37 @@
       legend style={at={(0.025, 0.975)}, anchor=north west, legend columns=1},
     ]
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_200cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_200cm.dat};
+    \IfFileExists{iec60052_200cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_200cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_200cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_150cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_150cm.dat};
+    \IfFileExists{iec60052_150cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_150cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_150cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_100cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_100cm.dat};
+    \IfFileExists{iec60052_100cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_100cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_100cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_75cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_75cm.dat};
+    \IfFileExists{iec60052_75cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_75cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_75cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_50cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_50cm.dat};
+    \IfFileExists{iec60052_50cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_50cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_50cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_25cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_25cm.dat};
+    \IfFileExists{iec60052_25cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_25cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_25cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_15cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_15cm.dat};
+    \IfFileExists{iec60052_15cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_15cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_15cm.dat};
 
-    \addplot+[IEC, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_10cm.dat};
-    \addplot+[IEC, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_10cm.dat};
+    \IfFileExists{iec60052_10cm.dat}{%
+      \addplot+[IEC, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {iec60052_10cm.dat};}{}
+    \addplot+[IEC, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim_10cm.dat};
 
     \addplot[densely dashed, thick] table[x expr=\thisrowno{0}, y expr=\thisrowno{14}] {sim_200cm.dat};
     \addplot[densely dotted, thick] table[x expr=\thisrowno{0}, y expr=\thisrowno{27}] {sim_200cm.dat};

@@ -16,12 +16,24 @@ between two spheres is available in closed form (bispherical series,
 inception criterion in a *non-uniform* field over a wide range of
 :math:`pd` without any numerical field calculation.
 
-Reference data
---------------
+Reference data (not included)
+-----------------------------
 
-The tables are shipped as ``examples/iec60052/iec60052_<D>cm.dat``, one
-file per sphere diameter, with columns :math:`pd` (bar·mm; equal to the
-spacing in mm at 1 bar) and voltage (kV, peak).
+.. important::
+
+   The disruptive-discharge voltages of IEC 60052 are copyrighted by the
+   International Electrotechnical Commission and are **not distributed with
+   this repository**.  The figure below is therefore built from the computed
+   curves alone.
+
+If you hold a copy of the standard you can reproduce the full comparison
+locally.  Place one file per sphere diameter in ``examples/iec60052/``, named
+``iec60052_<D>cm.dat``, with columns :math:`pd` (bar·mm; equal to the spacing
+in mm at 1 bar) and voltage (kV, peak); ``#`` comment lines are ignored.
+Every reference overlay in ``docs/figures/iec60052.tex`` is guarded by
+``\IfFileExists``, so the next ``make -C docs figures`` picks up whichever
+diameters you supplied and silently omits the rest.  See
+``examples/iec60052/README.md``.
 
 Running the calculation
 -----------------------
@@ -72,11 +84,12 @@ configurations and polarities).
 Result
 ------
 
-The figure below is not shipped with the repository: it is generated
-during the documentation build from the reference tables and the output of
-``run.sh`` by the pgfplots source ``docs/figures/iec60052.tex`` (see
-:ref:`Chap:Infrastructure`), so it always reflects the current state of
-the solver.
+The figure below is not shipped with the repository: it is generated during
+the documentation build from the output of ``run.sh`` by the pgfplots source
+``docs/figures/iec60052.tex`` (see :ref:`Chap:Infrastructure`), so it always
+reflects the current state of the solver.  As published here it shows the
+computed curves only; supply the reference tables as described above to
+overlay the IEC values.
 
 .. _fig_iec60052:
 

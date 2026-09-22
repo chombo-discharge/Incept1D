@@ -2,8 +2,12 @@
 % Paschen curve of dry air: Dakin et al. (ELECTRA 32, Table C2) vs. Incept1D.
 %
 % Data files (in the working directory when this is compiled):
-%   tablec2_air.dat   reference compilation, columns: pd (bar mm), U (kV)
 %   sim.dat           incept1d pdiv output from examples/electra/run.sh
+%   tablec2_air.dat   OPTIONAL reference table (CIGRE, ELECTRA 32, Table C2),
+%                     copyrighted by CIGRE and not distributed with this
+%                     repository -- see examples/electra/README.md.  The
+%                     overlays are guarded by \IfFileExists, so the figure
+%                     builds without it and shows the computed curves alone.
 %
 % 0-based column indices (\thisrowno) into sim.dat; 1-based layout:
 %    1  pd_bar_mm
@@ -49,8 +53,10 @@
   \begin{axis}[panel, xmode=log, ymode=log, alias=voltages, anchor=south west, ymax=1200,
       title={a) Inception voltage}, ylabel={$U$ (\si{\kilo\volt})},
       boxedlegend, legend style={at={(0.98, 0.04)}, anchor=south east}]
-    \addplot+[electra, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim.dat};
-    \addplot+[electra, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {tablec2_air.dat};
+    \IfFileExists{tablec2_air.dat}{%
+      \IfFileExists{tablec2_air.dat}{%
+      \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {tablec2_air.dat};}{}}{}
+    \addplot+[electra, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim.dat};
     \addplot[thick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{14}] {sim.dat};
     \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{27}] {sim.dat};
     \addlegendentry{Full scheme};
@@ -63,8 +69,10 @@
       ymin=200, ymax=1200, minor y tick num=3,
       restrict x to domain=0:400, restrict y to domain=0:1200,
       ylabel={$U$ (\si{\kilo\volt})}]
-    \addplot+[electra, no marks, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim.dat};
-    \addplot+[electra, draw=none] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {tablec2_air.dat};
+    \IfFileExists{tablec2_air.dat}{%
+      \IfFileExists{tablec2_air.dat}{%
+      \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {tablec2_air.dat};}{}}{}
+    \addplot+[electra, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}] {sim.dat};
     \addplot[thick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{14}] {sim.dat};
     \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{27}] {sim.dat};
   \end{axis}
@@ -73,7 +81,8 @@
   \begin{axis}[panel, xmode=log, ymode=log, alias=fields, anchor=north west, at=(voltages.south west),
       yshift=-6em, ymin=80, ymax=1E4,
       title={b) Average reduced field $E/N$}, ylabel={$E/N$ (\si{\townsend})}]
-    \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}/(\thisrowno{0}*2.47E25*1E-21)*1E6] {tablec2_air.dat};
+    \IfFileExists{tablec2_air.dat}{%
+      \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}/(\thisrowno{0}*2.47E25*1E-21)*1E6] {tablec2_air.dat};}{}
     \addplot+[electra, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{3}] {sim.dat};
     \addplot[thick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{13}] {sim.dat};
     \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{26}] {sim.dat};
@@ -84,7 +93,8 @@
       ymin=90, ymax=125, minor y tick num=4,
       restrict x to domain=90:400, restrict y to domain=90:125,
       ylabel={$E/N$ (\si{\townsend})}]
-    \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}/(\thisrowno{0}*2.47E25*1E-21)*1E6] {tablec2_air.dat};
+    \IfFileExists{tablec2_air.dat}{%
+      \addplot+[electra, draw=none, forget plot] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}/(\thisrowno{0}*2.47E25*1E-21)*1E6] {tablec2_air.dat};}{}
     \addplot+[electra, no marks] table[x expr=\thisrowno{0}, y expr=\thisrowno{3}] {sim.dat};
     \addplot[semithick, densely dashed] table[x expr=\thisrowno{0}, y expr=\thisrowno{13}] {sim.dat};
     \addplot[thick, densely dotted] table[x expr=\thisrowno{0}, y expr=\thisrowno{26}] {sim.dat};
