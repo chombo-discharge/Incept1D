@@ -192,11 +192,20 @@ def find_all_breakdown_EN(
         if EN_ref <= EN_lo:
             return True
         per_decade = (n_scan - 1) / math.log10(EN_hi / EN_lo)
-        n_guard = max(2, int(math.ceil(per_decade * math.log10(EN_ref / EN_lo))) + 1)
+        n_guard = max(3, int(math.ceil(per_decade * math.log10(EN_ref / EN_lo))) + 1)
         grid = np.logspace(np.log10(EN_lo), np.log10(EN_ref), n_guard)
         vals = np.array([scan_fn(en, pd, mod, p, T) for en in grid])
         vals = np.where(np.isfinite(vals), vals, 0.0)  # NaN → 0, as in _scan_with
-        return not np.any(vals[:-1] * vals[1:] < 0.0)
+        # The last grid point IS the warm-start root, where det Q is zero to
+        # within the root-finder tolerance and its sign is therefore numerical
+        # noise.  Comparing it against its neighbour reports a sign change
+        # roughly half the time, and a spurious "there is a root below" sends
+        # every pd point through the full scan — silently undoing the warm
+        # start it was meant to protect.  Test only the intervals that lie
+        # strictly below the root; a genuine lower root produces a sign change
+        # there, at the same resolution as the scan this replaces.
+        below = vals[:-1]
+        return not np.any(below[:-1] * below[1:] < 0.0)
 
     # Warm-start: only attempted when first_only=True (single-branch mode).
     # With first_only=False (--all-branches) the coarse scan is mandatory

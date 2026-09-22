@@ -1,0 +1,200 @@
+name: CI
+
+# Every check lives in this one workflow so that the aggregate gate below can
+# depend on all of them: `needs:` cannot reach across workflow files.
+#
+# Branch protection on `main` requires the single context "CI-passed", which
+# goes green only when the unit tests, the RST/autodoc check, the full
+# documentation build and the REUSE licensing check have all succeeded.
+
+on:
+  push:
+    branches: main
+  pull_request:
+  workflow_dispatch:
+
+# Allow the deploy job to publish to GitHub Pages via OIDC (no branch, no stored credentials).
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.head_ref }}-ci
+  cancel-in-progress: true
+
+jobs:
+  # --- fast checks ---------------------------------------------------------
+
+  reuse:
+    name: REUSE compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check REUSE compliance
+        uses: fsfe/reuse-action@v5
+
+  tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e .[dev]
+
+      - name: Run the test suite
+        env:
+          MPLBACKEND: Agg
+        run: python3 -m pytest tests/ -v --durations=10
+
+  rst:
+    name: RST and autodoc
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # conf.py records the commit id
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e .[docs]
+
+      # The "dummy" builder runs the whole Sphinx pipeline -- RST parsing,
+      # cross-reference resolution, autodoc imports -- and writes nothing, so
+      # broken markup is caught in seconds instead of after the figure build.
+      - name: Check the documentation sources
+        env:
+          MPLBACKEND: Agg
+        run: make -C docs dummy
+
+  # --- full documentation build --------------------------------------------
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # conf.py records the commit id
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-pictures \
+            texlive-science \
+            latexmk \
+            poppler-utils
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e .[docs]
+
+      - name: Restore computed example data
+        uses: actions/cache@v4
+        with:
+          # The figures are computed from the solver, not committed.  Cache the
+          # expensive part -- the inception curves -- keyed on everything that
+          # can change them, so a docs-only change reuses them.
+          path: |
+            docs/build/figures/iec60052/sim_*.dat
+            docs/build/figures/electra/sim.dat
+          key: curves-${{ hashFiles('src/incept1d/**', 'mechanisms/**', 'examples/**/run.sh') }}
+
+      - name: Build documentation figures
+        working-directory: ${{ github.workspace }}/docs
+        env:
+          MPLBACKEND: Agg
+        run: make figures
+
+      - name: Build HTML documentation
+        working-directory: ${{ github.workspace }}/docs
+        env:
+          MPLBACKEND: Agg
+        run: make html
+
+      # NOTE: `make latexpdf` currently produces a PDF containing only the
+      # chapter headings -- the ``:hidden:`` toctrees in source/index.rst keep
+      # the referenced documents out of the LaTeX doctree.  Add a PDF step here
+      # once that is fixed.
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/build/html
+
+  # --- aggregate gate ------------------------------------------------------
+
+  CI-passed:
+    name: CI-passed
+    # `always()` so this job still runs when a dependency fails; without it the
+    # job would be *skipped*, and a skipped required check does not block a
+    # merge.  The step below turns any non-success into an explicit failure.
+    if: always()
+    needs: [reuse, tests, rst, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every check to have succeeded
+        run: |
+          echo 'Job results: ${{ toJSON(needs) }}'
+          if ${{ contains(needs.*.result, 'failure')
+                 || contains(needs.*.result, 'cancelled')
+                 || contains(needs.*.result, 'skipped') }}; then
+            echo "::error::One or more required checks did not succeed."
+            exit 1
+          fi
+          echo "All required checks succeeded."
+
+  # --- deployment ----------------------------------------------------------
+
+  deploy:
+    name: Deploy documentation
+    # Pull requests build the documentation but must not publish it, and
+    # nothing is published unless the whole of CI is green.
+    if: github.event_name != 'pull_request'
+    needs: CI-passed
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

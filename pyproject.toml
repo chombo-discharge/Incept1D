@@ -37,3 +37,16 @@ extend-exclude = '''
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# tests/ holds the toy mechanism and closed_form.py, which the test modules
+# import by name.
+pythonpath = ["tests"]
+markers = [
+  "slow: loads real swarm data or runs the full solver (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+  "error::DeprecationWarning",
+  # A stale apt mpl_toolkits shadows the pip matplotlib on some machines.
+  "ignore:Unable to import Axes3D:UserWarning",
+  # The solver evaluates det Q far outside the physical range on purpose.
+  "ignore::RuntimeWarning",
+]

@@ -639,22 +639,32 @@ def run(args, parser):
                         **{**plot_kw, "color": col, "label": b_label},
                     )
 
-                # Print summary table for this branch
+                # Print summary table for this branch.  For a tabulated field
+                # line the absolute scale of the input is arbitrary, so the
+                # useful quantity is how far the supplied excitation is from
+                # inception: U* / V_file.
+                _vfile = (
+                    _field_dist.fieldline_voltage
+                    if _field_dist.field_type == "fieldline"
+                    else None
+                )
+                _scale_hdr = f"  {'U*/U_file':>11}" if _vfile else ""
                 print(
                     f"\n  {'pd (bar·mm)':>14}  {'p (bar)':>10}  {'d (mm)':>8}  "
-                    f"{'E/N (Td)':>12}  {'U (kV)':>12}  {'E (V/m)':>14}  "
+                    f"{'E/N (Td)':>12}  {'U (kV)':>12}  {'E (V/m)':>14}{_scale_hdr}  "
                     f"[{pol_label} (branch {b_idx + 1})]"
                 )
-                print("  " + "-" * 90)
+                print("  " + "-" * (90 + (13 if _vfile else 0)))
                 step = max(1, len(br_pd) // 20)
                 for j in range(0, len(br_pd), step):
+                    _scale = f"  {br_V[j]/_vfile:>11.4f}" if _vfile else ""
                     print(
                         f"  {br_pd[j]*1e3:>14.4e}  "
                         f"{br_p[j]:>10.4g}  "
                         f"{br_d[j]*1e3:>8.4g}  "
                         f"{br_EN[j]:>12.4f}  "
                         f"{br_V[j]/1000:>12.4f}  "
-                        f"{br_V[j]/br_d[j]:>14.4e}"
+                        f"{br_V[j]/br_d[j]:>14.4e}{_scale}"
                     )
 
         # Map branch 0 onto the full pd grid for file output and ratio plot
@@ -837,8 +847,33 @@ def run(args, parser):
             write_metadata_header(fh, extra_paths=[args.mechanism])
             fh.write(f"# Mechanism:   {mech_name}\n")
             fh.write(f"# Temperature: {args.T} K\n")
-            p_str = ", ".join(f"{p} bar" for p in args.p)
+            # In fixed-d mode --p is empty and the pressure varies along the
+            # sweep, so report the range actually solved rather than the
+            # (unused) argument list.
+            if args.p:
+                p_str = ", ".join(f"{p} bar" for p in args.p)
+            else:
+                _p_all = (
+                    np.concatenate(
+                        [
+                            rec[1][np.isfinite(rec[1])]
+                            for rec in _file_records
+                            if len(rec[1])
+                        ]
+                    )
+                    if _file_records
+                    else np.array([])
+                )
+                p_str = (
+                    f"{_p_all.min():.4g} – {_p_all.max():.4g} bar "
+                    f"(varying; fixed-d sweep)"
+                    if _p_all.size
+                    else "n/a"
+                )
             fh.write(f"# Pressures:   {p_str}\n")
+            if args.d:
+                d_str = ", ".join(f"{d} mm" for d in args.d)
+                fh.write(f"# Distances:   {d_str}\n")
             cfg_labels = ", ".join(d.get("label", "Baseline") for d in raw_dicts)
             fh.write(f"# Configs:     {cfg_labels}\n")
             fh.write(f"# Field type:  {_field_dist.field_type}\n")
@@ -857,6 +892,12 @@ def run(args, parser):
             if _field_dist.field_type == "fieldline":
                 fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
                 fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
+                fh.write(
+                    f"# U_file:      {_field_dist.fieldline_voltage/1e3:.6g} kV "
+                    f"(= ∫|E| ds along the tabulated line; only the shape of "
+                    f"the profile enters the solve, so U*/U_file is the factor "
+                    f"the supplied excitation must be scaled by)\n"
+                )
                 fh.write(
                     "# Polarity:    start=positive → first tabulated point is "
                     "anode (+),  start=negative → cathode (−)\n"

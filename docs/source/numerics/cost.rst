@@ -88,13 +88,3 @@ result:
 * **Root residual.**  The ``[det Q check]`` messages printed during a run
   flag roots whose residual is large relative to the bracket
   (:ref:`Chap:Numerics:RootFinding`); a clean run prints none.
-
-Limits of the geometry model
-----------------------------
-
-A ``max d/R`` warning is printed when the gap exceeds four sphere radii.
-Beyond that the on-axis bispherical field is still exact, but the gap is
-so non-uniform that the single-field-line model itself (no transverse
-structure, photons along the axis only) becomes a poor description of the
-discharge; see :ref:`Chap:TheoryOverview`.  Sphere gaps in the examples
-stay well inside :math:`d/R < 1`.

@@ -27,6 +27,9 @@ env/
 # OS cruft
 .DS_Store
 
+# pytest
+.pytest_cache/
+
 # pre-commit
 .pre-commit-cache/
 

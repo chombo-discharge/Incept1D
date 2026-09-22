@@ -1,0 +1,226 @@
+# SPDX-FileCopyrightText: 2026 SINTEF Energy Research
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+The shipped dry-air mechanism.
+
+These tests load real swarm data and run the full solver, so they are marked
+``slow``.  The important one is :meth:`TestClosedFormLimit` -- it ties the
+mechanism people actually use to the analytic result, rather than to numbers
+recorded from a previous run.
+"""
+
+import functools
+
+import numpy as np
+import pytest
+
+from closed_form import standard_paschen_lhs
+from incept1d.fields import FieldDistribution
+from incept1d.growth import find_lambda_for_voltage
+from incept1d.inception import compute_inception_curve, find_all_breakdown_EN
+from incept1d.mechanism import load_mechanism
+from incept1d.solver import inception_det, midpoint_propagator
+
+pytestmark = pytest.mark.slow
+
+UNIFORM = FieldDistribution("uniform")
+
+
+@pytest.fixture(scope="module")
+def det():
+    return functools.partial(inception_det, field_dist=UNIFORM)
+
+
+@pytest.fixture(scope="module")
+def paschen_air(air_path):
+    """Air reduced to the textbook limit by mechanisms/air/paschen.json."""
+    import json
+    import os
+
+    cfg_path = os.path.join(os.path.dirname(air_path), "paschen.json")
+    with open(cfg_path) as fh:
+        cfg = json.load(fh)["configurations"][0]
+    cfg["_cfg_dir"] = os.path.dirname(cfg_path)
+    return load_mechanism(air_path, cfg)
+
+
+class TestMechanism:
+    def test_loads_and_exposes_the_interface(self, air):
+        """A1."""
+        assert air.SPECIES[air.ELECTRON_INDEX] == "e"
+        assert len(air.SPECIES) == 6
+        assert callable(air.alpha) and callable(air.eta)
+
+    def test_alpha_rises_and_eta_falls_with_field(self, air):
+        p, T = 1.0, 293.0
+        EN = np.array([50.0, 100.0, 200.0, 400.0])
+        a = np.array([air.alpha(e, p, T) for e in EN])
+        assert np.all(np.diff(a) > 0.0)
+
+    def test_alpha_eta_crossover_is_in_the_expected_range(self, air):
+        """For dry air the crossover sits near 100 Td."""
+        import scipy.optimize
+
+        p, T = 1.0, 293.0
+        f = lambda e: air.alpha(e, p, T) - air.eta(e, p, T)  # noqa: E731
+        root = scipy.optimize.brentq(f, 50.0, 200.0)
+        assert 90.0 < root < 130.0
+
+
+class TestClosedFormLimit:
+    """
+    A2: the strongest test in the suite.
+
+    ``paschen.json`` switches off detachment, ion conversion and photon
+    feedback, which is exactly the reduced model of eq_standard_paschen.  The
+    full mechanism -- real swarm data, real rate coefficients, the whole
+    boundary-value solve -- must then reproduce the textbook algebra.
+    """
+
+    @pytest.mark.parametrize("pd_mm", [1.0, 10.0, 100.0])
+    def test_reproduces_standard_paschen(self, paschen_air, det, pd_mm):
+        p, T = 1.0, 293.0
+        pd = pd_mm * 1e-3
+        d = pd / p
+        roots = find_all_breakdown_EN(pd, paschen_air, p, T, first_only=True,
+                                      det_fn=det)
+        assert roots, f"no inception found at pd = {pd_mm} bar·mm"
+        EN = roots[0]
+        a, e = paschen_air.alpha(EN, p, T), paschen_air.eta(EN, p, T)
+        gamma = float(paschen_air.get_gamma_plus(EN, p, T)[0])
+        assert standard_paschen_lhs(a, e, gamma, d) == pytest.approx(1.0, rel=2e-2)
+
+
+class TestInceptionCurve:
+    def test_paschen_minimum(self, air, det):
+        """
+        A4: end-to-end regression for the warm-start lock-in.
+
+        Before the fix the curve bottomed out at 468 V because branch 1 had
+        locked onto a spurious high-field root at the smallest pd.
+        """
+        p, T = 1.0, 293.0
+        pd_arr = np.logspace(np.log10(3e-6), np.log10(1e-1), 40)
+        branches = compute_inception_curve(pd_arr, air, p, T, det_fn=det)
+        br = branches[0]
+        i = int(np.argmin(br["V"]))
+        assert br["V"][i] == pytest.approx(378.0, rel=0.05)
+        assert br["pd"][i] * 1e3 == pytest.approx(9.5e-3, rel=0.3)
+
+    def test_branch_one_is_the_lowest_root(self, air, det):
+        """
+        A5: an invariant, not a pinned number.
+
+        A pinned curve would have happily passed the lock-in bug, because the
+        wrong curve was self-consistent.  This checks the contract instead.
+        """
+        p, T = 1.0, 293.0
+        for pd_mm in (8e-3, 3e-2, 1.0, 50.0):
+            pd = pd_mm * 1e-3
+            first = find_all_breakdown_EN(pd, air, p, T, first_only=True, det_fn=det)
+            every = find_all_breakdown_EN(pd, air, p, T, first_only=False, det_fn=det)
+            if not every:
+                continue
+            assert first[0] == pytest.approx(min(every), rel=1e-6)
+
+    @pytest.mark.parametrize(
+        "pd_mm, EN_expected",
+        [
+            (1.0, 175.9713),
+            (10.0, 116.4574),
+            (100.0, 100.5216),
+        ],
+    )
+    def test_reference_values(self, air, det, pd_mm, EN_expected):
+        """A3: drift detector for the uniform-field curve at 1 bar."""
+        p, T = 1.0, 293.0
+        roots = find_all_breakdown_EN(pd_mm * 1e-3, air, p, T, first_only=True,
+                                      det_fn=det)
+        assert roots[0] == pytest.approx(EN_expected, rel=1e-5)
+
+    def test_sphere_plane_polarities_differ(self, air):
+        """Asymmetric geometry must give two different answers."""
+        p, T, pd = 1.0, 293.0, 20e-3
+        fd = FieldDistribution("sphere-plane", 50e-3)
+        assert not fd.is_symmetric
+        kw = dict(field_dist=fd)
+        pos = find_all_breakdown_EN(
+            pd, air, p, T, first_only=True,
+            det_fn=functools.partial(inception_det, positive_polarity=True, **kw),
+        )[0]
+        neg = find_all_breakdown_EN(
+            pd, air, p, T, first_only=True,
+            det_fn=functools.partial(inception_det, positive_polarity=False, **kw),
+        )[0]
+        assert pos != neg
+        assert abs(pos - neg) / pos < 0.2
+
+
+class TestGrowthRate:
+    """The physics of growth.py, which the toy cannot drive (see test_growth)."""
+
+    @staticmethod
+    @pytest.fixture(scope="class")
+    def star(air, det):
+        p, T, pd = 1.0, 293.0, 10e-3
+        EN = find_all_breakdown_EN(pd, air, p, T, first_only=True, det_fn=det)[0]
+        return air, pd, p, T, EN
+
+    def test_determinant_sign_convention(self, star):
+        """The assumption find_lambda_for_voltage relies on, for real air."""
+        air, pd, p, T, EN = star
+        below = inception_det(EN * 0.9, pd, air, p, T, UNIFORM)
+        assert np.isfinite(below) and below > 0.0
+
+    def test_small_overvoltage_gives_a_small_growth_rate(self, star):
+        """Just above threshold the solve still behaves."""
+        air, pd, p, T, EN = star
+        lam, status = find_lambda_for_voltage(
+            EN * 1.1, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
+        )
+        assert status in ("ok", "suspect")
+        assert np.isfinite(lam) and lam > 0.0
+
+    def test_reported_lambda_is_not_a_root_of_det_Q(self, star):
+        """
+        Documents a live defect in :mod:`incept1d.growth`.
+
+        Above roughly 1.25 V* the determinant is NaN across the whole bracket
+        [0, lambda_hi] -- Q is too ill-conditioned to evaluate -- and becomes
+        finite only above it.  ``_f_brentq`` maps NaN to a negative sentinel,
+        so brentq converges on the *edge of the NaN region* rather than on a
+        zero of det Q.  The result is a growth rate that is identical for
+        every overvoltage, because that edge is set by conditioning and not by
+        the physics.
+
+        This is the same failure mode that ``_accept_root`` guards against in
+        :mod:`incept1d.inception`; ``growth`` has no equivalent check.  The
+        assertion below pins the *symptom* so the defect cannot be forgotten;
+        delete this test when the solver reports a genuine root.
+        """
+        air, pd, p, T, EN = star
+        lam, _ = find_lambda_for_voltage(
+            EN * 2.0, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
+        )
+        assert np.isfinite(lam) and lam > 0.0
+        # A genuine root would make |det Q| small here.  It is NaN instead.
+        assert np.isnan(inception_det(EN * 2.0, pd, air, p, T, UNIFORM, lam=lam))
+
+    @pytest.mark.xfail(
+        reason="growth.py converges on the NaN-region boundary above ~1.25 V*, "
+        "so lambda is independent of overvoltage; see "
+        "test_reported_lambda_is_not_a_root_of_det_Q",
+        strict=True,
+    )
+    def test_growth_rate_increases_with_overvoltage(self, star):
+        """G2: the physical requirement, currently not met."""
+        air, pd, p, T, EN = star
+        lams = []
+        for over in (1.25, 1.6, 2.0):
+            lam, _ = find_lambda_for_voltage(
+                EN * over, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
+            )
+            lams.append(lam)
+        assert all(a < b for a, b in zip(lams, lams[1:]))

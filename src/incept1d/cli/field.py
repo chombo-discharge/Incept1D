@@ -59,6 +59,15 @@ def run(args, parser):
         geom_str += f"  (d/R = {d/fd.sphere_R:.3f})"
 
     print(f"Geometry:  {geom_str}")
+    if fd.field_type == "fieldline":
+        print(
+            f"U_file   = {fd.fieldline_voltage/1e3:.6g} kV"
+            f"   (= ∫|E| ds in the field units of the file)"
+        )
+        print(
+            "           only the shape of f(ξ) enters the solve, so this is a "
+            "units check, not an input"
+        )
     print(f"f(0) = {f(0.0):.6f}")
     print(f"f(1) = {f(1.0):.6f}")
     print(f"N = {N}  (cell width = {d_mm / N:.3f} mm)")

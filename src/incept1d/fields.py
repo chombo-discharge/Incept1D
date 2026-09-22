@@ -219,6 +219,13 @@ class FieldDistribution:
         normalised field ``f(ξ) = |E|/⟨|E|⟩`` with ∫₀¹ f dξ = 1 (trapezoidal).
     fieldline_length : float or None
         For 'fieldline': total arc length L of the tabulated line in metres.
+    fieldline_voltage : float or None
+        For 'fieldline': the voltage drop ``∫|E| ds`` along the tabulated line,
+        in volts — that is, the excitation the supplied field was computed at.
+        Only the *shape* of the profile enters the solve, so this value does
+        not affect the result; it is kept so the solver can report the factor
+        by which the supplied excitation must be scaled to reach inception,
+        and so that a units mistake in the input file is obvious.
     fieldline_path : str or None
         For 'fieldline': source file (for labels / output headers).
     """
@@ -228,6 +235,7 @@ class FieldDistribution:
     fieldline_xi: Optional[np.ndarray] = None
     fieldline_f: Optional[np.ndarray] = None
     fieldline_length: Optional[float] = None
+    fieldline_voltage: Optional[float] = None
     fieldline_path: Optional[str] = None
 
     @classmethod
@@ -241,6 +249,13 @@ class FieldDistribution:
         Hence E_ref = V/L is the uniform-equivalent field along the line, and
         ``V = ∫|E| ds`` is the voltage drop along the field line.
 
+        The absolute scale of the tabulated field is therefore irrelevant: a
+        line exported at 100 kV and the same line exported at 200 kV give
+        identical profiles and identical inception results.  The excitation the
+        file was computed at is nevertheless recorded as
+        :attr:`fieldline_voltage`, so the solver can report how far the
+        supplied case is from inception.
+
         See :func:`load_fieldline` for the accepted file layouts.
         """
         s, E = load_fieldline(path, length_unit)
@@ -253,6 +268,8 @@ class FieldDistribution:
             fieldline_xi=xi,
             fieldline_f=E / mean_E,
             fieldline_length=L,
+            # ∫|E| ds = L ∫|E| dξ = L ⟨|E|⟩, in the field units of the file.
+            fieldline_voltage=mean_E * L,
             fieldline_path=path,
         )
 
