@@ -9,7 +9,7 @@ Welcome to the ``Incept1D`` user documentation
    one-dimensional drift-reaction model of a gas discharge gap, including
    negative-ion transport and detachment, ion conversion, two-stream
    photoionization, and cathode secondary emission.  The code is hosted at
-   `GitHub <https://github.com/rmrsk/Incept1D>`_ together with the source
+   `GitHub <https://github.com/chombo-discharge/Incept1D>`_ together with the source
    files for this documentation.
 
 ``Incept1D`` is a small collection of Python scripts, not a library.  Given a

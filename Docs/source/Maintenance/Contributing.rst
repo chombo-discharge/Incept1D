@@ -15,7 +15,7 @@ Setting up
 
 .. code-block:: bash
 
-   git clone git@github.com:rmrsk/Incept1D.git
+   git clone git@github.com:chombo-discharge/Incept1D.git
    cd Incept1D
    python3 -m venv .venv && source .venv/bin/activate
    pip install numpy scipy matplotlib pre-commit pytest -r Docs/requirements.txt
