@@ -702,7 +702,10 @@ def inception_det(
     T : float
         Gas temperature in Kelvin.
     field_dist : FieldDistribution
-        Field geometry specification (uniform / sphere-plane / sphere-sphere).
+        Field geometry specification (uniform / sphere-plane / sphere-sphere /
+        fieldline).  For 'fieldline' the profile is a tabulated ``|E|`` along a
+        (possibly curved) field line parametrised by arc length; xi = 0 is the
+        first tabulated point.
     N_min : int
         Minimum (initial) number of integration segments.  Default 5.
     N_max : int
@@ -714,8 +717,8 @@ def inception_det(
     lam : float
         Temporal growth rate λ (s⁻¹, default 0.0).
     positive_polarity : bool
-        True → high-field electrode is anode (+).
-        False → high-field electrode is cathode (−).
+        True → xi = 0 electrode (sphere / field-line start) is anode (+).
+        False → xi = 0 electrode is cathode (−).
         Ignored for uniform and sphere-sphere (symmetric) geometries.
     propagator : callable
         Propagator algorithm.  Signature: propagator(A_func, x_lo, x_hi) → ndarray.
@@ -799,7 +802,7 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
 
     1. NaN-sentinel artefact: f_brentq mapped NaN → -1e-300 at a bracket
        endpoint, creating an artificial sign change.  det_fn(root) = NaN and
-       at least one bracket fa/fb equals the sentinel (|value| ≤ 1e-290).
+       at least one bracket fa/fb equals the sentinel (``|value| <= 1e-290``).
        → Discard and print a warning.
 
     2. Genuine singularity: both bracket endpoints are finite with opposite
@@ -807,7 +810,7 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
        singular so cond(Q) → ∞ and det_fn returns NaN.
        → Accept silently (NaN here is the expected consequence of Q → 0).
 
-    3. Large finite residual: det_fn(root) is finite but |det Q| is large
+    3. Large finite residual: det_fn(root) is finite but ``|det Q|`` is large
        relative to the bracket scale.
        → Accept but print a warning.
 
@@ -1398,10 +1401,24 @@ def main():
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
-    if not args.p and not args.d:
-        args.p = [1.0]
-
     _field_dist = parse_field_spec(args.field, parser)
+
+    if not args.p and not args.d:
+        if _field_dist.field_type == "fieldline":
+            # A tabulated field line has an intrinsic length: sweep p at d = L.
+            args.d = [float(f"{_field_dist.fieldline_length * 1e3:.6g}")]
+            print(
+                f"--field fieldline: no --p/--d given, using d = L = "
+                f"{args.d[0]:.4g} mm (arc length of the tabulated line)."
+            )
+        else:
+            args.p = [1.0]
+    elif _field_dist.field_type == "fieldline" and args.p:
+        print(
+            "Note: --field fieldline with fixed --p sweeps the gap length d; "
+            "d ≠ L corresponds to the same electrode arrangement scaled "
+            "geometrically by d/L (f(xi) unchanged)."
+        )
     _N_min, _N_max, _dx_tol = parse_dx_spec(args.dx, parser)
 
     _propagator = (
@@ -1516,6 +1533,8 @@ def main():
     def _polarity_desc(polarity):
         if _field_dist.field_type == "uniform":
             return polarity  # "positive" / "negative"
+        if _field_dist.field_type == "fieldline":
+            return f"start={polarity}"  # xi = 0 (first data row) is anode/cathode
         return f"sphere={polarity}"  # "sphere=positive" / "sphere=negative"
 
     def _branch0_grids(branches):
@@ -1622,7 +1641,7 @@ def main():
             med_det_pos = med_det_neg = None
         else:
             _fast_fd = FieldDistribution("uniform")
-            _med_fd = FieldDistribution(_field_dist.field_type, _field_dist.sphere_R)
+            _med_fd = _field_dist  # same geometry; only the step count differs
             _N_med = min(
                 5, _N_min
             )  # cheap constant scan; N_med = N_med disables adaptation
@@ -2028,12 +2047,19 @@ def main():
             fh.write(
                 f"# Stepping:    N_min={_N_min}, N_max={_N_max}, tol={_dx_tol:.3g}\n"
             )
-            if _field_dist.field_type != "uniform":
+            if _field_dist.sphere_R is not None:
                 fh.write(f"# Sphere R:    {_field_dist.sphere_R*1e3:.4g} mm\n")
             if _field_dist.field_type == "sphere-plane":
                 fh.write(
                     f"# Polarity:    sphere=positive → sphere is anode (+),  "
                     f"sphere=negative → sphere is cathode (−)\n"
+                )
+            if _field_dist.field_type == "fieldline":
+                fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
+                fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
+                fh.write(
+                    "# Polarity:    start=positive → first tabulated point is "
+                    "anode (+),  start=negative → cathode (−)\n"
                 )
             if _streamer_records:
                 fh.write(f"# Streamer C:  {args.streamer_criterion}\n")

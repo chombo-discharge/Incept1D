@@ -26,8 +26,9 @@ Usage
         --pressure-column COL      column name or 0-based index for pressure
         --voltage-column COL       column name or 0-based index for voltage
         --T T                      temperature in K (default 293.0)
-        --field SPEC               'uniform' | 'sphere-plane R_mm [tol [steps]]'
-                                   | 'sphere-sphere R_mm [tol [steps]]'
+        --field SPEC               'uniform' | 'sphere-plane R_mm' | 'sphere-sphere R_mm'
+                                   | 'fieldline FILE [UNIT]'
+        --N N                      midpoint quadrature steps across the gap (default 200)
         --no-plot                  suppress the matplotlib window
         --write-to-file FILE       write tab-separated results to FILE
 """
@@ -46,7 +47,6 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from Inception import _kB, load_mechanism, _read_json_configs
 from FieldDistributions import FieldDistribution, add_field_argument, parse_field_spec
-
 
 # ------------------------------------------------------------------
 # Core integrators
@@ -84,6 +84,15 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
         def _net(xi):
             en = EN_ref * f(xi)
             return mod.alpha(en, p_val, T) - mod.eta(en, p_val, T)
+
+        if not field_dist.is_monotone_decreasing:
+            # General profile (sphere-sphere, tabulated field line): the active
+            # region need not start at xi = 0 nor be a single interval, so use
+            # plain midpoint quadrature of max(α−η, 0) over the whole gap.
+            xis = (np.arange(N) + 0.5) / N
+            diff = np.array([_net(xi) for xi in xis])
+            result = float(np.sum(np.maximum(0.0, diff)) * d_val / N)
+            return result if np.isfinite(result) else float("nan")
 
         # If there is no net ionisation even at the sphere surface, return 0 immediately.
         if _net(0.0) <= 0.0:
@@ -145,6 +154,13 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
 
         def _lmax(xi):
             return _max_real_eigenvalue(mod, EN_ref * f(xi), p_val, T)
+
+        if not field_dist.is_monotone_decreasing:
+            # General profile: see aed_integral.
+            xis = (np.arange(N) + 0.5) / N
+            eigs = np.array([_lmax(xi) for xi in xis])
+            result = float(np.sum(np.maximum(0.0, eigs)) * d_val / N)
+            return result if np.isfinite(result) else float("nan")
 
         if _lmax(0.0) <= 0.0:
             return 0.0
@@ -344,6 +360,16 @@ def main():
         metavar="FILE",
         help="Write tab-separated results to FILE.",
     )
+    parser.add_argument(
+        "--N",
+        type=int,
+        default=200,
+        metavar="N",
+        help=(
+            "Number of midpoint-rule quadrature steps across the gap for "
+            "non-uniform fields (default: 200)."
+        ),
+    )
     args = parser.parse_args()
 
     # ---- Validation -----------------------------------------------------
@@ -361,7 +387,8 @@ def main():
             parser.error("--voltage-hi must be greater than --voltage-lo.")
 
     # ---- Field specification --------------------------------------------
-    _field_dist, _N = parse_field_spec(args.field, parser)
+    _field_dist = parse_field_spec(args.field, parser)
+    _N = args.N
     _field_str = _field_dist.label
 
     # ---- Load configurations --------------------------------------------
@@ -812,8 +839,13 @@ def _write_results(
             f"# Configs:     {', '.join(d.get('label', 'Baseline') for d in raw_dicts)}\n"
         )
         fh.write(f"# Field type:  {field_dist.field_type}\n")
-        if field_dist.field_type != "uniform":
+        if field_dist.sphere_R is not None:
             fh.write(f"# Sphere R:    {field_dist.sphere_R*1e3:.4g} mm,  N = {N}\n")
+        if field_dist.field_type == "fieldline":
+            fh.write(
+                f"# Field line:  {field_dist.fieldline_path},  "
+                f"L = {field_dist.fieldline_length*1e3:.6g} mm,  N = {N}\n"
+            )
         fh.write("#\n")
         for i, h in enumerate(col_headers, start=1):
             fh.write(f"# Column {i}: {h}\n")
