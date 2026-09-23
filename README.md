@@ -5,6 +5,7 @@
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSES/)
 [![REUSE compliant](https://img.shields.io/badge/REUSE-compliant-brightgreen)](https://reuse.software)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21916821.svg)](https://doi.org/10.5281/zenodo.21916821)
 
 **At what voltage does this gap break down?**
 
