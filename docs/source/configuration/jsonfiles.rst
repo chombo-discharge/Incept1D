@@ -1,101 +1,101 @@
 .. _Chap:Configuration:
 
-Configuration files
-===================
+JSON configuration files
+========================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
 Every solver command accepts JSON configuration files after the mechanism
-path.  A configuration changes the *parameters* of a mechanism — cross
-sections, rate multipliers, photoionization and SEE settings — without
-editing the Python file, and several configurations can be run and plotted
-side by side in one invocation.  This is how sensitivity studies are set
-up.
+path.  A configuration changes the *parameters* of a mechanism — which data
+it reads, how strongly a reaction contributes, what the electrode surface
+does — without editing the Python file, and several configurations can be
+run and plotted side by side in one invocation.  This is how a sensitivity
+study is set up: one file, one curve per entry.
 
 File format
 -----------
 
 A file contains either a single configuration object, a bare list of
-objects, or (the usual form) a list under a ``"configurations"`` key:
+objects, or, the usual form, a list under a ``"configurations"`` key:
 
 .. code-block:: json
 
    {
      "configurations": [
        {
-         "label": "Baseline",
-         "cross_sections": "lisbon.txt"
+         "label": "Baseline"
        },
        {
          "label": "No detachment",
-         "cross_sections": "lisbon.txt",
          "reaction_multipliers": {
-           "O2- + O2 -> e + O2 + O2": 0.0,
-           "O- + N2 -> e + N2O":      0.0
+           "A- + M -> e + A + M": 0.0
          }
        }
      ]
    }
 
-Configurations are independent — later entries do **not** inherit from
-earlier ones — so repeat every key you need in each entry.  Keys beginning
-with ``_`` (e.g. ``"_comment"``) are ignored.  Relative paths in
-``cross_sections`` are resolved first against the directory of the JSON
-file, then against the mechanism's directory.
+Configurations are independent — a later entry does **not** inherit from an
+earlier one — so every key a configuration needs must appear in it.  Keys
+beginning with ``_``, such as ``"_comment"``, are ignored, which is the
+only way to write a comment in JSON.
 
-Keys for the ``Air`` mechanism family
--------------------------------------
+Several files may be given at once, and every configuration in every file
+is run.  That makes a file a reusable set rather than a whole study: one
+file holding the cross-section variants and another holding the surface
+variants can be combined on the command line without editing either.
+
+What the keys mean
+------------------
+
+A configuration file is not validated against a fixed schema.  It is handed
+to the mechanism directory's ``config.py``, which decides what each key
+means (:ref:`Chap:ConfigPy`), and unknown keys are ignored so that one file
+can be shared between mechanisms understanding different subsets of it.
+
+One key is universal:
+
+``label``
+   The string shown in legends, terminal tables and output-file headers.
+   There is one curve per configuration, so it should be short and
+   distinguishing.
+
+The rest are the mechanism's own.  A set of conventional names has
+nevertheless established itself, because these map directly onto the
+parameters :class:`~incept1d.mechanism.Mechanism` applies:
 
 .. list-table::
    :header-rows: 1
-   :widths: 24 12 64
+   :widths: 26 74
 
    * - Key
-     - Default
-     - Meaning
-   * - ``label``
-     - ``"Baseline"``
-     - Name used in legends, terminal tables and output-file headers.
-   * - ``cross_sections``
-     - ``lisbon.txt``
-     - BOLSIG+ output file for electron transport and rates
-       :math:`k_1, k_2, k_3` (:ref:`Chap:AirScheme`).  Shipped:
-       ``lisbon.txt``, ``phelps.txt``, ``biagi.txt``, ``trinity.txt``,
-       ``morgan.txt``.
+     - Conventional meaning
    * - ``reaction_multipliers``
-     - ``{}``
      - Dictionary ``{reaction string: factor}``.  ``0.0`` disables a
        reaction, ``2.0`` doubles it.  See :ref:`Chap:ModifyingReactions`.
-   * - ``ngroups``
-     - ``3``
-     - Number of two-stream photon groups in the Zheleznyak fit
-       (:ref:`Chap:Photoionization`).
-   * - ``cone_angle``
-     - ``45.0``
-     - Half-opening angle :math:`\theta_\mathrm{cone}` in degrees;
-       :math:`\Delta\Omega/4\pi = (1 - \cos\theta)/2`.  ``0`` disables
-       photon feedback.
-   * - ``xi_photo``
-     - ``1.0``
-     - Scale factor on the photoionization coupling :math:`\bm{B}`.
-   * - ``xi_emit``
-     - ``1.0``
-     - Scale factor on the photoemission yields :math:`\vec{\gamma}_\Psi`.
+   * - ``xi_photo``, ``xi_emit``
+     - Scale factors on the photoionization coupling and the photoemission
+       yields (:ref:`Chap:Photoionization`,
+       :ref:`Chap:SecondaryEmission`).
    * - ``gamma0``, ``gamma1``, ``eref``, ``beta``
-     - ``1e-3``, ``0``, ``1.7e9``, ``1``
-     - Ion-induced SEE yield
-       :math:`\gamma = \gamma_0 + \gamma_1\exp(-E_\mathrm{ref}/\beta E)`
-       (:ref:`Chap:SecondaryEmission`).  :math:`E_\mathrm{ref}` in V/m.
+     - Parameters of the ion-induced secondary-emission yield.
    * - ``positive``, ``negative``
-     - —
-     - Nested objects with any of ``xi_photo``, ``xi_emit``, ``gamma0``,
-       ``gamma1``, ``eref``, ``beta`` that override the top-level values for
-       one polarity only (the *cathode* differs between polarities in a
-       non-symmetric gap).
+     - Nested objects overriding any of the above for one polarity only.
 
-Example with polarity-specific cathode yields:
+A new mechanism should use these names for these meanings rather than
+inventing its own, so that a reader who knows one mechanism can read the
+configurations of another.  Anything genuinely specific to a mechanism —
+which data file to read, which gas to select — is named by that mechanism
+and documented with it.
+
+Per-polarity overrides
+----------------------
+
+In a gap that is not symmetric, the cathode is a different electrode in the
+two polarities, so the surface parameters need not be the same.  A nested
+``positive`` or ``negative`` object overrides the top-level values for that
+polarity alone:
 
 .. code-block:: json
 
@@ -105,38 +105,18 @@ Example with polarity-specific cathode yields:
      "negative": { "gamma0": 2e-3 }
    }
 
-Shipped configuration sets
---------------------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 26 74
-
-   * - File
-     - Contents
-   * - ``mechanisms/air/baseline.json``
-     - The reference configuration, all multipliers 1.
-   * - ``mechanisms/air/nodetachment.json``
-     - Baseline plus a variant with reactions 5 and 6 (collisional and
-       associative detachment) switched off — the "no detachment" curve.
-   * - ``mechanisms/air/databases.json``
-     - Phelps, Trinity, Biagi and Lisbon cross-section sets, plus the
-       no-detachment variant.
-   * - ``mechanisms/air/ionsensitivity.json``
-     - Baseline; no :math:`\mathrm{O}^- \to \mathrm{O}_2^-` conversion; no
-       :math:`\mathrm{O}^- \to \mathrm{O}_3^-` conversion; no detachment.
-   * - ``mechanisms/air/see.json``
-     - :math:`\gamma_0 \in \{10^{-4}, 10^{-3}, 10^{-2}\}` and
-       :math:`\theta_\mathrm{cone} \in \{0^\circ, 45^\circ, 90^\circ\}`.
-   * - ``mechanisms/air/paschen.json``
-     - The textbook limit: no detachment, no ion conversion, no photon
-       feedback.  Reproduces :eq:`eq_standard_paschen`.
-   * - ``mechanisms/air/example_config.json``
-     - Annotated example for the two-body mechanism ``air_2body.py``.
+This works because :meth:`~incept1d.mechanism.Mechanism.resolve` is called
+once per polarity, after the module has been executed.  A parameter read
+while the module executes — a data file name, say — is fixed for the whole
+run and therefore cannot be overridden this way;
+:ref:`Chap:ConfigPy` explains which parameters fall on which side of that
+line.
 
 How configurations are applied
 ------------------------------
 
 A configuration file is inert on its own: the mechanism directory's
-``config.py`` is what turns it into overrides.  That interface is described in
-:ref:`Chap:ConfigPy`.
+``config.py`` is what turns it into overrides.  That interface is described
+in :ref:`Chap:ConfigPy`, and the two worked examples,
+:ref:`Chap:PaschenMechanism` and :ref:`Chap:AirScheme`, show the keys each
+of those mechanisms actually defines.

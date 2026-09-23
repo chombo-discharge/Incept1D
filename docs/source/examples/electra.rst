@@ -21,8 +21,9 @@ Reference data (not included)
 .. important::
 
    The ELECTRA breakdown voltages are copyrighted by CIGRE and are **not
-   distributed with this repository**.  The figure below is therefore built
-   from the computed curve alone.
+   distributed with this repository**.  The comparison figure is therefore
+   not part of the documentation build; the calculation itself runs without
+   it.
 
 If you have access to the article you can reproduce the full comparison
 locally.  Place ``tablec2_air.dat`` in ``examples/electra/``, with columns
@@ -60,10 +61,6 @@ m\ :sup:`-3` bar\ :sup:`-1` at 20 °C.
 Result
 ------
 
-As for the sphere-gap example, the figure is built during the documentation
-build from the output of ``run.sh`` and the pgfplots source
-``docs/figures/electra.tex``.
-
 As for the sphere gaps, the figure is **not built with the documentation**:
 without ``tablec2_air.dat`` there is nothing to compare against.  Supply the
 file as described above and build it explicitly:
@@ -94,11 +91,13 @@ effective critical field below :math:`\alpha = \eta`.
 Variations to try
 -----------------
 
-* ``--all-branches --plot-separate-branches`` reveals additional roots of
-  the determinant at low :math:`pd`; the lowest branch is the physical
-  inception voltage.
-* ``mechanisms/air/paschen.json`` reduces the chemistry to the textbook limit
-  (:eq:`eq_standard_paschen`); the difference to the baseline isolates
-  the combined effect of ion conversion, detachment and photon feedback.
-* ``mechanisms/air/see.json`` shows the sensitivity to the cathode yield and to the
-  photon cone angle, which matters most near the Paschen minimum.
+* **The other roots.**  ``--all-branches --plot-separate-branches`` reveals
+  further roots of the determinant at low :math:`pd`; the lowest branch is
+  the physical inception voltage.
+* **The textbook limit.**  ``mechanisms/air/paschen.json`` reduces the
+  chemistry to :eq:`eq_standard_paschen`, so the difference from the
+  baseline isolates the combined effect of ion conversion, detachment and
+  photon feedback.
+* **The least certain inputs.**  ``mechanisms/air/see.json`` sweeps the
+  cathode yield and the photon cone angle, which matter most near the
+  Paschen minimum.

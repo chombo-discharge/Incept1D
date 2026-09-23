@@ -23,8 +23,8 @@ Reference data (not included)
 
    The disruptive-discharge voltages of IEC 60052 are copyrighted by the
    International Electrotechnical Commission and are **not distributed with
-   this repository**.  The figure below is therefore built from the computed
-   curves alone.
+   this repository**.  The comparison figure is therefore not part of the
+   documentation build; the calculation itself runs without it.
 
 If you hold a copy of the standard you can reproduce the full comparison
 locally.  Place one file per sphere diameter in ``examples/iec60052/``, named
@@ -84,17 +84,13 @@ configurations and polarities).
 Result
 ------
 
-The figure below is not shipped with the repository: it is generated during
-the documentation build from the output of ``run.sh`` by the pgfplots source
-``docs/figures/iec60052.tex`` (see :ref:`Chap:Infrastructure`), so it always
-reflects the current state of the solver.
-
-The comparison figure is **not built with the documentation.**  Without the
+The comparison figure is **not built with the documentation**.  Without the
 IEC tables it would show the computed curves with nothing to compare them
 against, and the eight sphere diameters are by far the most expensive
-calculation in the repository — about three quarters of the total figure cost.
-The pgfplots source ``docs/figures/iec60052.tex`` is still maintained, so once
-you have placed the reference tables as described above you can build it:
+calculation in the repository — about three quarters of the total figure
+cost.  The pgfplots source ``docs/figures/iec60052.tex`` is maintained all
+the same (see :ref:`Chap:Infrastructure`), so once the reference tables are
+in place it can be built on its own:
 
 .. code-block:: bash
 
@@ -119,10 +115,12 @@ voltage.
 Variations to try
 -----------------
 
-* ``mechanisms/air/databases.json`` instead of ``mechanisms/air/nodetachment.json`` shows the
-  spread from the choice of electron cross sections.
-* ``--method magnus2 --dx 40 40`` replaces the adaptive midpoint grid by
-  a fixed fourth-order grid; compare run time and the resulting curve.
-* ``--field sphere-plane 500`` (one sphere against a plane) is *not*
-  symmetric; the output then contains both polarities and the polarity
-  effect at large :math:`pd` becomes visible.
+* **Cross-section spread.**  Swap ``mechanisms/air/nodetachment.json`` for
+  ``mechanisms/air/databases.json`` to see how much of the answer comes from
+  the choice of electron cross sections.
+* **A different propagator.**  ``--method magnus2 --dx 40 40`` replaces the
+  adaptive midpoint grid with a fixed fourth-order one; compare both the run
+  time and the resulting curve.
+* **An asymmetric gap.**  ``--field sphere-plane 500`` puts one sphere
+  against a plane, which is *not* symmetric, so the output carries both
+  polarities and the polarity effect at large :math:`pd` becomes visible.

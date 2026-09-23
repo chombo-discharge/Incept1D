@@ -14,7 +14,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-OUT=${OUT:-examples/Electra}
+OUT=${OUT:-examples/electra}
 PD_NUM=${PD_NUM:-100}
 mkdir -p "$OUT"
 

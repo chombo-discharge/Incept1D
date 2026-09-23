@@ -16,7 +16,8 @@ from pathlib import Path
 
 import pytest
 
-DOCS = Path(__file__).resolve().parent.parent / "docs"
+ROOT = Path(__file__).resolve().parent.parent
+DOCS = ROOT / "docs"
 SOURCE = DOCS / "source"
 
 #: Every figure lands here; see ``docs/figures/Makefile``.
@@ -75,3 +76,28 @@ def test_image_is_a_figure_the_makefile_builds(rst, target):
         f"{rst.relative_to(SOURCE)} references figure '{stem}', which "
         f"docs/figures/Makefile does not build"
     )
+
+
+EXAMPLES = ROOT / "examples"
+
+_OUT_RE = re.compile(r"^OUT=\$\{OUT:-(.*)\}\s*$", re.M)
+
+
+@pytest.mark.parametrize(
+    "run_sh", sorted(EXAMPLES.glob("*/run.sh")), ids=lambda p: p.parent.name
+)
+def test_example_writes_into_its_own_directory(run_sh):
+    """D3: an example's default output directory is the example's own.
+
+    The docs tell the reader to run ``bash examples/<name>/run.sh`` and then
+    look in ``examples/<name>/``.  The figure Makefile always passes ``OUT``,
+    so a wrong default is invisible to every automated build and shows up
+    only for someone following the documentation.
+    """
+    m = _OUT_RE.search(run_sh.read_text())
+    assert m, f"{run_sh.relative_to(ROOT)} has no 'OUT=${{OUT:-...}}' default"
+    default = m.group(1)
+    expected = f"examples/{run_sh.parent.name}"
+    assert (
+        default == expected
+    ), f"{run_sh.relative_to(ROOT)} defaults to '{default}', not '{expected}'"

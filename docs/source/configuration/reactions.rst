@@ -101,7 +101,7 @@ In rough order of how quickly they fail, for a mechanism at ``MECH``:
   obvious.
 * ``incept1d eigenvalues MECH`` — Shows whether the leading eigenvalue still
   crosses zero where you expect it.
-* ``incept1d pdiv MECH CONFIG.json`` with a configuration that reduces the
-  chemistry to a limit with a known answer.  If only detachment or conversion
-  chemistry was touched, that limit must be unchanged — which makes it a
-  regression check rather than just a sanity check.
+* ``incept1d pdiv MECH CONFIG.json`` — Run with a configuration that reduces
+  the chemistry to a limit with a known answer.  If only detachment or
+  conversion chemistry was touched, that limit must be unchanged, which makes
+  this a regression check rather than just a sanity check.

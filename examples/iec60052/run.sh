@@ -19,7 +19,7 @@ cd "$(dirname "$0")/../.."
 
 MECH=mechanisms/air/air_pancheshnyi.py
 CFG=mechanisms/air/nodetachment.json
-OUT=${OUT:-examples/IEC60052}
+OUT=${OUT:-examples/iec60052}
 PD_NUM=${PD_NUM:-100}
 mkdir -p "$OUT"
 

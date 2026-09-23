@@ -380,10 +380,93 @@ that can be edited one at a time:
 
 Three checks catch most mistakes:
 
-* ``python3 mechanisms/air/air_pancheshnyi.py`` plots the entries of
+* ``python3 mechanisms/air/air_pancheshnyi.py`` — Plots the entries of
   :math:`\bm{R}` against :math:`E/N`.
-* ``incept1d eigenvalues mechanisms/air/air_pancheshnyi.py`` shows whether the
-  leading eigenvalue still crosses zero where expected.
+* ``incept1d eigenvalues mechanisms/air/air_pancheshnyi.py`` — Shows whether
+  the leading eigenvalue still crosses zero where expected.
 * ``incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/paschen.json``
-  must still reproduce the classical Paschen curve — unchanged if only the
+  — Must still reproduce the classical Paschen curve, unchanged if only the
   detachment or conversion chemistry was touched.
+
+Configuration keys
+------------------
+
+``mechanisms/air/config.py`` accepts the following keys
+(:ref:`Chap:Configuration` describes the file format):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 14 62
+
+   * - Key
+     - Default
+     - Meaning
+   * - ``label``
+     - ``"Baseline"``
+     - Name used in legends, terminal tables and output-file headers.
+   * - ``cross_sections``
+     - ``lisbon.txt``
+     - BOLSIG+ output file for the electron transport data and the rates
+       :math:`k_1, k_2, k_3`.  Shipped: ``lisbon.txt``, ``phelps.txt``,
+       ``biagi.txt``, ``trinity.txt``, ``morgan.txt``.  A relative path is
+       resolved first against the directory of the JSON file, then against
+       the mechanism directory.
+   * - ``reaction_multipliers``
+     - ``{}``
+     - Dictionary ``{reaction string: factor}``, keyed by the strings
+       listed under `Modifying this scheme`_.
+   * - ``ngroups``
+     - ``3``
+     - Number of two-stream photon groups in the Zheleznyak fit.
+   * - ``cone_angle``
+     - ``45.0``
+     - Half-opening angle :math:`\theta_\mathrm{cone}` in degrees, with
+       :math:`\Delta\Omega/4\pi = (1 - \cos\theta)/2`.  ``0`` disables
+       photon feedback entirely.
+   * - ``xi_photo``, ``xi_emit``
+     - ``1.0``, ``1.0``
+     - Scale factors on the photoionization coupling :math:`\bm{B}` and on
+       the photoemission yields :math:`\vec{\gamma}_\Psi`.
+   * - ``gamma0``, ``gamma1``, ``eref``, ``beta``
+     - ``1e-3``, ``0``, ``1.7e9``, ``1``
+     - Ion-induced secondary-emission yield
+       :math:`\gamma = \gamma_0 + \gamma_1\exp(-E_\mathrm{ref}/\beta E)`,
+       with :math:`E_\mathrm{ref}` in V/m.
+   * - ``positive``, ``negative``
+     - —
+     - Nested objects overriding ``xi_photo``, ``xi_emit``, ``gamma0``,
+       ``gamma1``, ``eref`` or ``beta`` for one polarity only.
+
+Ready-made configuration sets
+-----------------------------
+
+Each of these files is a complete study, and several may be given at once:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - File
+     - Contents
+   * - ``baseline.json``
+     - The reference configuration, all multipliers 1.
+   * - ``databases.json``
+     - The Phelps, Trinity, Biagi and Lisbon cross-section sets, plus a
+       no-detachment variant — how much of the answer is the cross sections.
+   * - ``nodetachment.json``
+     - Baseline against the same scheme with collisional and associative
+       detachment switched off.
+   * - ``ionsensitivity.json``
+     - Baseline, then :math:`\mathrm{O}^- \to \mathrm{O}_2^-` conversion,
+       :math:`\mathrm{O}^- \to \mathrm{O}_3^-` conversion and detachment
+       removed in turn.
+   * - ``see.json``
+     - :math:`\gamma_0 \in \{10^{-4}, 10^{-3}, 10^{-2}\}` and
+       :math:`\theta_\mathrm{cone} \in \{0^\circ, 45^\circ, 90^\circ\}` —
+       the surface parameters, which are the least certain input.
+   * - ``paschen.json``
+     - The textbook limit: no detachment, no ion conversion, no photon
+       feedback.  Reproduces :eq:`eq_standard_paschen`, and so serves as a
+       regression check on any change to the ion chemistry.
+   * - ``example_config.json``
+     - Annotated example for the two-body mechanism ``air_2body.py``.
