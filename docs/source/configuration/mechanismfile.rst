@@ -12,9 +12,13 @@ tracked species, reactions, transport coefficients, photoionization data,
 and cathode yields.  It is not imported as a package — :func:`incept1d.mechanism.load_mechanism`
 executes it with ``importlib`` after injecting configuration variables into
 its namespace — so it must be self-contained and must locate its own data
-files relative to ``__file__``.  The recommended way to write one is to copy
-``mechanisms/air/air_pancheshnyi.py`` (or ``mechanisms/air/air_2body.py``) together with
-``mechanisms/air/config.py`` into a new directory and edit.
+files relative to ``__file__``.
+
+This page is the interface: what a module must expose, and what each function
+must return.  It deliberately does not describe any particular gas.  Two
+mechanisms are documented as worked examples — a minimal one in
+:ref:`Chap:PaschenMechanism` and a complete one in :ref:`Chap:AirScheme` —
+and either is a reasonable starting point to copy.
 
 Required interface
 ------------------
@@ -30,9 +34,8 @@ refuses to load a module that lacks any of them:
      - Contract
    * - ``SPECIES``
      - Ordered list of tracked species names, e.g.
-       ``["e", "N2+", "O2+", "O-", "O2-", "O3-"]``.  Names are the tokens
-       used in reaction strings.  Order defines the row/column order of
-       every matrix.
+       ``["e", "M+", "M-"]``.  Names are the tokens used in reaction
+       strings.  Order defines the row/column order of every matrix.
    * - ``ELECTRON_INDEX``
      - Index of the electron in ``SPECIES``.
    * - ``get_R(EN, p, T, multipliers=None)``
@@ -104,19 +107,20 @@ Optional interface
 Configuration hooks
 -------------------
 
-Parameters that must be known *before* the module body runs — the swarm
-data file, the SEE constants — are read from the module namespace with a
+Parameters that must be known *before* the module body runs — which data file
+to read, the cathode constants — are read from the module namespace with a
 default, so that ``Config.pre_exec_vars()`` can inject them:
 
-.. literalinclude:: ../../../mechanisms/air/air_pancheshnyi.py
-   :language: python
-   :start-at: # Ion secondary-emission coefficients
-   :end-at: _BETA = globals().get
+.. code-block:: python
 
-.. literalinclude:: ../../../mechanisms/air/air_pancheshnyi.py
-   :language: python
-   :start-at: BOLSIG_FILE = globals().get
-   :end-at: BOLSIG_FILE = globals().get
+   # Read at module level, so an injected value wins over the default.
+   CROSS_SECTIONS = globals().get(
+       "CROSS_SECTIONS", os.path.join(_HERE, "default_swarm_data.txt")
+   )
+   _GAMMA0 = globals().get("_GAMMA0", 1.0e-2)
+
+Anything a mechanism computes at import — reading a table, fitting a photon
+decomposition — must therefore come *after* these reads.
 
 Parameters that act at run time — reaction multipliers, ``xi_photo``,
 ``xi_emit``, polarity overrides — are applied by
@@ -125,9 +129,9 @@ file does not need to know about them beyond honouring the ``multipliers``
 argument of ``get_R``.
 
 A new mechanism *family* (a new directory) needs its own ``config.py``
-implementing ``pre_exec_vars`` / ``post_exec_init`` / ``mechanism_params``
-/ ``label`` (:ref:`Chap:Configuration`).  Copy ``mechanisms/air/config.py`` and adapt
-the key names; the solvers never import it directly.
+implementing ``pre_exec_vars`` / ``post_exec_init`` / ``mechanism_params`` /
+``label``; :ref:`Chap:ConfigPy` specifies that protocol and gives a minimal
+implementation.  The solvers never import it directly.
 
 Step by step
 ------------
@@ -135,20 +139,20 @@ Step by step
 1. **Species.**  Decide the tracked species and their order; put the
    electron first by convention.  Classify each as electron, cation or
    anion — this fixes ``get_Pi_*``.
-2. **Swarm data.**  Produce a BOLSIG+ (or equivalent) table of electron
-   mobility, diffusion, mean energy and the impact-ionization/attachment
-   rate coefficients vs. :math:`E/N` for the gas mixture, and write a
-   loader like ``_load_bolsig``.  Interpolate in :math:`\log E/N`.
+2. **Swarm data.**  Obtain electron mobility, diffusion, mean energy and the
+   impact-ionization and attachment rate coefficients against :math:`E/N`
+   for the mixture, usually from a Boltzmann solver, and write a loader for
+   whatever format they arrive in.  Interpolate in :math:`\log E/N`.
 3. **Ion transport.**  Reduced mobilities :math:`\mu_iN` for every ion,
    constant or tabulated; assemble ``get_V``.
 4. **Reactions.**  Write ``REACTIONS`` as ``(string, rate)`` pairs, fold
    neutral densities into the rate, and build ``get_R`` with
-   :func:`Reactions.compile_reactions` / :func:`Reactions.build_R_from_compiled`.
+   :func:`incept1d.reactions.compile_reactions` /
+   :func:`incept1d.reactions.build_R_from_compiled`.
    Remember: exactly one tracked species on the left of every reaction.
-5. **Photoionization.**  Either implement :math:`\bm{B}`, :math:`\bm{C}`,
-   :math:`\vec{\kappa}` for the gas (for air-like mixtures the Zheleznyak
-   fit in ``mechanisms/air/zheleznyak.py`` can be reused), or return zero-width
-   arrays.
+5. **Photoionization.**  Either implement :math:`\bm{B}`, :math:`\bm{C}` and
+   :math:`\vec{\kappa}` for the gas, or return zero-width arrays to declare
+   that the mechanism has none (:ref:`Chap:Photoionization`).
 6. **Cathode.**  Implement ``get_gamma_plus_with`` and ``get_gamma_Psi``.
 7. **Optional helpers.**  ``alpha``/``eta`` if you want ionization
    integrals and the streamer criterion.

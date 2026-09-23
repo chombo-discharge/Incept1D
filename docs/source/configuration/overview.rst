@@ -7,10 +7,13 @@ Overview of the configuration files
    :local:
    :depth: 1
 
-``Incept1D`` ships no chemistry of its own.  Everything the solver knows about
-a gas — which species exist, how fast they are made and destroyed, how quickly
-they drift, how many electrons a returning ion releases from the cathode —
-comes from files outside the package, under ``mechanisms/``.  This chapter
+``Incept1D`` builds no chemistry of its own.  Everything the solver knows
+about a gas — which species exist, how fast they are made and destroyed, how
+quickly they drift, how many electrons a returning ion releases from the
+cathode — is supplied to it, from files outside the package under
+``mechanisms/``.  The solver never derives a rate, fits a coefficient or
+assumes a reaction; it reads what a mechanism gives it and solves the system
+that results.  This chapter
 describes those files and the interfaces they must satisfy.
 
 The unit is a **mechanism directory**.  One directory holds one gas, and the
