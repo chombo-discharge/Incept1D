@@ -8,9 +8,6 @@ elementary charge, speed of light) used throughout the project, sourced
 from ``scipy.constants`` (CODATA 2018).  Every other module imports from
 here instead of hard-coding numeric values.
 
-.. literalinclude:: ../../../src/incept1d/constants.py
-   :language: python
-
 API reference
 -------------
 

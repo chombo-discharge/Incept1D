@@ -69,16 +69,8 @@ corresponding exterior product directly (the compound-matrix or Evans-function
 method), so that no individual mode is ever represented.  Until then, treat a
 ``det_Q_unresolved`` row as "not answered" rather than "no growth".
 
-.. literalinclude:: ../../../src/incept1d/growth.py
-   :language: python
-   :pyobject: find_lambda_for_voltage
-
-.. literalinclude:: ../../../src/incept1d/growth.py
-   :language: python
-   :pyobject: compute_lambda_curve
-
-Command-line interface
-----------------------
+Inputs
+------
 
 .. code-block:: console
 
@@ -100,6 +92,30 @@ Example
 .. code-block:: bash
 
    incept1d growth mechanisms/air/air_pancheshnyi.py --pd 10 --p 1 --n-voltages 30 --v-max-factor 1.5
+
+Outputs
+-------
+
+The inception point is reported first (:math:`U^*` and :math:`(E/N)^*`),
+then a table with one row per voltage:
+
+.. code-block:: text
+
+   V (kV)    V/V*    EN (Td)    λ (s⁻¹)    τ (ns)    λ/ν_ion
+
+:math:`\tau = 1/\lambda` is the e-folding time, and the last column measures
+the growth rate against the ionization frequency, which says whether the
+discharge grows on the avalanche timescale or far more slowly.  The figure
+has two panels, :math:`\lambda` and :math:`\tau` against :math:`U/U^*`.
+
+A row that cannot be resolved is reported as ``NaN`` and flagged with a
+status — ``det_Q_unresolved`` means the determinant could not be evaluated
+at any :math:`\lambda`, not that the gap does not grow; see *Range of
+validity* above.
+
+``--write-to-file`` writes one row per voltage with the columns ``V_kV``
+and ``V_ratio``, then ``lambda_s-1[LABEL]``, ``tau_ns[LABEL]`` and
+``nu_ion_s-1[LABEL]`` for every configuration side by side.
 
 API reference
 -------------

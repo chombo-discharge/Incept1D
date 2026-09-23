@@ -26,16 +26,8 @@ quantifies how much the local approximation misses once negative-ion
 transit and detachment matter, and how sensitive that is to the choice of
 electron cross sections.
 
-.. literalinclude:: ../../../src/incept1d/ionization.py
-   :language: python
-   :pyobject: aed_integral
-
-.. literalinclude:: ../../../src/incept1d/ionization.py
-   :language: python
-   :pyobject: eig_integral
-
-Command-line interface
-----------------------
+Inputs
+------
 
 .. code-block:: console
 
@@ -82,6 +74,27 @@ Examples
    incept1d ionization mechanisms/air/air_pancheshnyi.py --d 20 \
        --data-file measurements.dat --pressure-column 0 --voltage-column 1 \
        --field sphere-plane 25
+
+Outputs
+-------
+
+A figure of both integrals against applied voltage, one curve per
+(configuration, pressure, gap) combination, and a printed table with one
+block per configuration and the columns
+
+.. code-block:: text
+
+   p (bar)    V (kV)    E/N (Td)    ∫max(α−η,0)dx (m⁻¹)    ∫max(λ_max,0)dx (m⁻¹)
+
+The last column appears only when the mechanism supplies the matrices
+:math:`\bm{R}` and :math:`\bm{V}`; a value that overflowed is written
+``NaN``.
+
+``--single-voltage`` prints one row and skips the figure.
+``--write-to-file`` writes a wide table instead — one row per voltage,
+a column ``U_kV``, then ``streamer_integral[LABEL]`` and, where available,
+``eigenvalue_integral[LABEL]`` for every curve — under the usual metadata
+header.
 
 API reference
 -------------

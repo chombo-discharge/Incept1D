@@ -192,8 +192,15 @@ version of the same rules, so change both together.
   implementation detail belongs in `configuration/examples/`. Subscripts
   follow one scheme — `e`, `+`, `-` for species, `Ψ^±` for photon streams,
   `j` for photon groups — so `Π_-` is negative ions and `Π_{Ψ^-}` is
-  backward photons. `literalinclude` a whole object or a whole file, never
-  `:lines:` or `:start-at:`, and pass `:dedent:` for a method.
+  backward photons. User documentation does not show implementation code:
+  the `modules/` pages describe what a command does, what it takes and what
+  it writes, and leave the source to `automodule`. Where an example page
+  does show a file, `literalinclude` a whole object or a whole file, never
+  `:lines:`, and pass `:dedent:` for a method.
+
+- **Command pages** in `docs/source/modules/` follow one shape: an opening
+  paragraph saying what the command answers, then Inputs, Examples, Outputs
+  and API reference.
 
 - **Figures** are built, not shipped: `docs/figures/Makefile` runs
   `examples/*/run.sh` and the mechanism helpers, compiles the pgfplots

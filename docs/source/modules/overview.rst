@@ -140,33 +140,26 @@ the same units and label every column.
 Typical workflows
 -----------------
 
-**Inception curve for a gas** — ``incept1d pdiv`` with a mechanism and,
-optionally, configuration files for sensitivity variants:
+Each command answers a different question about the same mechanism:
 
-.. code-block:: bash
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/databases.json --p 1 --pd-min 1e-2 --pd-max 1e3
+   * - Question
+     - Command
+   * - At what voltage does the gap break down?
+     - ``incept1d pdiv``
+   * - Why does the curve look the way it does?
+     - ``incept1d eigenvalues``, ``incept1d ionization``
+   * - How fast does the discharge grow above threshold?
+     - ``incept1d growth``
+   * - What does the imported field profile look like?
+     - ``incept1d field``
+   * - How do I hand this chemistry to a 3-D solver?
+     - ``incept1d chombo``
 
-**Understand why the curve looks the way it does** — inspect the local
-eigenvalues and the ionization integrals:
-
-.. code-block:: bash
-
-   incept1d eigenvalues mechanisms/air/air_pancheshnyi.py --p 1 --EN-lo 20 --EN-hi 300
-   incept1d ionization mechanisms/air/air_pancheshnyi.py --p 10 --d 10 --voltage-lo 20 --voltage-hi 60
-
-**How fast does the discharge grow above threshold?**
-
-.. code-block:: bash
-
-   incept1d growth mechanisms/air/air_pancheshnyi.py --pd 10 --p 1 --v-max-factor 1.5
-
-**Hand the chemistry to a 3-D simulation:**
-
-.. code-block:: bash
-
-   incept1d chombo mechanisms/air/air_pancheshnyi.py --write-to-file air_transport.dat
-
-The remaining pages of this section document each command, the configuration format
-(:ref:`Chap:Configuration`), and how to modify or write mechanisms
-(:ref:`Chap:ModifyingReactions`, :ref:`Chap:NewMechanisms`).
+:ref:`Chap:QuickStart` works two of these through end to end.  The remaining
+pages of this chapter document one command each; the mechanism and
+configuration files they take as input are described in
+:ref:`Chap:ConfigurationOverview`.

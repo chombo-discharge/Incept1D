@@ -68,13 +68,10 @@ JSON configuration files can scale individual reactions with a
 ``→`` replaced by ``->`` — before comparison, so ``"e+N2->2e+N2+"`` matches
 the ``REACTIONS`` entry ``"e + N2 -> 2e + N2+"``.
 
-.. warning::
-
-   A key that matches no reaction is *ignored*.  :func:`build_R` prints a
-   warning when this happens, but the compiled fast path used by the shipped
-   mechanisms does not — a typo in a JSON multiplier key silently leaves the
-   reaction at its default rate.  Check the ``Configs:`` line and the
-   reaction list in the output-file header when in doubt.
+A key that matches no reaction is ignored, but not silently: both
+:func:`build_R` and the compiled fast path report it on stderr the first time
+they see it, so a typo is visible without flooding the output.  The reaction
+is then left at its default rate.
 
 Fast path
 ---------
@@ -86,10 +83,6 @@ module load into ``(driver_column, delta_vector, rate_fn, key)`` tuples;
 handling on the hot path.  The shipped mechanisms use the compiled pair,
 since ``get_R`` is called at every :math:`E/N` sample of every integration
 step of every determinant evaluation.
-
-.. literalinclude:: ../../../src/incept1d/reactions.py
-   :language: python
-   :pyobject: build_R
 
 API reference
 -------------

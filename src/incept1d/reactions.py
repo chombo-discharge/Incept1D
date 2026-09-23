@@ -33,6 +33,8 @@ Keys in a `reaction_multipliers` dict are normalised (spaces stripped,
 """
 
 import re
+import sys
+
 import numpy as np
 
 
@@ -72,11 +74,14 @@ def build_R_from_compiled(compiled, n, EN, p, T, multipliers=None):
 
     Drop-in replacement for build_R when the caller holds a compiled list
     produced by compile_reactions.  multipliers is handled identically to
-    build_R (keys are normalised before comparison).
+    build_R: keys are normalised before comparison, and a key matching no
+    reaction is reported to stderr once.
     """
     norm_mult = (
         {_normalize(k): v for k, v in multipliers.items()} if multipliers else {}
     )
+    if norm_mult:
+        _warn_unknown_multipliers(norm_mult, {c[3] for c in compiled})
     R = np.zeros((n, n))
     for j, delta, rate_fn, norm_key in compiled:
         K = rate_fn(EN, p, T) * norm_mult.get(norm_key, 1.0)
@@ -87,6 +92,37 @@ def build_R_from_compiled(compiled, n, EN, p, T, multipliers=None):
 def _normalize(s: str) -> str:
     """Canonical form of a reaction string for dict-key comparison."""
     return s.replace(" ", "").replace("→", "->")
+
+
+# Multiplier keys already reported, so that a typo is announced once rather
+# than at every E/N sample of every integration step.
+_WARNED_KEYS = set()
+
+
+def _warn_unknown_multipliers(norm_mult, known_keys):
+    """Report multiplier keys that match no reaction in this mechanism.
+
+    Parameters
+    ----------
+    norm_mult : dict
+        Normalised ``{reaction_string: multiplier}`` mapping.
+    known_keys : set of str
+        Normalised reaction strings the mechanism actually defines.
+
+    Notes
+    -----
+    A key is reported to stderr the first time it is seen; a typo in a JSON
+    configuration is therefore visible without flooding the output.
+    """
+    for k in norm_mult:
+        if k not in known_keys and k not in _WARNED_KEYS:
+            _WARNED_KEYS.add(k)
+            print(
+                f"WARNING: reaction multiplier key '{k}' does not match "
+                f"any reaction in this mechanism — ignored.",
+                file=sys.stderr,
+                flush=True,
+            )
 
 
 def _parse_side(text: str) -> dict:
@@ -147,14 +183,9 @@ def build_R(reactions, species, EN, p, T, multipliers=None):
         multipliers = {}
 
     norm_mult = {_normalize(k): v for k, v in multipliers.items()}
-    known_keys = {_normalize(rxn_str) for rxn_str, _ in reactions}
-    for k in norm_mult:
-        if k not in known_keys:
-            print(
-                f"WARNING (build_R): multiplier key '{k}' does not match "
-                f"any reaction in this mechanism — ignored.",
-                flush=True,
-            )
+    _warn_unknown_multipliers(
+        norm_mult, {_normalize(rxn_str) for rxn_str, _ in reactions}
+    )
 
     n = len(species)
     sp_idx = {s: i for i, s in enumerate(species)}

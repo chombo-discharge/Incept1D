@@ -22,12 +22,8 @@ Hungarian algorithm to match each eigenvalue at one :math:`E/N` sample to
 its continuation at the next (minimising total squared distance in the
 complex plane), so that plotted tracks do not jump between unrelated modes.
 
-.. literalinclude:: ../../../src/incept1d/eigenvalues.py
-   :language: python
-   :pyobject: compute_eigenvalues
-
-Command-line interface
-----------------------
+Inputs
+------
 
 .. code-block:: console
 
@@ -60,6 +56,19 @@ Examples
 
    ``incept1d eigenvalues`` has no ``--no-plot`` flag; on headless machines set
    ``MPLBACKEND=Agg`` and use ``--write-to-file``.
+
+Outputs
+-------
+
+A figure with one subplot per configuration: the reduced eigenvalues
+:math:`\mathrm{Re}(\lambda_j/N)` in m\ :sup:`2` against :math:`E/N`, one
+line per track, or one line per pressure in ``--pressure-scan`` mode.
+Dividing by the number density is what makes the curves collapse across
+pressures for a chemistry whose rates scale with :math:`N`.
+
+``--write-to-file`` writes one tab-separated file **per configuration**,
+named after the label, with a metadata header and columns ``EN_Td``
+followed by ``Re_lam<j>_N_m2`` for each track.
 
 API reference
 -------------

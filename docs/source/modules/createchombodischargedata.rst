@@ -15,34 +15,8 @@ raw transport and rate-coefficient tables a fluid solver needs as a
 function of :math:`E/N`, so that the *same* chemistry used for the 1-D
 criterion can be used in a 3-D simulation of the onset.
 
-Output columns
---------------
-
-.. code-block:: text
-
-   1      E/N [Townsend]
-   2      alpha/N [m^2]
-   3      eta/N [m^2]
-   4      Electron mean energy [eV]
-   5-6    mu*N, D*N for e
-   7-8    mu*N, D*N for the first ion species
-   ...    (two columns per species, in SPECIES order)
-   next   Raw rate coefficient for each reaction, in REACTIONS order
-          (m^3/s for two-body, m^6/s for three-body; flagged in the header)
-
-:func:`generate` evaluates the mechanism over an :math:`E/N` grid;
-:func:`build_header` writes a self-describing header (species order,
-reaction order, units); :func:`plot_results` renders a multi-panel
-sanity-check figure (ionization/attachment coefficients, mean energy,
-mobilities and diffusion coefficients, rate coefficients) so a new or
-modified mechanism can be inspected before it is handed to the 3-D solver.
-
-.. literalinclude:: ../../../src/incept1d/chombo.py
-   :language: python
-   :pyobject: generate
-
-Command-line interface
-----------------------
+Inputs
+------
 
 .. code-block:: console
 
@@ -69,6 +43,33 @@ Example
 
    This command has no ``--no-plot`` flag; on headless machines set
    ``MPLBACKEND=Agg``.
+
+Outputs
+-------
+
+A multi-panel sanity-check figure — ionization and attachment coefficients,
+mean energy, mobilities and diffusion coefficients, and every rate
+coefficient against :math:`E/N` — so that a new or modified mechanism can be
+inspected before it is handed to the 3-D solver.
+
+``--write-to-file`` writes the table itself: one row per :math:`E/N` point,
+with a self-describing header naming the species order, the reaction order
+and the units of every column:
+
+.. code-block:: text
+
+   1      E/N [Townsend]
+   2      alpha/N [m^2]
+   3      eta/N [m^2]
+   4      Electron mean energy [eV]
+   5-6    mu*N, D*N for e
+   7-8    mu*N, D*N for the first ion species
+   ...    (two columns per species, in SPECIES order)
+   next   Raw rate coefficient for each reaction, in REACTIONS order
+          (m^3/s for two-body, m^6/s for three-body; flagged in the header)
+
+Everything is reduced by the number density (``alpha/N``, ``mu*N``,
+``D*N``), so one table serves every pressure the 3-D solver runs at.
 
 API reference
 -------------

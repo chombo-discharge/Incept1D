@@ -237,7 +237,6 @@ Python modules
    modules/fielddistributions
    modules/reactions
    modules/constants
-   modules/fieldlines
 
 Examples
 ********

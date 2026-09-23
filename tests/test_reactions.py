@@ -7,6 +7,7 @@
 import numpy as np
 import pytest
 
+from incept1d import reactions as _reactions
 from incept1d.reactions import (
     build_R,
     build_R_from_compiled,
@@ -20,6 +21,18 @@ SPECIES = ["e", "N2+", "O-"]
 def _const(k):
     """A rate callable with the mechanism signature, returning a constant."""
     return lambda EN, p, T: k
+
+
+@pytest.fixture
+def fresh_warnings():
+    """Forget which multiplier keys have already been reported.
+
+    The warning is de-duplicated process-wide, so a test that expects to see
+    it must start from a clean slate.
+    """
+    _reactions._WARNED_KEYS.clear()
+    yield
+    _reactions._WARNED_KEYS.clear()
 
 
 class TestParsing:
@@ -114,13 +127,20 @@ class TestMultipliers:
         )
         assert np.count_nonzero(R) == 0
 
-    def test_unknown_key_warns_and_is_ignored(self, capsys):
+    def test_unknown_key_warns_and_is_ignored(self, capsys, fresh_warnings):
         """R8: a typo in a config file must be visible, not silent."""
         R = build_R(
             self.RX, SPECIES, 100.0, 1.0, 293.0, multipliers={"e + Xe -> 2e + Xe+": 2.0}
         )
-        assert "does not match" in capsys.readouterr().out
+        assert "does not match" in capsys.readouterr().err
         assert R[0, 0] == pytest.approx(5.0)
+
+    def test_unknown_key_is_reported_once(self, capsys, fresh_warnings):
+        """R8b: the warning is de-duplicated, not printed per evaluation."""
+        mult = {"e + Xe -> 2e + Xe+": 2.0}
+        for _ in range(5):
+            build_R(self.RX, SPECIES, 100.0, 1.0, 293.0, multipliers=mult)
+        assert capsys.readouterr().err.count("does not match") == 1
 
 
 class TestCompiledFastPath:
@@ -146,6 +166,20 @@ class TestCompiledFastPath:
             compiled, len(SPECIES), 120.0, 1.0, 293.0, multipliers=mult
         )
         assert a == pytest.approx(b)
+
+    def test_unknown_key_warns_on_the_fast_path(self, capsys, fresh_warnings):
+        """R10c: a typo must be as visible on the hot path as in build_R."""
+        compiled = compile_reactions(self.RX, SPECIES)
+        R = build_R_from_compiled(
+            compiled,
+            len(SPECIES),
+            100.0,
+            1.0,
+            293.0,
+            multipliers={"e + Xe -> 2e + Xe+": 2.0},
+        )
+        assert "does not match" in capsys.readouterr().err
+        assert R[0, 0] == pytest.approx(5.0 - 3.0)
 
     def test_compile_rejects_two_tracked_reactants(self):
         with pytest.raises(ValueError, match="exactly one tracked species"):
