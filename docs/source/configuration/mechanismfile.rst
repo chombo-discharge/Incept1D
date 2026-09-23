@@ -48,12 +48,12 @@ refuses to load a module that lacks any of them:
        negative; see :ref:`Chap:Transport`).  Must be non-singular for all
        :math:`E/N > 0`.
    * - ``get_Pi_e()``, ``get_Pi_plus()``, ``get_Pi_minus()``
-     - Row-selection matrices :math:`\Pi_\mathrm{e}` (shape
-       :math:`(1, N_s)`), :math:`\Pi_+` (:math:`(N_+, N_s)`), :math:`\Pi_-`
+     - Row-selection matrices :math:`\bm{\Pi}_\mathrm{e}` (shape
+       :math:`(1, N_s)`), :math:`\bm{\Pi}_+` (:math:`(N_+, N_s)`), :math:`\bm{\Pi}_-`
        (:math:`(N_-, N_s)`).  Every species must be selected by exactly one
        of them.
    * - ``get_gamma_plus(EN, p, T)``
-     - Ion-induced SEE yields :math:`\vec{\gamma}_\mathrm{p}`, shape
+     - Ion-induced SEE yields :math:`\vec{\gamma}_+`, shape
        :math:`(N_+,)`, in the row order of ``get_Pi_plus()``.  ``EN`` is the
        cathode field.
    * - ``get_gamma_plus_with(EN, p, T, gamma0=None, gamma1=None, eref=None, beta=None)``

@@ -19,10 +19,10 @@ expresses through the propagator as :math:`\vec{\theta}(d) =
 .. math::
    :label: eq_Qd
 
-   \Pi_+\bm{M}(d)\vec{\theta}_0 = \vec{0}, \qquad
-   \Pi_\leftarrow\bm{M}(d)\vec{\theta}_0 = \vec{0}
+   \bm{\Pi}_+\bm{M}(d)\vec{\theta}_0 = \vec{0}, \qquad
+   \bm{\Pi}_{\Psi^-}\bm{M}(d)\vec{\theta}_0 = \vec{0}
    \quad\Longrightarrow\quad
-   \bm{Q}_d = \begin{bmatrix}\Pi_+\bm{M}(d)\\ \Pi_\leftarrow\bm{M}(d)\end{bmatrix} .
+   \bm{Q}_d = \begin{bmatrix}\bm{\Pi}_+\bm{M}(d)\\ \bm{\Pi}_{\Psi^-}\bm{M}(d)\end{bmatrix} .
 
 The complete specification of the boundary-value problem is the square,
 homogeneous linear system
@@ -46,7 +46,7 @@ mode — exists if and only if
    \det\bm{Q}(\lambda) = 0 .
 
 Since :math:`\bm{Q}` depends on the applied field through
-:math:`\bm{M}(d)` and :math:`\vec{\gamma}_\mathrm{p}`, and on :math:`\lambda`
+:math:`\bm{M}(d)` and :math:`\vec{\gamma}_+`, and on :math:`\lambda`
 through :math:`\bm{A}` and :math:`\bm{D}`, :eq:`eq_det_criterion` is a
 relation between the applied voltage and the temporal growth rate:
 
@@ -102,8 +102,8 @@ species by three reactions: impact ionization
      \eta & 0 & -\delta
    \end{bmatrix},
 
-with :math:`\Pi_\mathrm{e} = (1,0,0)`, :math:`\Pi_+ = (0,1,0)`,
-:math:`\Pi_- = (0,0,1)` and a scalar yield :math:`\gamma`.  The matrix
+with :math:`\bm{\Pi}_\mathrm{e} = (1,0,0)`, :math:`\bm{\Pi}_+ = (0,1,0)`,
+:math:`\bm{\Pi}_- = (0,0,1)` and a scalar yield :math:`\gamma`.  The matrix
 exponential can be computed analytically, and :math:`\det\bm{Q}(0) = 0`
 becomes
 
@@ -121,7 +121,10 @@ with
    c_\pm = \frac{\Delta \pm (\alpha - \eta + \delta)}{2\Delta}, \qquad
    \Delta = \sqrt{(\alpha - \eta - \delta)^2 + 4\alpha\delta}.
 
-Here :math:`\lambda_+` is the largest eigenvalue of
+Here :math:`\lambda_\pm` are the two eigenvalues of the reduced model's
+electron/negative-ion block, so :math:`\lambda_+` is its
+:math:`\lambda_{\max}` in the sense of :ref:`Chap:Transport`: the largest
+eigenvalue of
 :math:`\bm{R}\bm{V}^{-1}` and defines the *apparent effective ionization
 coefficient*; it reduces to :math:`\alpha - \eta` when :math:`\delta = 0`.
 It is :math:`\lambda_+`, not :math:`\alpha - \eta`, that determines the net

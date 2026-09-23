@@ -29,7 +29,7 @@ At the **cathode** (:math:`x = 0`):
 
 At the **anode** (:math:`x = d`):
 
-* Zero incoming flux of positive ions, :math:`\Pi_+\vec{\theta}(d) = \vec{0}`;
+* Zero incoming flux of positive ions, :math:`\bm{\Pi}_+\vec{\theta}(d) = \vec{0}`;
 * Zero incoming backward photon flux, :math:`\Psi_j^-(d) = 0`.
 
 Counting: :math:`N_-` negative-ion conditions, :math:`1` electron condition,
@@ -43,43 +43,81 @@ matrices below encode.
 Row-selection matrices
 ----------------------
 
-Let :math:`\Pi_\mathrm{e}`, :math:`\Pi_+`, and :math:`\Pi_-` be the
-row-selection matrices that pick the electron row, the positive-ion rows,
-and the negative-ion rows of :math:`\vec{\theta}` (:math:`\Pi_\mathrm{e}` is
-a single row).  Similarly let :math:`\Pi_\rightarrow` and
-:math:`\Pi_\leftarrow` select the :math:`\vec{\Psi}^+` and
-:math:`\vec{\Psi}^-` blocks.  For the six-species dry-air scheme
+Writing the conditions compactly needs a way to say "the electron row of
+:math:`\vec{\theta}`", "the positive-ion rows", and so on.  Each is a
+row-selection matrix :math:`\bm{\Pi}`, subscripted by the block it picks
+out:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 30 22 28
+
+   * - Operator
+     - Selects
+     - Shape
+     - Supplied by
+   * - :math:`\bm{\Pi}_\mathrm{e}`
+     - The electron flux
+     - :math:`(1, N_s)`
+     - ``get_Pi_e()``
+   * - :math:`\bm{\Pi}_+`
+     - The positive-ion fluxes
+     - :math:`(N_+, N_s)`
+     - ``get_Pi_plus()``
+   * - :math:`\bm{\Pi}_-`
+     - The negative-ion fluxes
+     - :math:`(N_-, N_s)`
+     - ``get_Pi_minus()``
+   * - :math:`\bm{\Pi}_{\Psi^+}`
+     - The forward photon fluxes :math:`\vec{\Psi}^+`
+     - :math:`(N_\gamma, \cdot)`
+     - The solver
+   * - :math:`\bm{\Pi}_{\Psi^-}`
+     - The backward photon fluxes :math:`\vec{\Psi}^-`
+     - :math:`(N_\gamma, \cdot)`
+     - The solver
+
+The two photon operators are subscripted by the stream they select,
+:math:`\vec{\Psi}^\pm`, and not by a direction — :math:`\bm{\Pi}_{\Psi^-}`
+is the *backward photon* selector, not the negative-ion selector
+:math:`\bm{\Pi}_-`.
+
+For the six-species dry-air scheme
 (:math:`\mathrm{e}, \mathrm{N}_2^+, \mathrm{O}_2^+, \mathrm{O}^-,
-\mathrm{O}_2^-, \mathrm{O}_3^-`):
+\mathrm{O}_2^-, \mathrm{O}_3^-`) the charged-species selectors are:
 
 .. math::
 
-   \Pi_\mathrm{e} = \begin{bmatrix}1&0&0&0&0&0\end{bmatrix},\quad
-   \Pi_+ = \begin{bmatrix}0&1&0&0&0&0\\0&0&1&0&0&0\end{bmatrix},\quad
-   \Pi_- = \begin{bmatrix}0&0&0&1&0&0\\0&0&0&0&1&0\\0&0&0&0&0&1\end{bmatrix}.
+   \bm{\Pi}_\mathrm{e} = \begin{bmatrix}1&0&0&0&0&0\end{bmatrix},\quad
+   \bm{\Pi}_+ = \begin{bmatrix}0&1&0&0&0&0\\0&0&1&0&0&0\end{bmatrix},\quad
+   \bm{\Pi}_- = \begin{bmatrix}0&0&0&1&0&0\\0&0&0&0&1&0\\0&0&0&0&0&1\end{bmatrix}.
 
 .. admonition:: Code
 
-   A mechanism file returns these through ``get_Pi_e()``, ``get_Pi_plus()``
-   and ``get_Pi_minus()``, each of shape ``(rows, N_s)``.  The photon
-   selectors are built by the solver, since it decides at run time which
-   photon groups are propagated explicitly (:ref:`Chap:Numerics:Propagator`).
+   A mechanism file returns the three charged-species selectors through
+   ``get_Pi_e()``, ``get_Pi_plus()`` and ``get_Pi_minus()``, each of shape
+   ``(rows, N_s)``.  The photon selectors are built by the solver as
+   ``Pi_fwd`` and ``Pi_bck`` (:math:`\bm{\Pi}_{\Psi^+}` and
+   :math:`\bm{\Pi}_{\Psi^-}`), because it decides at run time which photon
+   groups are propagated explicitly and which are folded into
+   :math:`\bm{A}`; their width is therefore the *augmented* dimension rather
+   than :math:`N_s` (:ref:`Chap:Numerics:Propagator`).
 
 The secondary-emission condition
 --------------------------------
 
-Let :math:`\vec{\gamma}_\mathrm{p} = \vec{\gamma}_\mathrm{p}(E)` be the
+Let :math:`\vec{\gamma}_+ = \vec{\gamma}_+(E)` be the
 column vector of SEE efficiencies due to ion bombardment (one entry per
-positive-ion species, in the row order of :math:`\Pi_+`), and
+positive-ion species, in the row order of :math:`\bm{\Pi}_+`), and
 :math:`\vec{\gamma}_\Psi` the efficiencies due to photon bombardment (one
 entry per photon group).  The emitted electron flux is
 
 .. math::
    :label: eq_see_condition
 
-   \Pi_\mathrm{e}\vec{\theta}_0 =
-     -\vec{\gamma}_\mathrm{p}^\intercal\,\Pi_+\vec{\theta}_0
-     + \vec{\gamma}_\Psi^\intercal\,\Pi_\leftarrow\vec{\theta}_0 .
+   \bm{\Pi}_\mathrm{e}\vec{\theta}_0 =
+     -\vec{\gamma}_+^\intercal\,\bm{\Pi}_+\vec{\theta}_0
+     + \vec{\gamma}_\Psi^\intercal\,\bm{\Pi}_{\Psi^-}\vec{\theta}_0 .
 
 The minus sign on the ion term comes from the coordinate convention: the
 positive-ion flux at the cathode is negative (ions move towards
@@ -93,10 +131,10 @@ Combining the three cathode constraints into a block system
    :label: eq_Q0
 
    \bm{Q}_0 = \begin{bmatrix}
-     \Pi_\mathrm{e} + \vec{\gamma}_\mathrm{p}^\intercal\Pi_+
-                    - \vec{\gamma}_\Psi^\intercal\Pi_\leftarrow \\
-     \Pi_- \\
-     \Pi_\rightarrow
+     \bm{\Pi}_\mathrm{e} + \vec{\gamma}_+^\intercal\bm{\Pi}_+
+                    - \vec{\gamma}_\Psi^\intercal\bm{\Pi}_{\Psi^-} \\
+     \bm{\Pi}_- \\
+     \bm{\Pi}_{\Psi^+}
    \end{bmatrix} .
 
 Ion-induced emission
@@ -104,7 +142,7 @@ Ion-induced emission
 
 A positive ion arriving at the cathode may liberate an electron from the
 surface.  The probability that it does is
-:math:`\vec{\gamma}_\mathrm{p} = \vec{\gamma}_\mathrm{p}(E)` — one number
+:math:`\vec{\gamma}_+ = \vec{\gamma}_+(E)` — one number
 per positive-ion species, in general a function of the field at the cathode,
 since a faster ion arrives with more energy.
 
@@ -114,7 +152,7 @@ assumption about the functional form, and none is needed for the derivation.
 A mechanism is free to return a constant, a fitted field dependence, or a
 table.
 
-This is worth stating plainly because :math:`\vec{\gamma}_\mathrm{p}` is
+This is worth stating plainly because :math:`\vec{\gamma}_+` is
 the least certain quantity in the whole model.  It depends on the cathode
 material, its oxide layer, its roughness and its history, and quoted values
 for the same nominal surface span orders of magnitude.  The criterion is only
@@ -126,7 +164,7 @@ sensitivity sweep is still the honest way to report a result.  See
 
 .. admonition:: Code
 
-   ``get_gamma_plus(EN, p, T)`` returns :math:`\vec{\gamma}_\mathrm{p}` with
+   ``get_gamma_plus(EN, p, T)`` returns :math:`\vec{\gamma}_+` with
    the mechanism's own defaults; ``get_gamma_plus_with(EN, p, T, ...)`` is the
    same with per-call overrides.  The solver always calls the latter (through
    :class:`incept1d.mechanism.Mechanism`), which is how polarity-specific
@@ -141,7 +179,7 @@ The second way the cathode returns an electron is optical.  An ionizing
 photon produced in the gas can travel *back* to the cathode and eject an
 electron from the surface — the photoelectric effect — with probability
 :math:`\vec{\gamma}_\Psi`, one entry per photon group.  This is the
-:math:`\vec{\gamma}_\Psi^\intercal\Pi_\leftarrow` term in
+:math:`\vec{\gamma}_\Psi^\intercal\bm{\Pi}_{\Psi^-}` term in
 :eq:`eq_see_condition`, acting on the backward flux
 :math:`\vec{\Psi}^-(0)`.
 

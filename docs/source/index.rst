@@ -68,7 +68,7 @@ feedback and volume feedback are on the same footing
 
 **Electronegative gases done properly.**  Attachment, detachment and ion
 conversion are carried as species, so the inception field is set by the
-apparent ionization coefficient :math:`\lambda_+` and not by
+apparent ionization coefficient :math:`\lambda_{\max}` and not by
 :math:`\alpha = \eta` alone.
 
 **Photon feedback along the field line.**  A multigroup two-stream model
@@ -125,8 +125,15 @@ Notation
 ========
 
 Throughout the theory pages, bold upright symbols (:math:`\bm{R}`,
-:math:`\bm{V}`, :math:`\bm{Q}`) are matrices and arrow symbols
-(:math:`\vec{n}`, :math:`\vec{\theta}`) are column vectors.  Reduced fields
+:math:`\bm{V}`, :math:`\bm{Q}`, :math:`\bm{\Pi}`) are matrices and arrow
+symbols (:math:`\vec{n}`, :math:`\vec{\theta}`, :math:`\vec{\gamma}`) are
+column vectors.  Subscripts name the species or stream a quantity belongs to,
+and are used consistently: :math:`\mathrm{e}` for electrons, :math:`+` and
+:math:`-` for positive and negative ions, and :math:`\Psi^+` or
+:math:`\Psi^-` for the forward and backward photon streams — so
+:math:`\bm{\Pi}_-` selects negative ions while :math:`\bm{\Pi}_{\Psi^-}`
+selects backward photons.  A subscript :math:`j` always indexes a photon
+group.  Reduced fields
 :math:`E/N` are given in Townsend
 (:math:`1\,\mathrm{Td} = 10^{-21}\,\mathrm{V\,m^2}`), pressures in bar, gap
 distances in mm, and the product :math:`pd` in bar·mm.  Inside the code all
