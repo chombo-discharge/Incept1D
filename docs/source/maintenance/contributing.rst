@@ -96,20 +96,40 @@ Files where a comment header would be rendered by the consumer (``.rst``,
 ``.json``, ``.css``) are declared in bulk in ``REUSE.toml`` instead; the
 existing glob patterns already cover new files of those types.
 
-**Third-party data is different.**  The reference tables redistributed here —
-LXCat cross sections and ion mobilities, the IEC 60052 sphere-gap voltages, the
-CIGRE ELECTRA breakdown curve — are *not* owned by this project and are *not*
-under the project licence.  They carry their real rights holder and a
-``LicenseRef-`` licence in ``REUSE.toml``, with the terms spelled out in
-``LICENSES/``.  When you add data of this kind:
+Third-party data
+................
+
+Some data in this repository is not ours.  Redistributed swarm data, for
+instance, belongs to the databases it was retrieved from, is *not* under the
+project licence, and carries its real rights holder and a ``LicenseRef-``
+licence in ``REUSE.toml``, with the terms spelled out in ``LICENSES/``.
+
+.. warning::
+
+   **Do not add content that this project has no right to redistribute.**
+   Published standards, journal tables, figures and datasets are copyrighted
+   by their publishers, and a small extract used for validation is still
+   redistribution.  If you cannot point to a licence or a permission that
+   allows it, it does not go in the repository — not in ``examples/``, not in
+   a figure, not in a docstring.
+
+   This is not a formality.  A comparison against data you may not
+   redistribute is still perfectly reproducible: commit the *calculation*,
+   document the expected input file and its column layout, and let a reader
+   who holds the data supply it themselves.  Two of the worked examples are
+   built exactly that way, and the figures they would produce are opt-in for
+   the same reason (:ref:`Chap:Infrastructure`).
+
+When you add data that *is* redistributable:
 
 * Redistribute it **verbatim**, with its original header intact — the header
   carries the citation its authors ask for, and the whitespace hooks skip
-  ``mechanisms/**`` and ``examples/**`` data files on purpose;
+  ``mechanisms/**`` and ``examples/**`` data files on purpose.
 * Add a ``[[annotations]]`` entry naming the actual rights holder, never
-  ``SINTEF Energy Research`` by default;
+  ``SINTEF Energy Research`` by default.
 * If its terms are not an existing SPDX licence, add a
   ``LICENSES/LicenseRef-<name>.txt`` describing them, and reference it.
+* Record where it came from and when, so the claim can be checked later.
 
 Mislabelling third-party data as project-owned is worse than leaving it
 undeclared, because ``reuse lint`` will then happily pass.

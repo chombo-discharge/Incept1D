@@ -11,30 +11,38 @@ ionization-integral curves, temporal growth rates, transport-coefficient
 tables for 3-D simulation codes).
 
 **Before touching any of the physics code, read the Theory chapter of the
-documentation, `docs/source/Theory/`.**  Those pages are the single source
+documentation, `docs/source/theory/`.**  Those pages are the single source
 of truth for the equations the code implements (the manuscript they were
 derived from is not part of the repository and must not be referenced
-from the docs):
+from the docs).  The chapter builds the criterion in order — what is
+transported, then the photons, then the electrodes, then the assembly:
 
-- `Theory/Overview.rst`, eq. `eq_drift_reaction`: the governing drift-reaction PDE.
-- `Theory/Transport.rst`, eq. `eq_augmented_ode`: the augmented first-order
+- `theory/overview.rst`, eq. `eq_drift_reaction`: the governing drift-reaction PDE.
+- `theory/transport.rst`, eq. `eq_flux_ode`: the charged-species equation in
+  flux form, and the eigenvalues of `R V⁻¹`.
+- `theory/photoionization.rst`, eq. `eq_two_stream`: the two-stream photon
+  transport supplying the `B`, `C`, `D` blocks.
+- `theory/secondaryemission.rst`, eqs. `eq_see_condition` / `eq_Q0`: the
+  electrode boundary conditions and the row-selection operators.
+- `theory/augmented.rst`, eq. `eq_augmented_ode`: the augmented first-order
   ODE `∂_x θ = A_aug θ` with block matrix `A_aug = [[A,B,B],[C,-D,0],[-C,0,D]]`
   — this is exactly `incept1d.solver._build_A_aug`; eq. `eq_theta_soln` is the
   propagator `M(d)`.
-- `Theory/Photoionization.rst`, eq. `eq_two_stream`: the two-stream photon
-  transport supplying the `B`, `C`, `D` blocks.
-- `Theory/SecondaryEmission.rst`, eqs. `eq_see_condition` / `eq_Q0`: the
-  cathode boundary conditions.
-- `Theory/InceptionCriterion.rst`, eqs. `eq_Qd` / `eq_Q_system` /
+- `theory/inceptioncriterion.rst`, eqs. `eq_Qd` / `eq_Q_system` /
   `eq_det_criterion`: `Q(λ) θ_0 = 0` and `det Q(λ=0) = 0` — this is
   `incept1d.solver._assemble_det_Q` / `incept1d.solver.inception_det`, whose root in
   `E/N` at fixed `p·d` is what `incept1d.inception.compute_inception_curve` scans for.
   The `3×3` reduced model (`eq_generalized_paschen`, `eq_standard_paschen`)
-  is the closed-form sanity check for the attachment/detachment physics.
-- `Theory/AirScheme.rst`, table `tab_reactions`: the reaction list
-  implemented in `mechanisms/air/air_pancheshnyi.py` / `mechanisms/air/air_2body.py`.
-- `docs/source/Numerics/`: how the propagator, determinant and root
-  finding are actually implemented.
+  is the closed-form sanity check for the attachment/detachment physics, and
+  is what `tests/closed_form.py` transcribes.
+- `docs/source/numerics/`: how the propagator, determinant and root
+  finding are actually implemented — including the limits of the
+  determinant formulation (`numerics/determinant.rst`, and the range-of-
+  validity note in `modules/lambda.rst`).
+
+The reaction schemes are inputs, not part of the derivation: they live in
+`docs/source/configuration/examples/` (`air.rst`, table `tab_reactions`, is
+the scheme implemented by `mechanisms/air/air_pancheshnyi.py`).
 
 Code docstrings still cite "manuscript, eq. NNN" in places; those numbers
 refer to an external LaTeX source and have drifted. When code and docs
@@ -119,34 +127,24 @@ of them.
 
 ## Working conventions
 
-- **Formatting/linting**: `black` (line length 88) and `flake8` are wired up
-  via `.pre-commit-config.yaml` / `pyproject.toml` / `.flake8`. Run
-  `pre-commit install` once per clone; `pre-commit run --all-files` to check
-  everything. Note: the existing `.py` files predate `black` and use manual
-  column alignment in places — `black` will reformat any file it touches, so
-  expect a real diff the first time a given file is committed.
-- **Docs**: Sphinx sources live in `docs/source/`, organised as one
-  directory per chapter (`Introduction/`, `Theory/`, `Numerics/`,
-  `Modules/`, `examples/`, `Maintenance/`).  Build with `make html` from
-  `docs/` (or `python3 -m sphinx -W -b html docs/source docs/build/html`
-  from the repo root; prefer `python3 -m sphinx` over the bare
-  `sphinx-build`, which on at least one dev machine resolves to a pipx shim
-  without numpy).  The build runs with `-W`: any warning fails it, and a
-  `dummy` build is a pre-commit hook.  Figures are **built, not shipped**:
-  `docs/figures/Makefile` runs `examples/*/run.sh` and `mechanisms/air/zheleznyak.py`,
-  compiles the pgfplots `.tex` sources in `docs/figures/`, and drops
-  PDF/PNG into the git-ignored `docs/source/figures/`; `make html` triggers
-  it.  `make figures` builds only the self-contained figures (`paschen`,
-  `zheleznyakfit`) and takes seconds; the sphere-gap and ELECTRA
-  comparisons are opt-in (`OPTIONAL_FIGURES`), because their reference
-  tables are copyrighted and not in the repo and because the eight IEC
-  diameters are ~75 % of the figure cost — build one with
-  `make -C docs/figures iec60052` after supplying the data.  Do not add
-  pre-rendered figures or reference the manuscript.  New public functions get
-  NumPy-style docstrings (autodoc); docs pages `literalinclude` the
-  functions that implement an equation rather than re-typing them; cite
-  literature with `[Key]_` and add the entry to `zzreferences.rst`
-  (unreferenced citations fail the build).
+These mirror `docs/source/maintenance/`; that chapter is the contributor-facing
+version of the same rules, so change both together.
+
+- **Before committing**: `pre-commit run --all-files` and `python3 -m pytest`
+  must pass. Run `pre-commit install` once per clone. Hooks: `black`
+  (line length 88), `flake8`, `reuse lint`, and a Sphinx `dummy` build. If
+  the Sphinx hook fails oddly right after moving or renaming a docs file,
+  clear its cache: `rm -rf /tmp/incept1d-docs-precommit`.
+
+- **Tests**: `tests/`, run with `pytest`. `-m "not slow"` skips the ones that
+  load real swarm data. Three layers, strongest first: verification against
+  closed forms (`tests/toy/` plus `tests/closed_form.py`, which must stay an
+  independent transcription of the documented algebra — never import solver
+  code into it), unit tests, then invariants. **Prefer an invariant to a
+  pinned value**: a wrong-but-self-consistent curve passes a pin, which is
+  exactly how the warm-start bug survived. Add tests with the change, not
+  after.
+
 - **Packaging**: `pyproject.toml` (setuptools, src layout) is the single
   source of dependencies and of the `incept1d` entry point. No
   `sys.path.insert` hacks anywhere: package modules use absolute
@@ -155,13 +153,68 @@ of them.
   new `cli/<name>.py` + one line in `cli/__init__.py:COMMANDS` + a docs
   page. Shared CLI options (`--field`, `--dx`) come from
   `fields.add_field_argument` / `solver.parse_dx_spec`.
+
+- **CI**: one workflow, `.github/workflows/ci.yml`, because `needs:` cannot
+  reach across workflow files. Jobs `reuse`, `tests`, `rst`, `docs` all feed
+  the aggregate `CI-passed`, which is the single context branch protection
+  on `main` requires; Pages deployment is gated behind it. A new check must
+  be added to `needs:` of `CI-passed` or it gates nothing. `main` takes
+  squash merges only, and admin bypass is enabled.
+
+- **Licensing (REUSE)**: the project is GPL-3.0-or-later and must stay REUSE
+  compliant — `reuse lint` is a hook and a CI job. New `.py` files get the
+  SPDX header; everything else is declared in `REUSE.toml`, whose existing
+  globs usually already cover it.
+  **Never add content the project has no right to redistribute.** Published
+  standards, journal tables, figures and datasets are copyrighted, and a
+  small extract used for validation is still redistribution. Commit the
+  *calculation* instead, document the expected input file, and let a reader
+  supply the data — two worked examples are built that way. For data that
+  *is* redistributable: keep it verbatim with its original header, annotate
+  it in `REUSE.toml` with its **real** rights holder (never SINTEF by
+  default), and add a `LICENSES/LicenseRef-*.txt` if its terms are not an
+  SPDX licence. Mislabelling third-party data as project-owned is worse than
+  leaving it undeclared, because `reuse lint` then passes.
+
+- **Docs**: Sphinx sources in `docs/source/`, one directory per chapter
+  (`introduction/`, `theory/`, `numerics/`, `configuration/`, `modules/`,
+  `examples/`, `maintenance/`). Build with `make html` from `docs/`; prefer
+  `python3 -m sphinx` over bare `sphinx-build`, which on at least one dev
+  machine resolves to a pipx shim without numpy. The build runs with `-W`,
+  so any warning fails it. New pages go in the right `toctree` in
+  `index.rst`. New public functions get NumPy-style docstrings (autodoc).
+  Cite literature with `[Key]_` and add the entry to `zzreferences.rst` —
+  unreferenced citations fail the build.
+
+- **Docs style**: bullet and numbered list items begin with a capital letter.
+  The generic chapters (Theory, Numerics, and the interface pages of
+  Configuration files) must not name a specific mechanism, gas or data file;
+  implementation detail belongs in `configuration/examples/`. Subscripts
+  follow one scheme — `e`, `+`, `-` for species, `Ψ^±` for photon streams,
+  `j` for photon groups — so `Π_-` is negative ions and `Π_{Ψ^-}` is
+  backward photons. `literalinclude` a whole object or a whole file, never
+  `:lines:` or `:start-at:`, and pass `:dedent:` for a method.
+
+- **Figures** are built, not shipped: `docs/figures/Makefile` runs
+  `examples/*/run.sh` and the mechanism helpers, compiles the pgfplots
+  `.tex` sources, and drops PDF/PNG into the git-ignored
+  `docs/source/figures/`; `make html` triggers it. `make figures` builds
+  only the self-contained figures and takes seconds. Figures that compare
+  against published reference data are opt-in (`OPTIONAL_FIGURES`), because
+  that data is not in the repository and those runs dominate the cost.
+  Do not add pre-rendered figures or reference the manuscript.
+
 - **Physics-affecting changes**: if you change a rate coefficient, a
   boundary condition, or the augmented-matrix assembly, cite the
-  corresponding equation label / table in `docs/source/Theory/` in the
-  commit message or docstring, update the theory page if the model itself
-  changed, and check the closed-form limit with `mechanisms/air/paschen.json`.
-- **Examples**: `examples/<Name>/` holds reference data with a provenance
-  header and a `run.sh` that reproduces the calculation; the corresponding
-  docs page lives in `docs/source/examples/` and its figure source in
-  `docs/figures/<Name>.tex`.  Keep the three in sync (column indices in the
-  `.tex` follow the `--write-to-file` header layout).
+  corresponding equation label in `docs/source/theory/` in the commit
+  message or docstring, update the theory page if the model itself changed,
+  and check a closed-form limit. Include before/after inception curves in
+  the PR, and confirm that cases the change should *not* affect are
+  unchanged.
+
+- **Examples**: `examples/<name>/` holds a `run.sh` that reproduces the
+  calculation; the docs page lives in `docs/source/examples/` and the figure
+  source in `docs/figures/<name>.tex`. Keep the three in sync — column
+  indices in the `.tex` follow the `--write-to-file` header layout. Where a
+  comparison needs data we cannot ship, the example documents the expected
+  filename and column layout instead, and the figure is opt-in.

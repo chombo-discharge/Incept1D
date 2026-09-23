@@ -68,18 +68,17 @@ Default and opt-in figures
 ``make figures`` builds only ``paschen`` and ``zheleznyakfit``.  Both are
 self-contained and take seconds.
 
-The sphere-gap and ELECTRA comparisons are **opt-in**
-(``OPTIONAL_FIGURES`` in the Makefile) for two reasons.  They plot against
-reference tables that are copyrighted and therefore not part of this
-repository (:ref:`Chap:Examples:IEC60052`, :ref:`Chap:Examples:Electra`), so
-without them the figure would show the computed curves with nothing to compare
-against; and they are expensive — the eight IEC sphere diameters alone are
-about three quarters of the total figure cost.  A contributor who holds the
-data builds them by name:
+Figures that compare against **published reference data** are **opt-in**
+(``OPTIONAL_FIGURES`` in the Makefile), for two reasons.  Such data is
+generally copyrighted and therefore not part of this repository, so without it
+the figure would show the computed curves with nothing to compare against; and
+these are the expensive figures, together the large majority of the total
+figure cost.  A contributor who holds the data supplies it as the relevant
+example page describes, and builds the figure by name:
 
 .. code-block:: bash
 
-   make -C docs/figures iec60052
+   make -C docs/figures <figure>
 
 The computed curves are only re-run when something that can change them is
 newer: the solver modules, anything under ``mechanisms/``, or the run
