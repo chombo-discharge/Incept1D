@@ -1,0 +1,19 @@
+{
+  "title": "Incept1D",
+  "description": "Discharge inception in a 1-D drift-reaction model: inception curves, growth rates and transport tables.",
+  "upload_type": "software",
+  "license": "GPL-3.0-or-later",
+  "creators": [
+    {
+      "name": "Marskar, Robert",
+      "affiliation": "SINTEF Energy Research"
+    }
+  ],
+  "keywords": [
+    "gas discharge",
+    "streamer",
+    "partial discharge inception voltage",
+    "Paschen curve",
+    "plasma"
+  ]
+}
