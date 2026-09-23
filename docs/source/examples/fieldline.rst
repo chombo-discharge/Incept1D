@@ -73,6 +73,9 @@ excitation itself, which is what ``--fieldline-voltage`` declares:
        --fieldline-voltage 100 \
        --pd-min 1 --pd-max 100 --pd-num 40
 
+The sweep is asked for in :math:`pd`, as for any other geometry, and comes
+back in :math:`p`.
+
 Because the declared voltage is divided into a computed :math:`U^*`, and
 :math:`U^*` comes from the normalised shape, the resulting ratio is exact
 whatever the field column happens to be in.  Without the flag the ratio is
@@ -106,7 +109,9 @@ Running the calculation
    :start-at: MECH=
 
 This is a **pressure sweep**, and for a tabulated field line it is the only
-sweep that makes sense.  The line describes one geometry at one size: its
+sweep that makes sense — which is also why the results come back against
+:math:`p` in bar rather than :math:`pd`: with :math:`d` pinned at
+:math:`L`, the two differ by a constant.  The line describes one geometry at one size: its
 arc length fixes the gap at :math:`d = L = 20` mm, and :math:`pd` is varied
 by varying :math:`p` alone — here from 0.05 to 5 bar across the requested
 1 to 100 bar·mm.  Neither ``--p`` nor ``--d`` is given, which is what
@@ -140,7 +145,7 @@ Result
 ------
 
 Each run opens a two-panel figure — the inception voltage :math:`U^*` and
-the reduced field :math:`(E/N)^*` against :math:`pd`, one curve per
+the reduced field :math:`(E/N)^*` against the pressure, one curve per
 polarity — and prints the table behind it.  Add ``--no-plot``, or set
 ``MPLBACKEND=Agg``, for a headless run; the tables are written either way.
 
@@ -148,9 +153,9 @@ The two runs are compared directly:
 
 .. code-block:: text
 
-        pd (bar·mm)   p (bar)   d (mm)   E/N (Td)    U (kV)     U*/U_applied
-         1.0000e+00      0.05       20   164.8633    4.0754           0.0408   start=positive
-         1.0000e+00      0.05       20   164.3114    4.0618           0.0406   start=negative
+           p (bar)      E/N (Td)        U (kV)         E (V/m)    U*/U_applied
+        5.0000e-02      164.8633        4.0754      2.0377e+05          0.0408   start=positive
+        5.0000e-02      164.3114        4.0618      2.0309e+05          0.0406   start=negative
 
 Both files give this same table — the two output files are identical to the
 last digit, which is the property worth having and what the test suite

@@ -244,11 +244,16 @@ class TestPdiv:
         assert "using d = L" in capsys.readouterr().out
 
         data = np.genfromtxt(out)
-        pd_col, p_col, d_col = data[:, 0], data[:, 1], data[:, 2]
+        # With d pinned at L, the sweep column is the pressure itself.
+        sweep, p_col, d_col = data[:, 0], data[:, 1], data[:, 2]
         assert np.allclose(d_col, d_col[0]), "the gap length must not vary"
         assert d_col[0] == pytest.approx(20.0), "the gap must be the arc length"
-        assert p_col.max() > p_col.min(), "the pressure must be what varies"
-        assert np.allclose(pd_col, p_col * d_col)
+        assert sweep.max() > sweep.min(), "the pressure must be what varies"
+        assert np.allclose(sweep, p_col), "the sweep column must be the pressure"
+
+        header = out.read_text()
+        assert "# Column 1: p_bar\n" in header
+        assert "pd_bar_mm" not in header, "p*d says nothing the pressure does not"
 
     def test_fixed_pressure_is_refused_for_a_field_line(self, tmp_path, capsys):
         """

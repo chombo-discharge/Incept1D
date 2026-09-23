@@ -179,6 +179,14 @@ differently sized copy of the imported arrangement.  For a single point at
 one pressure, ask for it directly — :math:`pd = p\,L` with ``--pd-num 1``,
 which the error message spells out.
 
+Since :math:`d` is pinned, :math:`pd` is the pressure times a constant and
+says nothing the pressure does not.  The results are therefore reported
+against :math:`p` in bar rather than :math:`pd` in bar·mm: that is the
+x-axis of the figures and the first column of ``--write-to-file``, and the
+gap appears once in each curve's label instead of as a column that never
+changes.  The sweep is still *requested* in :math:`pd` through
+``--pd-min`` / ``--pd-max``.
+
 The gap length can still be set explicitly with ``--d``.  That is allowed,
 because :math:`f(\xi)` is invariant under a geometric rescaling, so
 :math:`d \ne L` solves the *same* arrangement scaled by :math:`d/L` — every

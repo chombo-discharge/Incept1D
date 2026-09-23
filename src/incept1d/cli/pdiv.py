@@ -315,6 +315,28 @@ def run(args, parser):
         np.log10(args.pd_min * 1e-3), np.log10(args.pd_max * 1e-3), args.pd_num
     )
 
+    # A tabulated field line pins the gap at its arc length, so p*d is the
+    # pressure times a constant and carries nothing the pressure does not.
+    # Report the sweep in pressure there, and in p*d everywhere else.
+    _sweep_is_pressure = _field_dist.field_type == "fieldline"
+    if _sweep_is_pressure:
+        _L_m = _field_dist.fieldline_length
+
+        def _x(pd):
+            """Sweep coordinate for plots and tables: pressure in bar."""
+            return pd / _L_m
+
+        _x_label = "p  (bar)"
+        _x_head, _x_col = "p (bar)", "p_bar"
+    else:
+
+        def _x(pd):
+            """Sweep coordinate for plots and tables: p*d in bar*mm."""
+            return pd * 1e3
+
+        _x_label = "p·d  (bar·mm)"
+        _x_head, _x_col = "pd (bar·mm)", "pd_bar_mm"
+
     # Build curve specs: (label, p_arr, d_arr, mod)
     # Each config dict gets its own freshly loaded Mechanism instance.
     curve_specs = []
@@ -636,7 +658,7 @@ def run(args, parser):
                         ls=ls,
                         **color_kw,
                     )
-                    ax1.loglog(br_pd * 1e3, br_V / 1000, **plot_kw)
+                    ax1.loglog(_x(br_pd), br_V / 1000, **plot_kw)
                     if is_first:
                         _curve_color[label] = ax1.get_lines()[-1].get_color()
                     col = _curve_color[label]
@@ -652,7 +674,7 @@ def run(args, parser):
                             ]
                         )
                         ax1b.plot(
-                            br_pd * 1e3,
+                            _x(br_pd),
                             aed,
                             color=col,
                             alpha=_AED_ALPHA,
@@ -661,7 +683,7 @@ def run(args, parser):
                             zorder=1,
                         )
                     ax2.loglog(
-                        br_pd * 1e3,
+                        _x(br_pd),
                         br_EN,
                         **{**plot_kw, "color": col, "label": b_label},
                     )
@@ -674,19 +696,28 @@ def run(args, parser):
                 # file are unknown -- and the column is omitted.
                 _vfile = _field_dist.fieldline_applied_voltage
                 _scale_hdr = f"  {'U*/U_applied':>14}" if _vfile else ""
+                # With the gap pinned at L, the p*d and d columns say nothing
+                # the pressure and the curve label do not already say.
+                _pd_hdr = (
+                    "" if _sweep_is_pressure else f"  {'p (bar)':>10}  {'d (mm)':>8}"
+                )
                 print(
-                    f"\n  {'pd (bar·mm)':>14}  {'p (bar)':>10}  {'d (mm)':>8}  "
+                    f"\n  {_x_head:>14}{_pd_hdr}  "
                     f"{'E/N (Td)':>12}  {'U (kV)':>12}  {'E (V/m)':>14}{_scale_hdr}  "
                     f"[{pol_label} (branch {b_idx + 1})]"
                 )
-                print("  " + "-" * (90 + (16 if _vfile else 0)))
+                _w = 90 + (16 if _vfile else 0) - (22 if _sweep_is_pressure else 0)
+                print("  " + "-" * _w)
                 step = max(1, len(br_pd) // 20)
                 for j in range(0, len(br_pd), step):
                     _scale = f"  {br_V[j]/_vfile:>14.4f}" if _vfile else ""
+                    _pd_cols = (
+                        ""
+                        if _sweep_is_pressure
+                        else f"  {br_p[j]:>10.4g}  {br_d[j]*1e3:>8.4g}"
+                    )
                     print(
-                        f"  {br_pd[j]*1e3:>14.4e}  "
-                        f"{br_p[j]:>10.4g}  "
-                        f"{br_d[j]*1e3:>8.4g}  "
+                        f"  {_x(br_pd[j]):>14.4e}{_pd_cols}  "
                         f"{br_EN[j]:>12.4f}  "
                         f"{br_V[j]/1000:>12.4f}  "
                         f"{br_V[j]/br_d[j]:>14.4e}{_scale}"
@@ -771,21 +802,26 @@ def run(args, parser):
                     markevery=max(1, int(_smask.sum()) // 10),
                     label=_s_label,
                 )
-                ax1.loglog(pd_arr[_smask] * 1e3, _V_s[_smask] / 1000, **_sm_kw)
-                ax2.loglog(pd_arr[_smask] * 1e3, _EN_s[_smask], **_sm_kw)
+                ax1.loglog(_x(pd_arr[_smask]), _V_s[_smask] / 1000, **_sm_kw)
+                ax2.loglog(_x(pd_arr[_smask]), _EN_s[_smask], **_sm_kw)
 
             print(
-                f"\n  {'pd (bar·mm)':>14}  {'p (bar)':>10}  {'d (mm)':>8}  "
+                f"\n  {_x_head:>14}"
+                f"{'' if _sweep_is_pressure else f'  {chr(112)} (bar)':>0}"
+                f"{'' if _sweep_is_pressure else '     d (mm)'}  "
                 f"{'E/N (Td)':>12}  {'U (kV)':>12}  {'E (V/m)':>14}  [{_s_label}]"
             )
-            print("  " + "-" * 90)
+            print("  " + "-" * (90 - (22 if _sweep_is_pressure else 0)))
             _sstep = max(1, int(_smask.sum()) // 20)
             _sindices = np.where(_smask)[0][::_sstep]
             for _j in _sindices:
+                _pd_cols = (
+                    ""
+                    if _sweep_is_pressure
+                    else f"  {_p_arr_cs[_j]:>10.4g}  {_d_arr_cs[_j]*1e3:>8.4g}"
+                )
                 print(
-                    f"  {pd_arr[_j]*1e3:>14.4e}  "
-                    f"{_p_arr_cs[_j]:>10.4g}  "
-                    f"{_d_arr_cs[_j]*1e3:>8.4g}  "
+                    f"  {_x(pd_arr[_j]):>14.4e}{_pd_cols}  "
                     f"{_EN_s[_j]:>12.4f}  "
                     f"{_V_s[_j]/1000:>12.4f}  "
                     f"{_V_s[_j]/_d_arr_cs[_j]:>14.4e}"
@@ -796,7 +832,7 @@ def run(args, parser):
         SEP = "\t"
 
         # Build flat column list: (name, value_fn) where value_fn(j) -> float
-        columns = [("pd_bar_mm", lambda j: pd_arr[j] * 1e3)]
+        columns = [(_x_col, lambda j: _x(pd_arr[j]))]
         for lbl, p_arr_c, d_arr_c, EN_c, V_c, _rec_mod in _file_records:
             columns += [
                 (f"p_bar[{lbl}]", lambda j, a=p_arr_c: a[j]),
@@ -993,7 +1029,7 @@ def run(args, parser):
                 marker = _markers[curve_idx % len(_markers)]
                 markevery = max(1, mask_r.sum() // 15)
                 ax3.semilogx(
-                    pd_arr[mask_r] * 1e3,
+                    _x(pd_arr[mask_r]),
                     ratio[mask_r],
                     label=ratio_label,
                     color=_curve_color.get(label),
@@ -1002,19 +1038,19 @@ def run(args, parser):
                     markersize=6,
                 )
             ax3.axhline(1.0, color="k", ls="--", lw=1.0)
-            ax3.set_xlabel("p·d  (bar·mm)")
+            ax3.set_xlabel(_x_label)
             ax3.set_ylabel(rf"$U / U_{{\mathrm{{{_ref_cfg_label}}}}}$")
             ax3.set_title(f"Voltage ratio vs. {_ref_cfg_label!r}")
             ax3.legend(loc="best", framealpha=1.0)
             ax3.grid(True, which="both", ls="--", alpha=0.4)
 
-        ax1.set_xlabel("p·d  (bar·mm)")
+        ax1.set_xlabel(_x_label)
         ax1.set_ylabel("U  (kV)")
         ax1.set_title("Breakdown voltage")
         ax1.legend(loc="upper left", framealpha=1.0)
         ax1.grid(True, which="both", ls="--", alpha=0.4)
 
-        ax2.set_xlabel("p·d  (bar·mm)")
+        ax2.set_xlabel(_x_label)
         ax2.set_ylabel("E/N  (Td)")
         ax2.set_title("Critical reduced field (average)")
         ax2.legend(loc="best", framealpha=1.0)

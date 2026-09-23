@@ -46,6 +46,12 @@ examples/**/sim*.dat
 examples/paschen/closed_form.dat
 examples/fieldline/line_*.csv
 
+# Field-line exports dropped in the repository root while testing.  They are
+# the user's own data, not ours to track or to license, and `reuse lint`
+# skips whatever git ignores.
+/*.csv
+/*.dat
+
 # Third-party reference tables: copyrighted by the IEC and by CIGRE, so they
 # are NOT part of this repository.  Users who hold a copy drop it in the
 # example directory to enable the comparison overlay -- see the READMEs there.
