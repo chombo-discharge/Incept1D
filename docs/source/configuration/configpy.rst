@@ -7,17 +7,49 @@ The ``config.py`` protocol
    :local:
    :depth: 1
 
-A mechanism directory may contain a ``config.py`` defining a class called
-``Config``.  It is the adapter between an inert JSON dictionary
-(:ref:`Chap:Configuration`) and the mechanism module
-(:ref:`Chap:NewMechanisms`), and it is what makes a mechanism configurable at
-all.  Without it the module is a fixed gas: passing a configuration file to a
-mechanism that has no ``config.py`` raises ``ImportError`` rather than
-silently ignoring the file.
+Why a mechanism needs one
+-------------------------
 
-:func:`incept1d.mechanism.load_mechanism` discovers the file by name, in the
-same directory as the mechanism module.  It is executed, not imported, so it
-must not rely on being part of a package.
+A mechanism module is **executed once**, by ``importlib``, and everything it
+computes at module level — reading a swarm-data table, fitting a photon
+decomposition, building the reaction list — happens during that single
+execution.  Nothing downstream can reach back in afterwards and change it.
+
+That is a problem as soon as you want to ask a question of the form "what if
+this were different?", which is most of what the code is for:
+
+* Which cross-section database should the swarm data come from?
+* What is the cathode yield, given that it is uncertain by orders of
+  magnitude?
+* How much does the answer move if detachment is switched off?
+* Does the positive polarity of this gap want different surface parameters
+  from the negative one?
+
+None of these are new physics, so none of them should require a new mechanism
+file.  But the first two must be settled *before* the module runs, because the
+module reads them at import.
+
+``config.py`` exists to bridge that gap.  It is a small adapter that turns an
+inert JSON dictionary (:ref:`Chap:Configuration`) into two distinct things: a
+set of values injected into the module namespace **before** it executes, and a
+set of parameters applied **afterwards**, every time an accessor is called.
+With it, one mechanism file supports an unlimited family of variants, each a
+few lines of JSON, and several of them can be solved and plotted side by side
+in a single run.
+
+A mechanism with no ``config.py`` is still perfectly valid — it is then a
+fixed gas with no adjustable parameters.  Passing a configuration file to such
+a mechanism raises ``ImportError`` rather than silently ignoring it, so a
+mistyped path cannot quietly leave the defaults in place.
+
+Where the file lives
+--------------------
+
+:func:`incept1d.mechanism.load_mechanism` looks for a file called exactly
+``config.py`` in the same directory as the mechanism module, and expects it to
+define a class called ``Config``.  It is executed, not imported, so it must
+not rely on being part of a package.  One ``config.py`` serves every mechanism
+in its directory.
 
 The interface
 -------------
@@ -38,14 +70,15 @@ attribute.
        must be ignored**, so that one configuration file can be shared by
        mechanisms that understand different subsets of it.
    * - ``pre_exec_vars() -> dict``
-     - Names injected into the module namespace *before* the module body runs.
-       This is the only way to influence module-level constants, because the
-       body executes exactly once.  Returning an empty dict is fine.
+     - Names injected into the module namespace *before* the module body
+       runs.  This is the only way to influence module-level constants,
+       because the body executes exactly once.  Returning an empty dict is
+       fine.
    * - ``post_exec_init(mod) -> None``
      - Called after the module body has executed and passed the interface
-       check.  For work that needs the finished module — the air family uses
-       it to run ``init_photoionization(ngroups, cone_angle)``.  May be a
-       no-op.
+       check.  For work that needs the finished module — fitting a photon
+       decomposition, for instance, which cannot run until the rate functions
+       exist.  May be a no-op.
    * - ``mechanism_params() -> dict``
      - Keyword arguments forwarded to :class:`~incept1d.mechanism.Mechanism`.
        These are applied at *call* time inside the accessors, so they can vary
@@ -60,54 +93,37 @@ Choosing between the two override paths
 ---------------------------------------
 
 The commonest mistake when writing a new ``config.py`` is putting a parameter
-in the wrong one, so the rule is worth stating plainly:
+in the wrong one, so the rule is worth stating plainly.
 
 **Use** ``pre_exec_vars`` **when the module needs the value while it is being
-executed.**  Which cross-section file to read is the archetype: the module
-opens it at module level, so the name has to be present beforehand.  The
-module picks such values up with ``globals().get``:
+executed.**  Which data file to read is the archetype: the module opens it at
+module level, so the name has to be present beforehand.  The module picks such
+values up with ``globals().get``, which returns the injected value if there is
+one and the default otherwise:
 
 .. code-block:: python
 
-   BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_HERE, "lisbon.txt"))
+   CROSS_SECTIONS = globals().get(
+       "CROSS_SECTIONS", os.path.join(_HERE, "default_swarm_data.txt")
+   )
 
 **Use** ``mechanism_params`` **when the value only affects what the accessors
 return.**  Rate multipliers, the photoionization and photoemission scale
-factors and the per-polarity secondary-emission overrides all belong here.
-They cost nothing to change, they do not require re-executing the module, and
-— importantly — they are the only ones that can differ between the positive
-and negative polarity of the same run, because
+factors and the per-polarity surface parameters all belong here.  They cost
+nothing to change, they do not require re-executing the module, and —
+importantly — they are the only ones that can differ between the positive and
+negative polarity of the same run, because
 :meth:`incept1d.mechanism.Mechanism.resolve` applies them per polarity.
 
-Worked example
---------------
+If a parameter could plausibly go either way, prefer ``mechanism_params``: a
+value read at import is fixed for the whole run, while one applied in the
+accessor can still be varied afterwards.
 
-The air family's implementation is the reference.  ``from_dict`` filters the
-raw dictionary against the dataclass fields, which is what makes unknown keys
-harmless:
+A minimal implementation
+------------------------
 
-.. literalinclude:: ../../../mechanisms/air/config.py
-   :language: python
-   :pyobject: Config.from_dict
-
-``pre_exec_vars`` maps configuration names onto the module-level constants the
-mechanism reads at execution time:
-
-.. literalinclude:: ../../../mechanisms/air/config.py
-   :language: python
-   :pyobject: Config.pre_exec_vars
-
-and ``mechanism_params`` hands the run-time scalings to ``Mechanism``:
-
-.. literalinclude:: ../../../mechanisms/air/config.py
-   :language: python
-   :pyobject: Config.mechanism_params
-
-A minimal version
------------------
-
-Nothing in the protocol requires a dataclass or the air family's key set.  A
-mechanism with a single tunable parameter needs only this:
+Nothing in the protocol requires a dataclass, and a mechanism with a single
+tunable parameter needs only this:
 
 .. code-block:: python
 
@@ -132,5 +148,22 @@ mechanism with a single tunable parameter needs only this:
            known = {f.name for f in cls.__dataclass_fields__.values()}
            return cls(**{k: v for k, v in d.items() if k in known})
 
+The ``from_dict`` body above is the idiom worth copying: filtering against the
+dataclass fields is what makes unknown keys harmless, which is what lets one
+JSON file be shared between mechanisms that understand different subsets of
+it.
+
 The test suite exercises exactly this shape in ``tests/toy/config.py``, so it
 is a working starting point rather than an illustration.
+
+Worked examples
+---------------
+
+:ref:`Chap:PaschenMechanism` shows the protocol at its simplest: one key
+selects the gas, which has to be known before the module body runs because it
+fixes the coefficients at module level.
+
+:ref:`Chap:AirScheme` shows it carrying a realistic load: a choice of
+cross-section database, four cathode-yield parameters, per-reaction
+multipliers, photon scale factors, and separate surface parameters for the two
+polarities of an asymmetric gap.

@@ -1,6 +1,6 @@
 .. _Chap:PaschenMechanism:
 
-Example: the classical Townsend model
+Example: The classical Townsend model
 =====================================
 
 .. contents:: On this page
@@ -85,9 +85,10 @@ The **gas** must be known before the module body runs, because selecting it
 fixes :math:`A` and :math:`B` at module level.  It therefore goes through
 ``pre_exec_vars``:
 
-.. literalinclude:: ../../../mechanisms/paschen/config.py
+.. literalinclude:: ../../../../mechanisms/paschen/config.py
    :language: python
    :pyobject: Config.pre_exec_vars
+   :dedent:
 
 The cathode yield :math:`\gamma_0` travels the same way here, because the
 module reads it at import; a mechanism that evaluated it per call could
@@ -95,9 +96,8 @@ equally have passed it through ``mechanism_params``.
 
 The configurations themselves are three lines each:
 
-.. literalinclude:: ../../../mechanisms/paschen/gases.json
+.. literalinclude:: ../../../../mechanisms/paschen/gases.json
    :language: json
-   :lines: 1-10
 
 Why it is worth having
 ----------------------

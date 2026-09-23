@@ -1,6 +1,6 @@
 .. _Chap:AirScheme:
 
-Example: a minimal scheme for dry air
+Example: A minimal scheme for dry air
 =====================================
 
 .. contents:: On this page
@@ -352,3 +352,38 @@ Photoemission uses a constant yield :math:`\gamma_\Psi = 0.1` per group.
 Both are uncertain by orders of magnitude; ``mechanisms/air/see.json`` sweeps
 :math:`\gamma_0` over :math:`10^{-4}`–:math:`10^{-2}` so the sensitivity can
 be read off directly.
+
+Modifying this scheme
+---------------------
+
+The reaction strings, which are the keys ``reaction_multipliers`` matches
+against (:ref:`Chap:ModifyingReactions`), are:
+
+.. code-block:: text
+
+   e + N2 -> 2e + N2+
+   e + O2 -> 2e + O2+
+   e + O2 -> O- + O
+   e + 2O2 -> O2- + O2
+   O2- + O2 -> e + O2 + O2
+   O- + N2 -> e + N2O
+   O- + O2 -> O + O2-
+   O- + O2 + M -> O3- + M
+
+Each is paired with a callable that folds in the neutral densities, so the
+rate coefficients themselves stay in small named functions ``k1`` … ``k8``
+that can be edited one at a time:
+
+.. literalinclude:: ../../../../mechanisms/air/air_pancheshnyi.py
+   :language: python
+   :pyobject: k5
+
+Three checks catch most mistakes:
+
+* ``python3 mechanisms/air/air_pancheshnyi.py`` plots the entries of
+  :math:`\bm{R}` against :math:`E/N`.
+* ``incept1d eigenvalues mechanisms/air/air_pancheshnyi.py`` shows whether the
+  leading eigenvalue still crosses zero where expected.
+* ``incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/paschen.json``
+  must still reproduce the classical Paschen curve — unchanged if only the
+  detachment or conversion chemistry was touched.

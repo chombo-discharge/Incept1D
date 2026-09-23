@@ -66,6 +66,7 @@ callable :math:`f(\xi)` for a specific gap length.
 .. literalinclude:: ../../../src/incept1d/fields.py
    :language: python
    :pyobject: FieldDistribution.build
+   :dedent:
 
 ``add_field_argument`` / ``parse_field_spec`` implement the shared
 ``--field SPEC`` syntax used by every subcommand, so geometry parsing is

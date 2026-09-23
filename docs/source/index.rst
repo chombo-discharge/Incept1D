@@ -218,8 +218,7 @@ Configuration files
    configuration/configpy
    configuration/jsonfiles
    configuration/reactions
-   configuration/paschenmechanism
-   configuration/airscheme
+   configuration/examples/index
 
 Python modules
 **************

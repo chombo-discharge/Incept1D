@@ -104,7 +104,7 @@ invocation produces all three curves:
 
 .. literalinclude:: ../../../examples/paschen/run.sh
    :language: bash
-   :lines: 24-
+   :start-at: set -euo pipefail
 
 ``closed_form.py`` then tabulates :eq:`eq_paschen_curve` from the very same
 coefficients, so the comparison is self-contained — no external table is
