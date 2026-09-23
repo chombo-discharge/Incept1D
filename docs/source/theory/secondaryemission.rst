@@ -10,10 +10,14 @@ Secondary emission and approximations
 Boundary conditions at the electrodes
 -------------------------------------
 
-The augmented ODE :eq:`eq_augmented_ode` is a first-order system in
-:math:`x` on the domain :math:`[0, d]`, so :math:`N_s + 2N_\gamma`
-conditions are needed to pin down :math:`\vec{\theta}_0 = \vec{\theta}(0)`.
-They are split between the two electrodes:
+The gap carries :math:`N_s` charged-species fluxes :math:`\vec{y}`
+(:ref:`Chap:Transport`) and :math:`2N_\gamma` photon fluxes
+:math:`\vec{\Psi}^\pm` (:ref:`Chap:Photoionization`), each governed by a
+first-order equation in :math:`x`.  Pinning the solution down therefore takes
+:math:`N_s + 2N_\gamma` conditions, split between the two electrodes.
+
+Each one says the same kind of thing: what crosses that electrode, and in
+which direction.
 
 At the **cathode** (:math:`x = 0`):
 
@@ -98,45 +102,67 @@ Combining the three cathode constraints into a block system
 Ion-induced emission
 --------------------
 
-The ion-induced yields are the principal free parameters of the cathode
-model.  The dry-air mechanism uses a field-dependent form
+A positive ion arriving at the cathode may liberate an electron from the
+surface.  The probability that it does is
+:math:`\vec{\gamma}_\mathrm{p} = \vec{\gamma}_\mathrm{p}(E)` — one number
+per positive-ion species, in general a function of the field at the cathode,
+since a faster ion arrives with more energy.
 
-.. math::
+That probability is an **input to the model, not a result of it**.  The
+solver asks the mechanism for it and uses whatever comes back; it makes no
+assumption about the functional form, and none is needed for the derivation.
+A mechanism is free to return a constant, a fitted field dependence, or a
+table.
 
-   \gamma_i(E) = \gamma_0 + \gamma_1\exp\left(-\frac{E_\mathrm{ref}}{\beta E}\right),
-   \qquad E = (E/N)\,N ,
-
-identical for :math:`\mathrm{N}_2^+` and :math:`\mathrm{O}_2^+`, with the
-default :math:`\gamma_0 = 10^{-3}`, :math:`\gamma_1 = 0` (i.e.
-a constant yield).  The four parameters are exposed as ``gamma0``,
-``gamma1``, ``eref``, ``beta`` in the JSON configuration and can be set
-independently for the two polarities of a non-symmetric gap
-(:ref:`Chap:Configuration`).  There is considerable uncertainty in these
-constants; ``mechanisms/air/see.json`` sweeps :math:`\gamma_0` over
-:math:`10^{-4}`–:math:`10^{-2}` to quantify the sensitivity.
+This is worth stating plainly because :math:`\vec{\gamma}_\mathrm{p}` is
+the least certain quantity in the whole model.  It depends on the cathode
+material, its oxide layer, its roughness and its history, and quoted values
+for the same nominal surface span orders of magnitude.  The criterion is only
+logarithmically sensitive to it — :math:`\ln(1 + \gamma^{-1})` in the
+classical limit — which is what makes the approach usable at all, but a
+sensitivity sweep is still the honest way to report a result.  See
+:ref:`Chap:AirScheme` for the form and values the dry-air mechanism uses, and
+``mechanisms/air/see.json`` for a ready-made sweep.
 
 .. admonition:: Code
 
    ``get_gamma_plus(EN, p, T)`` returns :math:`\vec{\gamma}_\mathrm{p}` with
-   the module defaults; ``get_gamma_plus_with(EN, p, T, gamma0=, gamma1=,
-   eref=, beta=)`` is the same with per-call overrides.  The solver always
-   calls the latter (through :class:`incept1d.mechanism.Mechanism`), which is how
-   polarity-specific overrides are applied without reloading the mechanism.
-   The yields are evaluated at the *cathode* field, which for a non-uniform
-   gap differs between polarities.
+   the mechanism's own defaults; ``get_gamma_plus_with(EN, p, T, ...)`` is the
+   same with per-call overrides.  The solver always calls the latter (through
+   :class:`incept1d.mechanism.Mechanism`), which is how polarity-specific
+   overrides are applied without reloading the mechanism.  The yields are
+   evaluated at the *cathode* field, which for a non-uniform gap differs
+   between polarities.
 
-Photon-induced emission
------------------------
+The photoelectric effect
+------------------------
 
-Photoemission by ionizing photons is treated with a constant yield
-:math:`\gamma_\Psi = 0.1` for every group in the dry-air scheme.  Because
-the model only tracks photons energetic enough to ionize O\ :sub:`2`
-(:math:`> 12` eV) and not the broader spectrum down to the cathode work
-function, this term is likely an underestimate of the true photoemission
-feedback.  The overall strength
-of the photon feedback can be scaled with ``xi_emit`` (photoemission) and
-``xi_photo`` (photoionization) in the JSON configuration, and switched off
-with ``cone_angle: 0``.
+The second way the cathode returns an electron is optical.  An ionizing
+photon produced in the gas can travel *back* to the cathode and eject an
+electron from the surface — the photoelectric effect — with probability
+:math:`\vec{\gamma}_\Psi`, one entry per photon group.  This is the
+:math:`\vec{\gamma}_\Psi^\intercal\Pi_\leftarrow` term in
+:eq:`eq_see_condition`, acting on the backward flux
+:math:`\vec{\Psi}^-(0)`.
+
+It matters for a reason worth being explicit about: it is *fast*.  Ion-induced
+emission requires an ion to drift the length of the gap, which at atmospheric
+pressure takes microseconds.  A photon crosses the same gap in nanoseconds.
+Where photoemission is strong enough to sustain the discharge on its own, the
+cathode feedback loop closes many orders of magnitude sooner, and the relevant
+question stops being *whether* the gap breaks down and becomes *how fast* —
+which is what :ref:`Chap:Lambda` computes.
+
+Two things limit how far this can be pushed here.  The model tracks only
+photons energetic enough to ionize the gas, because that is what the
+photoionization data describes; photons below the ionization threshold but
+above the cathode work function would also eject electrons, and they are
+simply absent.  And :math:`\vec{\gamma}_\Psi`, like its ion counterpart, is
+a surface property carrying the same order-of-magnitude uncertainty.  The
+photoemission channel can therefore be scaled with ``xi_emit``, the
+photoionization channel with ``xi_photo``, and both switched off entirely
+with ``cone_angle: 0`` (:ref:`Chap:Configuration`) — which is how a
+calculation can be made to show what the photons are actually contributing.
 
 .. admonition:: Code
 

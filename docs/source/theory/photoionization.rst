@@ -120,107 +120,15 @@ for the growth-rate calculation in :ref:`Chap:Lambda`.
    A mechanism without photoionization returns zero-width arrays
    (:math:`N_\gamma = 0`).
 
-Photon production in air
-------------------------
+Where the numbers come from
+---------------------------
 
-For the dry-air scheme (:ref:`Chap:AirScheme`) the number of ionizing
-photons produced per electron per unit time is
+Nothing above fixes :math:`\rho`, :math:`g_j` or :math:`\kappa_j`: the
+two-stream model is a transport scheme, and the spectrum it transports is a
+property of the gas.  A mechanism must supply them, by whatever route suits
+it — a measured absorption curve, a fitted multigroup decomposition, or a
+single effective group.
 
-.. math::
-   :label: eq_photogeneration
-
-   \rho = \nu_\mathrm{exc}\,\frac{p_q}{p_q + p}\,
-          \left(k_1\nu_{\mathrm{N}_2} + k_2\nu_{\mathrm{O}_2}\right)N,
-
-where :math:`k_1, k_2` are the N\ :sub:`2` and O\ :sub:`2` impact-ionization
-rate coefficients, :math:`\nu_{\mathrm{N}_2} = 0.79`,
-:math:`\nu_{\mathrm{O}_2} = 0.21` are molar fractions,
-:math:`p_q \approx 40` mbar is a quenching pressure, and
-:math:`\nu_\mathrm{exc} = 0.6` is a relative excitation efficiency.  The
-photoionization efficiency is :math:`\xi_j = 0.1` for every group.  Only
-photons capable of ionizing O\ :sub:`2` (energies above 12 eV) are
-considered; the broader spectrum down to the cathode work function, which
-could contribute to photoemission, is not available and not included.
-
-Fitting the two-stream model to the Zheleznyak absorption curve
----------------------------------------------------------------
-
-The Zheleznyak model [Zheleznyak1982]_ describes photoionization in air
-with a continuous distribution of absorption coefficients.  The O\ :sub:`2` absorption
-coefficient is approximated as
-
-.. math::
-
-   k_f = \left(\chi_1 p_{\mathrm{O}_2}\right)\left(\frac{\chi_2}{\chi_1}\right)^u,
-   \qquad u \in [0, 1],
-
-with :math:`\chi_1 = 2.625\times10^{-2}\,\mathrm{m^{-1}\,Pa^{-1}}` and
-:math:`\chi_2 = 1.5\,\mathrm{m^{-1}\,Pa^{-1}}`, which leads to the
-absorption function [Liu2004]_
-
-.. math::
-
-   \varphi(r) = \frac{\exp\left(-\chi_1 p_{\mathrm{O}_2} r\right)
-                    - \exp\left(-\chi_2 p_{\mathrm{O}_2} r\right)}
-                     {r\,\ln\left(\chi_2/\chi_1\right)} .
-
-To use this in the multigroup two-stream model, the pairs
-:math:`(g_j, \kappa_j)` are fitted by non-negative linear least squares so
-that the two-stream solution for a proxy source reproduces the Zheleznyak
-solution.  A six-group fit reproduces the absorption curve to better than
-1 % across the relevant range (:numref:`fig_zheleznyak_fit`); the
-parameters are listed in :numref:`tab_photo_groups`.
-
-.. _fig_zheleznyak_fit:
-
-.. figure:: ../figures/zheleznyakfit.*
-   :width: 100%
-   :align: center
-
-   Six-group two-stream reconstruction of the Zheleznyak absorption
-   function.  a) Pressure-reduced absorption curves and the individual
-   groups.  b) Relative error of the reconstruction.
-
-.. _tab_photo_groups:
-
-.. list-table:: Six-group parameters fitted to the Zheleznyak absorption
-   function (:math:`\kappa_j/p_{\mathrm{O}_2}` in
-   :math:`\mathrm{Pa^{-1}\,m^{-1}}`).
-   :header-rows: 1
-   :widths: 10 30 30
-
-   * - :math:`j`
-     - :math:`g_j`
-     - :math:`\kappa_j/p_{\mathrm{O}_2}`
-   * - 1
-     - :math:`1.59\times10^{-2}`
-     - :math:`2.69\times10^{-2}`
-   * - 2
-     - :math:`5.43\times10^{-2}`
-     - :math:`3.06\times10^{-2}`
-   * - 3
-     - :math:`1.43\times10^{-1}`
-     - :math:`4.48\times10^{-2}`
-   * - 4
-     - :math:`2.51\times10^{-1}`
-     - :math:`1.00\times10^{-1}`
-   * - 5
-     - :math:`3.06\times10^{-1}`
-     - :math:`3.18\times10^{-1}`
-   * - 6
-     - :math:`2.29\times10^{-1}`
-     - :math:`1.01`
-
-.. admonition:: Code
-
-   The fit is performed at import time of the mechanism by
-   ``mechanisms/air/zheleznyak.py`` (``fit_twostream(ngroups)``), called from
-   ``init_photoionization(ngroups, cone_angle_deg)`` in
-   ``mechanisms/air/air_pancheshnyi.py``.  The number of groups is the ``ngroups``
-   entry of the JSON configuration (default 3; six groups reproduce the
-   Zheleznyak curve to better than 1 %).  Absorption coefficients scale with the O\ :sub:`2` partial
-   pressure, :math:`\kappa_j = (\kappa_j/p_{\mathrm{O}_2})\,x_{\mathrm{O}_2}\,p`.
-   Running ``python3 mechanisms/air/zheleznyak.py`` standalone plots the fit;
-   :numref:`fig_zheleznyak_fit` is built from its ``--write-to-file``
-   output by ``docs/figures/zheleznyakfit.tex`` during the documentation
-   build.
+The dry-air mechanism shipped with the code fits its groups to the
+Zheleznyak absorption function; that construction, and the numbers it
+produces, are in :ref:`Chap:AirScheme`.

@@ -114,10 +114,19 @@ configurations exist.
 Where to go next
 ----------------
 
-* :ref:`Chap:NewMechanisms` — the module interface, function by function, and
-  how to write one for a new gas.
-* :ref:`Chap:ConfigPy` — the ``Config`` protocol.
-* :ref:`Chap:Configuration` — the JSON format and the keys the air family
+* :ref:`Chap:NewMechanisms` — The module interface, function by function,
+  and how to write one for a new gas.
+* :ref:`Chap:ConfigPy` — The ``Config`` protocol.
+* :ref:`Chap:Configuration` — The JSON format and the keys the air family
   understands.
-* :ref:`Chap:ModifyingReactions` — the declarative reaction strings and how
+* :ref:`Chap:ModifyingReactions` — The declarative reaction strings and how
   multipliers select them.
+
+Two complete mechanisms are documented as worked examples:
+
+* :ref:`Chap:PaschenMechanism` — The smallest mechanism that does
+  anything: two species, one reaction, no data files, and an answer that can
+  be checked in closed form.
+* :ref:`Chap:AirScheme` — The reference dry-air scheme: six species, a
+  declarative reaction table, multigroup photoionization and a family of
+  ready-made configurations.

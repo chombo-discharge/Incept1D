@@ -71,9 +71,10 @@ conversion are carried as species, so the inception field is set by the
 apparent ionization coefficient :math:`\lambda_+` and not by
 :math:`\alpha = \eta` alone.
 
-**Photoionization without a fitting exercise.**  A two-stream model, fitted
-to the Zheleznyak absorption curve, supplies the volume feedback
-(:ref:`Chap:Photoionization`).
+**Photon feedback along the field line.**  A multigroup two-stream model
+carries the ionizing photons, so photoionization in the gas and the
+photoelectric effect at the cathode are both part of the system rather than
+lumped into an effective yield (:ref:`Chap:Photoionization`).
 
 **Answers you can check.**  Every result carries a header recording the git
 commit and the command that produced it, and the solver is verified against
@@ -180,8 +181,8 @@ Theory
    theory/transport
    theory/photoionization
    theory/secondaryemission
+   theory/augmented
    theory/inceptioncriterion
-   theory/airscheme
 
 Numerics
 ********
@@ -210,6 +211,8 @@ Configuration files
    configuration/configpy
    configuration/jsonfiles
    configuration/reactions
+   configuration/paschenmechanism
+   configuration/airscheme
 
 Python modules
 **************

@@ -132,12 +132,17 @@ Where the derivation continues
 
 The rest of this chapter builds :math:`\bm{Q}` one piece at a time:
 
-* :ref:`Chap:Transport` — The augmented ODE and its formal solution.
+* :ref:`Chap:Transport` — The charged-species equation, in flux form.
 * :ref:`Chap:Photoionization` — The two-stream photon equations.
-* :ref:`Chap:SecondaryEmission` — The cathode boundary condition.
+* :ref:`Chap:SecondaryEmission` — What happens at the two electrodes.
+* :ref:`Chap:AugmentedSystem` — The three combined into one ODE, and its
+  formal solution.
 * :ref:`Chap:InceptionCriterion` — Assembling :math:`\bm{Q}`, and recovering
   Paschen's law from it as a limiting case.
-* :ref:`Chap:AirScheme` — The dry-air reaction scheme shipped with the code.
+
+The reaction scheme itself is not part of the derivation: it is an input.
+The dry-air scheme shipped with the code is documented as a worked example in
+:ref:`Chap:AirScheme`.
 
 How the assembled criterion is then evaluated and its roots located is a
 numerical question, taken up in :ref:`Chap:Numerics`.
