@@ -116,12 +116,21 @@ selects this mode; ``incept1d pdiv`` says so on startup:
 
    --field fieldline: no --p/--d given, using d = L = 20 mm (arc length of the tabulated line).
 
-Fixing ``--p`` instead would sweep :math:`d`, and passing a ``--d`` other
-than :math:`L` would solve at that gap instead.  Both are defensible in
-principle, since :math:`f(\xi)` is invariant under a geometric rescaling,
-but they rescale the whole electrode arrangement rather than the gap alone
-— not usually what an imported line is for, and both are reported when they
-happen.
+Fixing ``--p`` would make :math:`d` the swept variable instead, so every
+point would be a differently sized copy of the imported arrangement.  There
+is no useful reading of that sweep, so it is refused:
+
+.. code-block:: text
+
+   incept1d pdiv: error: --p cannot be used with --field fieldline: it would sweep the
+   gap length, and every d ≠ L = 20 mm is the electrode arrangement at a different
+   size.  Omit --p for a pressure sweep at d = L, or for the single point p = 1 bar
+   use --pd-min 20 --pd-max 20 --pd-num 1.
+
+Passing a ``--d`` other than :math:`L` is allowed — :math:`f(\xi)` is
+invariant under a geometric rescaling, so it solves the same arrangement at
+a different size — but it says so, since that is a modelling decision
+rather than a grid one.
 
 The line is not symmetric — :math:`|E|` is highest at the first tabulated
 point — so both polarities are computed: ``start=positive`` means the first

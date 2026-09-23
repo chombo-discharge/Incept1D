@@ -258,20 +258,24 @@ def run(args, parser):
         else:
             args.p = [1.0]
     elif _field_dist.field_type == "fieldline":
-        # Either of these leaves the imported geometry behind: f(xi) is
-        # invariant under a geometric rescaling, so a gap other than L is the
-        # same electrode arrangement at a different size -- every dimension,
-        # not just the gap.  Legitimate, but rarely what an imported line is
-        # for, so neither may happen silently.
         _L_mm = _field_dist.fieldline_length * 1e3
         if args.p:
-            print(
-                f"Warning: --field fieldline with fixed --p sweeps the gap "
-                f"length instead of the pressure.  Every d ≠ L = "
-                f"{_L_mm:.4g} mm is the same electrode arrangement scaled by "
-                f"d/L.  Omit --p and --d for a pressure sweep at d = L.",
-                file=sys.stderr,
+            # Fixing the pressure makes the gap the swept variable, so every
+            # point of the sweep is a differently sized copy of the imported
+            # arrangement.  A tabulated line is one geometry at one size, so
+            # there is no reading of that sweep worth offering.
+            _pd = args.p[0] * _L_mm
+            parser.error(
+                f"--p cannot be used with --field fieldline: it would sweep "
+                f"the gap length, and every d \u2260 L = {_L_mm:.4g} mm is the "
+                f"electrode arrangement at a different size.  Omit --p for a "
+                f"pressure sweep at d = L, or for the single point "
+                f"p = {args.p[0]:.4g} bar use --pd-min {_pd:.6g} --pd-max "
+                f"{_pd:.6g} --pd-num 1."
             )
+        # An explicit --d other than the arc length rescales the arrangement
+        # too, but it does so once and on purpose, so it is reported rather
+        # than refused.
         _off = [d for d in args.d or [] if abs(d / _L_mm - 1.0) > 1e-6]
         if _off:
             print(

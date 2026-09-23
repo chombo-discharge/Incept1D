@@ -57,10 +57,13 @@ Inputs
    * - Option
      - Meaning
    * - ``--p P [P ...]``
-     - Fixed-pressure mode: pressure(s) in bar.  Default 1.0 when ``--d``
-       is not given.
+     - Fixed-pressure mode: pressure(s) in bar, with :math:`d` swept.
+       Default 1.0 when ``--d`` is not given.  Refused for
+       ``--field fieldline``, whose gap is fixed by the arc length of the
+       line (:ref:`Chap:FieldLines`).
    * - ``--d D [D ...]``
-     - Fixed-distance mode: gap distance(s) in mm.
+     - Fixed-distance mode: gap distance(s) in mm, with :math:`p` swept.
+       For a field line this is the default, at :math:`d = L`.
    * - ``--pd-min``, ``--pd-max``, ``--pd-num``
      - The :math:`pd` grid in bar·mm (default :math:`10^{-2}`–:math:`10^{3}`,
        50 log-spaced points).

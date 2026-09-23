@@ -250,6 +250,20 @@ class TestPdiv:
         assert p_col.max() > p_col.min(), "the pressure must be what varies"
         assert np.allclose(pd_col, p_col * d_col)
 
+    def test_fixed_pressure_is_refused_for_a_field_line(self, tmp_path, capsys):
+        """
+        C7f: --p would make the gap the swept variable.
+
+        Every point of such a sweep is a differently sized copy of the
+        imported arrangement, which is not a question a tabulated line can
+        answer, so it is refused rather than warned about.
+        """
+        rc = self._run_fieldline(self._fieldline(tmp_path), "--p", "1.0")
+        assert rc != 0
+        err = capsys.readouterr().err
+        assert "--p cannot be used with --field fieldline" in err
+        assert "--pd-num 1" in err, "the error must say how to ask for one pressure"
+
     def test_declared_excitation_is_refused_for_a_uniform_gap(self, tmp_path, capsys):
         """C7d: there the voltage is a result, so accepting it would mislead."""
         rc = _run("pdiv", TOY, "--fieldline-voltage", "100", "--no-plot")

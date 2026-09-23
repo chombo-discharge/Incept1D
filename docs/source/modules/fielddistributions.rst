@@ -165,12 +165,18 @@ the gap, :math:`d = L`, so a :math:`pd` sweep along a field line is a
 nor ``--d`` is given, and it is the only sweep that keeps the imported
 geometry intact.
 
-The gap length can still be set explicitly, with ``--d``, or swept, by
-fixing ``--p``.  Both are legitimate, because :math:`f(\xi)` is invariant
-under a geometric rescaling of the electrode arrangement, so :math:`d \ne L`
-solves the *same* arrangement scaled by :math:`d/L` — every electrode
-dimension, not only the gap.  It is rarely what is wanted from an imported
-line, so both are reported on stderr when they occur.
+``--p`` is therefore **refused** for a field line: fixing the pressure
+makes the gap the swept variable, so every point of the sweep would be a
+differently sized copy of the imported arrangement.  For a single point at
+one pressure, ask for it directly — :math:`pd = p\,L` with ``--pd-num 1``,
+which the error message spells out.
+
+The gap length can still be set explicitly with ``--d``.  That is allowed,
+because :math:`f(\xi)` is invariant under a geometric rescaling, so
+:math:`d \ne L` solves the *same* arrangement scaled by :math:`d/L` — every
+electrode dimension, not only the gap.  It rescales the geometry once and
+on purpose rather than across a sweep, so it is reported on stderr rather
+than refused.
 
 Resolution
 ~~~~~~~~~~
