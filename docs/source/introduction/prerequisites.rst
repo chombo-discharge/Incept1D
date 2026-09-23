@@ -26,7 +26,7 @@ Building the documentation additionally requires
 
 * **Sphinx** ≥ 7.0 and **sphinx-rtd-theme** ≥ 2.0 (listed in
   ``docs/requirements.txt``);
-* a LaTeX distribution with ``pdflatex`` if you want the PDF version.
+* A LaTeX distribution with ``pdflatex`` if you want the PDF version.
 
 Development
 -----------
@@ -40,12 +40,16 @@ Contributors should also install
 Input data
 ----------
 
-The mechanism files shipped in ``mechanisms/air/`` read electron swarm data from
-BOLSIG+ output files (``mechanisms/air/lisbon.txt``, ``mechanisms/air/phelps.txt``,
-``mechanisms/air/biagi.txt``, ``mechanisms/air/trinity.txt``, ``mechanisms/air/morgan.txt``) and negative-ion
-mobility tables from LXCat (``mechanisms/air/o2m_mobility.txt``,
-``mechanisms/air/o3m_mobility.txt``).  These are included in the repository; no
-external database access is needed to run the examples.  If you build a
-mechanism for another gas you will need to generate the corresponding swarm
-data yourself with `BOLSIG+ <https://www.bolsig.laplace.univ-tlse.fr>`_ or
-an equivalent Boltzmann solver (see :ref:`Chap:NewMechanisms`).
+The solver itself reads nothing from disk: every gas-dependent quantity comes
+from a mechanism file, and what that file reads is its own business.  In
+practice a mechanism needs electron swarm data — the ionization, attachment
+and transport coefficients as functions of :math:`E/N` — usually produced by a
+Boltzmann solver such as `BOLSIG+
+<https://www.bolsig.laplace.univ-tlse.fr>`_ from a cross-section set, together
+with ion mobilities.
+
+Everything the shipped dry-air mechanism needs is already in the repository,
+so no external database access is required to reproduce the examples.  If you
+build a mechanism for another gas you will have to supply the equivalent data
+yourself; :ref:`Chap:NewMechanisms` describes what is required and how a
+mechanism is expected to load it.

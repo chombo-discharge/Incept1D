@@ -58,12 +58,12 @@ If you change a rate coefficient, a boundary condition, a transport
 coefficient, or the assembly of :math:`\bm{\mathcal{A}}` or
 :math:`\bm{Q}`:
 
-* cite the equation of :ref:`Chap:TheoryOverview` (or the literature
+* Cite the equation of :ref:`Chap:TheoryOverview` (or the literature
   source of the new data) in the docstring and the commit message;
-* update the corresponding theory page if the model itself changed;
-* check the closed-form limit with ``mechanisms/air/paschen.json``
+* Update the corresponding theory page if the model itself changed;
+* Check the closed-form limit with ``mechanisms/air/paschen.json``
   (:eq:`eq_standard_paschen`) and re-run one of the examples;
-* extend the test suite (:ref:`Chap:TestSuite`) where the change has a
+* Extend the test suite (:ref:`Chap:TestSuite`) where the change has a
   checkable consequence.
 
 New mechanisms
@@ -103,12 +103,12 @@ under the project licence.  They carry their real rights holder and a
 ``LicenseRef-`` licence in ``REUSE.toml``, with the terms spelled out in
 ``LICENSES/``.  When you add data of this kind:
 
-* redistribute it **verbatim**, with its original header intact — the header
+* Redistribute it **verbatim**, with its original header intact — the header
   carries the citation its authors ask for, and the whitespace hooks skip
   ``mechanisms/**`` and ``examples/**`` data files on purpose;
-* add a ``[[annotations]]`` entry naming the actual rights holder, never
+* Add a ``[[annotations]]`` entry naming the actual rights holder, never
   ``SINTEF Energy Research`` by default;
-* if its terms are not an existing SPDX licence, add a
+* If its terms are not an existing SPDX licence, add a
   ``LICENSES/LicenseRef-<name>.txt`` describing them, and reference it.
 
 Mislabelling third-party data as project-owned is worse than leaving it

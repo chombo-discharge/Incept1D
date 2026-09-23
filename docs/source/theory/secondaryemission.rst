@@ -17,16 +17,16 @@ They are split between the two electrodes:
 
 At the **cathode** (:math:`x = 0`):
 
-* zero incoming flux of negative ions — they drift *away* from the cathode,
+* Zero incoming flux of negative ions — they drift *away* from the cathode,
   so nothing enters;
-* zero incoming forward photon flux, :math:`\Psi_j^+(0) = 0`;
-* the electron flux is the **secondary emission** flux produced by ions and
+* Zero incoming forward photon flux, :math:`\Psi_j^+(0) = 0`;
+* The electron flux is the **secondary emission** flux produced by ions and
   photons hitting the cathode (below).
 
 At the **anode** (:math:`x = d`):
 
-* zero incoming flux of positive ions, :math:`\Pi_+\vec{\theta}(d) = \vec{0}`;
-* zero incoming backward photon flux, :math:`\Psi_j^-(d) = 0`.
+* Zero incoming flux of positive ions, :math:`\Pi_+\vec{\theta}(d) = \vec{0}`;
+* Zero incoming backward photon flux, :math:`\Psi_j^-(d) = 0`.
 
 Counting: :math:`N_-` negative-ion conditions, :math:`1` electron condition,
 and :math:`N_\gamma` photon conditions at the cathode; :math:`N_+`

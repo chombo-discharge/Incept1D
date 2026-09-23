@@ -3,74 +3,121 @@
 Quick start
 ===========
 
-This page walks through the three most common calculations.  All commands
-are run from the repository root.
+Two complete calculations, from opposite ends of the range: one whose answer
+is known in closed form, and one that is a genuine engineering case.  All
+commands are run from the repository root.
 
-An inception curve in a uniform field
--------------------------------------
+The classical Paschen curve
+---------------------------
 
-.. code-block:: bash
-
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py --p 1.0 --pd-min 1e-2 --pd-max 1e3
-
-This loads the dry-air mechanism ``mechanisms/air/air_pancheshnyi.py`` with its default
-(baseline) configuration, sweeps :math:`pd` logarithmically from
-:math:`10^{-2}` to :math:`10^{3}` bar·mm at a fixed pressure of 1 bar, and for
-every :math:`pd` finds the reduced field :math:`E/N` at which the inception
-determinant :math:`\det\bm{Q}(\lambda{=}0)` vanishes (see
-:ref:`Chap:InceptionCriterion`).  A two-panel figure is shown: the breakdown
-voltage :math:`U(pd)` and the corresponding reduced field :math:`E/N(pd)`.
-A table with the same numbers is printed to the terminal.
-
-To write the curve to a file instead of (or in addition to) plotting it:
+Start here, because the answer can be checked by hand.  ``mechanisms/paschen``
+is the textbook Townsend model — one ionizing reaction, no attachment, no
+photoionization, secondary emission at the cathode — for helium, argon and
+air:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py --p 1.0 --no-plot \
-       --write-to-file pdiv_air_1bar.dat
+   incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json --p 1.0
 
-The output is a tab-separated table with a self-describing header that
-records the date, git commit, full command line, and one column group per
+``gases.json`` holds three configurations, one per gas, so all three curves
+are computed and plotted together.  A two-panel figure appears — the
+inception voltage :math:`U(pd)` and the reduced field :math:`E/N(pd)` — and
+the same numbers are printed as a table.
+
+Each curve should show the familiar Paschen shape: a steep left branch, a
+minimum, and a slowly rising right branch.  The minima are the check:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Gas
+     - :math:`U_\mathrm{min}`
+     - :math:`(pd)_\mathrm{min}`
+   * - Helium
+     - 142 V
+     - 0.056 bar·mm
+   * - Argon
+     - 188 V
+     - 0.014 bar·mm
+   * - Air
+     - 305 V
+     - 0.011 bar·mm
+
+Those are not fitted values: for this model both follow from
+:math:`\ln(1 + \gamma^{-1})` in closed form, and
+:ref:`Chap:Examples:Paschen` compares the whole curve against the analytic
+result.  If your run reproduces them, the installation is sound.
+
+Dry air in a sphere gap
+-----------------------
+
+Now a real case.  Dry air is electronegative, so attachment, detachment and
+ion conversion all matter, and a realistic gap is not uniform.  The following
+sweeps a sphere-sphere gap of 50 mm sphere radius and overlays the streamer
+criterion :math:`\int\max(\alpha-\eta,0)\,dx = 18`:
+
+.. code-block:: bash
+
+   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+       --pd-min 1 --pd-max 55 --pd-num 100 \
+       --field sphere-sphere 50 --streamer-criterion 18
+
+Three things are worth looking at in the result.
+
+* **The field profile is not flat.**  ``--field`` normalises the on-axis
+  profile so that :math:`\int_0^1 f\,d\xi = 1`, which makes :math:`E/N` in the
+  output the *gap-average* reduced field; the field at the sphere surface is
+  higher.  Use ``incept1d field --field sphere-sphere 50 --d 20`` to see the
+  profile itself.
+* **The streamer criterion is a different curve.**  It is the classical
+  avalanche-size condition, plotted alongside the inception criterion rather
+  than instead of it.  Where the two separate, the discharge is not
+  streamer-limited — that comparison is the subject of
+  :ref:`Chap:IonizationIntegral`.
+* **Polarity.**  A sphere-sphere gap is symmetric, so both polarities give
+  the same answer and the curves coincide.  Repeat with ``--field
+  sphere-plane 50`` and they separate, because the high-field electrode is
+  then either the anode or the cathode.
+
+To keep the numbers instead of the figure:
+
+.. code-block:: bash
+
+   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+       --pd-min 1 --pd-max 55 --pd-num 100 \
+       --field sphere-sphere 50 --streamer-criterion 18 \
+       --no-plot --write-to-file air_sphere50.dat
+
+The output is a tab-separated table with a self-describing header recording
+the date, the git commit, the full command line, and one column group per
 configuration and polarity.
 
-Comparing configurations
-------------------------
+Varying the physics
+-------------------
 
-The physics of a mechanism can be varied without touching the Python file by
-passing one or more JSON configuration files (see :ref:`Chap:Configuration`).
-For example, ``mechanisms/air/nodetachment.json`` defines two configurations, the
-baseline and one with both electron-detachment reactions switched off:
+Neither example edited a Python file.  A mechanism's parameters — which
+cross-section database to use, which reactions to scale or switch off, the
+secondary-emission yield — are changed by passing JSON configuration files
+after the mechanism, and each becomes its own curve in the same figure:
 
 .. code-block:: bash
 
    incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
        --p 1.0 --pd-min 1 --pd-max 1e3
 
-Both configurations are computed and plotted in the same figure, giving
-the "with / without detachment" comparison directly.
-
-A non-uniform field
--------------------
-
-Sphere-plane and sphere-sphere gaps are supported analytically.  For a
-sphere-sphere gap with sphere radius 50 mm, additionally overlaying the
-streamer criterion :math:`\int\max(\alpha-\eta,0)\,dx = 18`:
-
-.. code-block:: bash
-
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
-       --pd-min 1 --pd-max 55 --pd-num 100 \
-       --field sphere-sphere 50 --streamer-criterion 18
-
-For sphere-plane gaps (which are not symmetric) both polarities are computed
-and reported separately.  Tabulated field lines from an external
-electrostatic solver are supported through ``--field fieldline FILE``; see
-:ref:`Chap:FieldLines`.
+``nodetachment.json`` holds the baseline and a variant with both
+electron-detachment reactions switched off, so this produces the
+"with / without detachment" comparison directly.  See
+:ref:`Chap:Configuration` for the format and
+:ref:`Chap:ConfigurationOverview` for the files a mechanism is made of.
 
 Where to go next
 ----------------
 
-* :ref:`Chap:ModulesOverview` — what every command does and its options.
-* :ref:`Chap:Configuration` — the JSON configuration format.
-* :ref:`Chap:Examples:IEC60052` and :ref:`Chap:Examples:Electra` — full
-  comparisons against reference breakdown data.
+* :ref:`Chap:ModulesOverview` — What every command does and its options.
+* :ref:`Chap:FieldLines` — Using a tabulated field line from an external
+  electrostatic solver, curvature included.
+* :ref:`Chap:Examples:Paschen` — The closed-form verification in full.
+* :ref:`Chap:Examples:IEC60052` and :ref:`Chap:Examples:Electra` —
+  Comparisons against reference breakdown data.

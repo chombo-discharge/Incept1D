@@ -33,9 +33,9 @@ The solver must reproduce it, and its documented limits, to about
 * :eq:`eq_generalized_paschen` over a range of gap lengths;
 * :eq:`eq_standard_paschen` with detachment switched off;
 * :math:`\alpha d = \ln(1 + \gamma^{-1})` with attachment switched off too;
-* solutions in the attachment regime :math:`\alpha \le \eta`, where the
+* Solutions in the attachment regime :math:`\alpha \le \eta`, where the
   long-gap limit is :math:`\alpha \to \eta/(1+\gamma)`;
-* the leading eigenvalue of :math:`\bm{R}\bm{V}^{-1}` equals
+* The leading eigenvalue of :math:`\bm{R}\bm{V}^{-1}` equals
   :math:`\lambda_+`.
 
 The shipped dry-air mechanism is held to the same standard:
@@ -52,11 +52,11 @@ must then satisfy :eq:`eq_standard_paschen` using its own tabulated
   malformed input;
 * :mod:`incept1d.mechanism` — the interface contract, the ``config.py``
   protocol and JSON configuration shapes;
-* the propagators — ``magnus2`` reduces to the midpoint rule for constant
+* The propagators — ``magnus2`` reduces to the midpoint rule for constant
   :math:`\bm{\mathcal{A}}`; composed propagators reproduce a single
   ``expm``; the uniform-field shortcut agrees with the stepped path; the
   photon collapse switches exactly at :math:`\kappa d = 12`;
-* the command line — every subcommand parses, runs, and writes a file whose
+* The command line — every subcommand parses, runs, and writes a file whose
   header describes its own columns.
 
 **Invariants and regressions.**  Pinned values are the weakest kind of test:

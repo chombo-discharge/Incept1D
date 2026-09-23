@@ -62,7 +62,7 @@ Here
   drift velocities;
 * :math:`\bm{R}` is the reaction-rate matrix, which crucially does **not**
   depend on :math:`\vec{n}`;
-* the last term is photoionization by :math:`N_\gamma` photon groups:
+* The last term is photoionization by :math:`N_\gamma` photon groups:
   :math:`\kappa_j\Psi_j^0` is the number of group-:math:`j` photons absorbed
   per unit volume and time, :math:`\xi_j` the photoionization efficiency,
   and :math:`\vec{\beta}_j` selects which species the absorption produces.

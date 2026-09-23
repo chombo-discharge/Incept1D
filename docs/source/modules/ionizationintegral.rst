@@ -12,11 +12,11 @@ inception criterion defined in :ref:`Chap:InceptionCriterion` along the
 (possibly non-uniform) field profile and plots them against applied
 voltage:
 
-* the effective ionization integral :math:`I_\alpha = \int_0^d
+* The effective ionization integral :math:`I_\alpha = \int_0^d
   \max(\alpha - \eta, 0)\,dx` (:eq:`eq_ionization_integral`), i.e. the
   classical streamer-criterion integrand, which ignores detachment, ion
   transit and photoionization entirely;
-* the apparent effective ionization integral :math:`I_\lambda = \int_0^d
+* The apparent effective ionization integral :math:`I_\lambda = \int_0^d
   \max(\mathrm{Re}\,\lambda_{\max}(\bm{R}\bm{V}^{-1}), 0)\,dx`
   (:eq:`eq_apparent_ionization_integral`), which uses the leading local
   eigenvalue in place of :math:`\alpha - \eta`.

@@ -5,32 +5,132 @@ Welcome to the ``Incept1D`` user documentation
 
 .. important::
 
-   ``Incept1D`` computes the inception (breakdown) condition of a
-   one-dimensional drift-reaction model of a gas discharge gap, including
-   negative-ion transport and detachment, ion conversion, two-stream
-   photoionization, and cathode secondary emission.  The code is hosted at
-   `GitHub <https://github.com/chombo-discharge/Incept1D>`_ together with the source
+   ``Incept1D`` decides whether a gas discharge **starts**.  It solves a
+   one-dimensional drift-reaction model of a discharge gap — electrons,
+   positive and negative ions, two-stream photoionization and cathode
+   secondary emission — and returns the voltage at which the gap breaks
+   down.  The code is hosted at `GitHub
+   <https://github.com/chombo-discharge/Incept1D>`_ together with the source
    files for this documentation.
 
-``Incept1D`` is a small Python package with a command-line front end.  Given a
-plasma-chemistry *mechanism file* it can
+What it does
+============
 
-* compute inception curves, i.e. generalized Paschen curves (inception voltage and reduced field
-  vs. :math:`pd`) for uniform, sphere-plane, sphere-sphere, or tabulated
-  field-line geometries (:ref:`Chap:Inception`);
-* inspect the local eigenvalues of the reaction-transport matrix
-  :math:`\bm{R}\bm{V}^{-1}` vs. :math:`E/N` (:ref:`Chap:Eigenvalues`);
-* compare the full inception criterion against the classical ionization
-  integral and the streamer criterion (:ref:`Chap:IonizationIntegral`);
-* compute the temporal growth rate of the discharge above the inception
-  voltage (:ref:`Chap:Lambda`);
-* export transport and rate-coefficient tables for the 3-D plasma solver
-  `chombo-discharge <https://github.com/chombo-discharge/chombo-discharge>`_
-  (:ref:`Chap:CreateChomboDischargeData`).
+.. list-table::
+   :header-rows: 1
+   :widths: 26 46 28
 
-The underlying theory is derived in :ref:`Chap:TheoryOverview` and the
-following pages, and the documentation maps every equation onto the
-function that implements it.
+   * - Command
+     - Answers
+     - See
+   * - ``incept1d pdiv``
+     - **Inception curves.**  The inception voltage and reduced field against
+       :math:`pd` — a generalized Paschen curve.
+     - :ref:`Chap:Inception`
+   * - ``incept1d growth``
+     - **Growth rate.**  How fast the discharge grows once the voltage exceeds
+       inception.
+     - :ref:`Chap:Lambda`
+   * - ``incept1d ionization``
+     - **Ionization integrals.**  The classical and apparent integrals, for
+       comparison against the full criterion.
+     - :ref:`Chap:IonizationIntegral`
+   * - ``incept1d eigenvalues``
+     - **Local growth modes.**  Eigenvalues of the reaction-transport matrix
+       :math:`\bm{R}\bm{V}^{-1}` against :math:`E/N`.
+     - :ref:`Chap:Eigenvalues`
+   * - ``incept1d field``
+     - **Gap geometry.**  The normalised field profile of a gap, before you
+       spend time on a sweep.
+     - :ref:`Chap:FieldDistributions`
+   * - ``incept1d chombo``
+     - **Transport tables.**  Export for the 3-D plasma solver
+       `chombo-discharge <https://github.com/chombo-discharge/chombo-discharge>`_.
+     - :ref:`Chap:CreateChomboDischargeData`
+
+Features
+========
+
+**Any gas.**  The chemistry lives in a *mechanism file* outside the package,
+so a new gas is a new file rather than a patch to the solver
+(:ref:`Chap:NewMechanisms`).  Dry air is shipped, with several ready-made
+variants.
+
+**Any gap geometry.**  Uniform, sphere-plane and sphere-sphere gaps are
+analytic.  A **tabulated field line** from an external electrostatic solver
+is read straight from file, curvature included (:ref:`Chap:FieldLines`).
+
+**A criterion that does not assume the answer.**  Rather than asking whether
+an avalanche reaches a critical size, the solver evaluates
+:math:`\det\bm{Q}(\lambda) = 0` for the whole coupled system, so electrode
+feedback and volume feedback are on the same footing
+(:ref:`Chap:InceptionCriterion`).
+
+**Electronegative gases done properly.**  Attachment, detachment and ion
+conversion are carried as species, so the inception field is set by the
+apparent ionization coefficient :math:`\lambda_+` and not by
+:math:`\alpha = \eta` alone.
+
+**Photoionization without a fitting exercise.**  A two-stream model, fitted
+to the Zheleznyak absorption curve, supplies the volume feedback
+(:ref:`Chap:Photoionization`).
+
+**Answers you can check.**  Every result carries a header recording the git
+commit and the command that produced it, and the solver is verified against
+closed-form limits rather than against stored output
+(:ref:`Chap:Examples:Paschen`, :ref:`Chap:TestSuite`).
+
+Getting started
+===============
+
+.. code-block:: bash
+
+   git clone https://github.com/chombo-discharge/Incept1D.git
+   cd Incept1D && pip install -e .
+   incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json --p 1
+
+:ref:`Chap:Installation` covers the install in full, and
+:ref:`Chap:QuickStart` walks through two complete calculations.
+
+How this documentation is organised
+===================================
+
+* **Introduction** — What you need, where to get the code, and how to run a
+  first calculation.
+* **Theory** — The drift-reaction model, two-stream photoionization,
+  secondary emission and the determinant inception criterion.  Every
+  equation is cross-referenced to the function that implements it.
+* **Numerics** — How the propagator is built, how the determinant is
+  evaluated robustly, how roots are found and tracked, and what a
+  calculation costs.
+* **Configuration files** — The mechanism module, the ``config.py``
+  protocol and the JSON format: what a gas needs and the interfaces it must
+  satisfy.
+* **Python modules** — What each module and command does, and its
+  command-line interface.
+* **Examples** — Worked calculations: the classical Paschen curve, and
+  comparisons against the IEC 60052 sphere-gap standard and the Dakin
+  *et al.* (ELECTRA) breakdown compilation.
+* **Maintenance** — The test suite, continuous integration, and how to
+  contribute.
+
+The API reference is generated from the NumPy-style docstrings in the code.
+The version at `chombo-discharge.github.io/Incept1D
+<https://chombo-discharge.github.io/Incept1D/>`_ is rebuilt by continuous
+integration from every commit to ``main``; see :ref:`Chap:Infrastructure`
+for how to build it locally.
+
+Notation
+========
+
+Throughout the theory pages, bold upright symbols (:math:`\bm{R}`,
+:math:`\bm{V}`, :math:`\bm{Q}`) are matrices and arrow symbols
+(:math:`\vec{n}`, :math:`\vec{\theta}`) are column vectors.  Reduced fields
+:math:`E/N` are given in Townsend
+(:math:`1\,\mathrm{Td} = 10^{-21}\,\mathrm{V\,m^2}`), pressures in bar, gap
+distances in mm, and the product :math:`pd` in bar·mm.  Inside the code all
+quantities are SI except where a function docstring explicitly says
+otherwise; the command-line interfaces accept bar, mm, kV and Td.
 
 This documentation was built from commit |commit|.
 
@@ -41,6 +141,7 @@ This documentation was built from commit |commit|.
    section#introduction,
    section#theory,
    section#numerics,
+   section#configuration-files,
    section#python-modules,
    section#examples,
    section#maintenance,
@@ -62,7 +163,6 @@ Introduction
    :caption: Introduction
    :hidden:
 
-   introduction/documentation
    introduction/prerequisites
    introduction/obtaining
    introduction/installation

@@ -23,20 +23,20 @@ cost of one.  For the six-species dry-air scheme with three photon groups
      - Notes
    * - :math:`\det\bm{Q}`, uniform field
      - ≈ 0.4 ms
-     - one ``expm`` and one :math:`\bm{\mathcal{A}}` assembly — exact, so
+     - One ``expm`` and one :math:`\bm{\mathcal{A}}` assembly — exact, so
        ``--dx`` and ``--method`` do not apply
    * - :math:`\det\bm{Q}`, sphere gap, default ``--dx``
      - ≈ 4.5 ms
-     - adaptive midpoint, :math:`N_{\min} = 5`, :math:`N_{\max} = 200`;
+     - Adaptive midpoint, :math:`N_{\min} = 5`, :math:`N_{\max} = 200`;
        15 ``expm`` and 16 :math:`\bm{\mathcal{A}}` assemblies, the latter
        dominated by Python overhead in ``get_R``
    * - one :math:`pd` point of an inception curve
      - 60–250 evaluations
-     - warm start ≈ 20 + the guard scan below it, full scan ≈ 200 +
+     - Warm start ≈ 20 + the guard scan below it, full scan ≈ 200 +
        refinement
    * - 100-point inception curve, sphere gap, two configurations
-     - minutes
-     - the :ref:`Chap:Examples:IEC60052` runs
+     - Minutes
+     - The :ref:`Chap:Examples:IEC60052` runs
 
 Non-uniform fields are roughly an order of magnitude more expensive than
 uniform ones: the uniform propagator is a single exact ``expm``, whereas a

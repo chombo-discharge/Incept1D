@@ -59,10 +59,10 @@ How the line is used
 the profile by normalised arc length :math:`\xi = s/L` and normalises it
 so that :math:`\int_0^1 f\,d\xi = 1`.  Consequently
 
-* the gap length is the arc length, :math:`d = L`;
-* the reference field is the mean field along the line, :math:`E_\mathrm{ref}
+* The gap length is the arc length, :math:`d = L`;
+* The reference field is the mean field along the line, :math:`E_\mathrm{ref}
   = U/L` with :math:`U = \int|E|\,ds` the voltage drop along the line;
-* every voltage reported by the commands is this line integral.
+* Every voltage reported by the commands is this line integral.
 
 Polarity
 ........

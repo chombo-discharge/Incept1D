@@ -50,16 +50,16 @@ Which files are needed
        coupling and the secondary-emission yields.  Must expose the interface
        in :ref:`Chap:NewMechanisms`.
    * - ``config.py``
-     - no
+     - No
      - A ``Config`` class that turns a JSON dictionary into overrides for the
        module.  Needed only if the mechanism is to accept configuration files
        at all; see :ref:`Chap:ConfigPy`.
    * - ``*.json``
-     - no
+     - No
      - Named parameter sets — cross-section database, rate multipliers,
        photoionization and SEE settings.  See :ref:`Chap:Configuration`.
    * - data files
-     - no
+     - No
      - Whatever the module chooses to read: BOLSIG+ swarm output, LXCat
        mobility tables, fitted absorption curves.  The package never opens
        them; the module does, relative to its own location.
