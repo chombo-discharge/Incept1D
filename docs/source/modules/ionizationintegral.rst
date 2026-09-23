@@ -1,0 +1,104 @@
+.. _Chap:IonizationIntegral:
+
+Ionization integrals — ``incept1d ionization``
+==============================================
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+``incept1d ionization`` evaluates the two local surrogates of the
+inception criterion defined in :ref:`Chap:InceptionCriterion` along the
+(possibly non-uniform) field profile and plots them against applied
+voltage:
+
+* The effective ionization integral :math:`I_\alpha = \int_0^d
+  \max(\alpha - \eta, 0)\,dx` (:eq:`eq_ionization_integral`), i.e. the
+  classical streamer-criterion integrand, which ignores detachment, ion
+  transit and photoionization entirely;
+* The apparent effective ionization integral :math:`I_\lambda = \int_0^d
+  \max(\mathrm{Re}\,\lambda_{\max}(\bm{R}\bm{V}^{-1}), 0)\,dx`
+  (:eq:`eq_apparent_ionization_integral`), which uses the leading local
+  eigenvalue in place of :math:`\alpha - \eta`.
+
+Comparing the two curves at the inception voltage found by ``incept1d pdiv``
+quantifies how much the local approximation misses once negative-ion
+transit and detachment matter, and how sensitive that is to the choice of
+electron cross sections.
+
+Inputs
+------
+
+.. code-block:: console
+
+   incept1d ionization MECHANISM.py [CONFIG.json ...]
+       --d D [D ...] (--p P [P ...] | --data-file FILE [--pressure-column COL] [--voltage-column COL])
+       [--voltage-lo V] [--voltage-hi V] [--voltage-num N] [--single-voltage V]
+       [--T T] [--field SPEC] [--N N] [--no-plot] [--write-to-file FILE]
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Meaning
+   * - ``--d D [D ...]``
+     - Gap distance(s) in mm (required).
+   * - ``--p P [P ...]``
+     - Pressure(s) in bar (required unless ``--data-file``).
+   * - ``--voltage-lo/-hi/-num``
+     - Linear voltage sweep in kV (defaults 0–1 kV, 100 points).
+   * - ``--single-voltage V``
+     - Evaluate at one voltage, print the result, no plot.
+   * - ``--data-file FILE``
+     - Read (pressure, voltage) pairs from an ASCII table — e.g. measured
+       breakdown voltages — and evaluate the integrals at exactly those
+       points instead of sweeping.  Columns are selected by name or 0-based
+       index.
+   * - ``--N N``
+     - Number of midpoint-rule quadrature steps across the gap for
+       non-uniform fields (default 200).
+   * - ``--field SPEC``
+     - Geometry, as for ``incept1d pdiv``.
+
+Examples
+--------
+
+.. code-block:: bash
+
+   # Both integrals vs voltage, four cross-section sets, 10 mm gap at 10 bar
+   incept1d ionization mechanisms/air/air_pancheshnyi.py mechanisms/air/databases.json \
+       --p 10 --d 10 --voltage-lo 100 --voltage-hi 300
+
+   # Evaluate the integrals at measured breakdown voltages in a sphere-plane gap
+   incept1d ionization mechanisms/air/air_pancheshnyi.py --d 20 \
+       --data-file measurements.dat --pressure-column 0 --voltage-column 1 \
+       --field sphere-plane 25
+
+Outputs
+-------
+
+A figure of both integrals against applied voltage, one curve per
+(configuration, pressure, gap) combination, and a printed table with one
+block per configuration and the columns
+
+.. code-block:: text
+
+   p (bar)    V (kV)    E/N (Td)    ∫max(α−η,0)dx (m⁻¹)    ∫max(λ_max,0)dx (m⁻¹)
+
+The last column appears only when the mechanism supplies the matrices
+:math:`\bm{R}` and :math:`\bm{V}`; a value that overflowed is written
+``NaN``.
+
+``--single-voltage`` prints one row and skips the figure.
+``--write-to-file`` writes a wide table instead — one row per voltage,
+a column ``U_kV``, then ``streamer_integral[LABEL]`` and, where available,
+``eigenvalue_integral[LABEL]`` for every curve — under the usual metadata
+header.
+
+API reference
+-------------
+
+.. automodule:: incept1d.ionization
+   :members:
+   :undoc-members:

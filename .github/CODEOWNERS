@@ -1,0 +1,37 @@
+# CODEOWNERS for Incept1D
+#
+# Each line maps a path pattern to one or more owners. Owners are automatically
+# requested for review on PRs that touch matching files. When "Require review
+# from Code Owners" is enabled in the branch protection rule for `main`, at
+# least one listed owner must approve before the PR can be merged.
+#
+# Later matches take precedence over earlier ones, so order from most general
+# to most specific.
+
+# Default owner for everything in the repository.
+*                        @rmrsk
+
+# The solver package: augmented ODE, propagators, det Q, root finding.
+/src/incept1d/           @rmrsk
+
+# Command-line front ends.
+/src/incept1d/cli/       @rmrsk
+
+# Plasma chemistry: mechanism files, configuration protocol, swarm data.
+# Changes here alter the physics and need a rate-by-rate review.
+/mechanisms/             @rmrsk
+
+# Documentation, including the theory pages that the code is validated against.
+/docs/                   @rmrsk
+
+# Worked examples: reference data and the scripts that reproduce them.
+/examples/               @rmrsk
+
+# Tests.
+/tests/                  @rmrsk
+
+# CI, repository configuration, and these ownership rules themselves.
+/.github/                @rmrsk
+/pyproject.toml          @rmrsk
+/.pre-commit-config.yaml @rmrsk
+/.flake8                 @rmrsk

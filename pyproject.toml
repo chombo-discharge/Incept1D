@@ -1,8 +1,52 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "incept1d"
+version = "0.1.0"
+description = "Discharge inception in a 1-D drift-reaction model: Paschen curves, growth rates and transport tables"
+requires-python = ">=3.10"
+authors = [{ name = "Robert Marskar" }]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSES/*.txt"]
+dependencies = [
+    "numpy>=1.25",
+    "scipy>=1.10",
+    "matplotlib>=3.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pre-commit", "black", "flake8"]
+docs = ["sphinx>=7.0", "sphinx-rtd-theme>=2.0"]
+
+[project.scripts]
+incept1d = "incept1d.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.black]
 line-length = 88
 target-version = ["py310", "py311", "py312"]
 extend-exclude = '''
 /(
-  Docs/_build
+  docs/build
 )/
 '''
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests/ holds the toy mechanism and closed_form.py, which the test modules
+# import by name.
+pythonpath = ["tests"]
+markers = [
+  "slow: loads real swarm data or runs the full solver (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+  "error::DeprecationWarning",
+  # A stale apt mpl_toolkits shadows the pip matplotlib on some machines.
+  "ignore:Unable to import Axes3D:UserWarning",
+  # The solver evaluates det Q far outside the physical range on purpose.
+  "ignore::RuntimeWarning",
+]

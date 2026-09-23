@@ -1,0 +1,40 @@
+LXCat data — terms of use
+=========================
+
+This licence text covers the electron-scattering cross sections, swarm
+parameters and ion mobilities retrieved from the LXCat open-access database
+(www.lxcat.net) that are redistributed in this repository, together with the
+BOLSIG+ output computed from them.
+
+These files are NOT covered by the GPL-3.0-or-later licence that applies to
+the rest of this repository.  They are redistributed unmodified, with their
+original headers intact, under the terms stated by LXCat and by the individual
+contributing databases.
+
+As stated in the file headers:
+
+    LXCat, www.lxcat.net
+    All rights reserved.
+
+    RECOMMENDED REFERENCE FORMAT
+    - <name> database, www.lxcat.net, retrieved on <date>.
+    Be aware that some databases and solvers can additionally have
+    instructions how to reference corresponding data.  Please check below in
+    the headers of databases.
+
+Each redistributed file retains the full LXCat header, which names the
+contributing database, its permanent link, its description and the citation
+that the database authors ask for.  Anyone using these data must follow the
+reference format given in the header of the file they use.
+
+The databases drawn on here are:
+
+    IST-Lisbon database   www.lxcat.net/IST-Lisbon
+    Phelps database       www.lxcat.net/Phelps
+    Biagi database        www.lxcat.net/Biagi
+    Morgan database       www.lxcat.net/Morgan
+    TRINITI database      www.lxcat.net/TRINITI
+    Viehland database     www.lxcat.net/Viehland
+
+The copyright in these data belongs to the respective database authors, not to
+the authors of this repository.  If you redistribute them, keep the headers.

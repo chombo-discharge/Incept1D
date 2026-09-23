@@ -1,0 +1,126 @@
+.. _Chap:Examples:IEC60052:
+
+Sphere gaps: the IEC 60052 standard
+===================================
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+The IEC 60052 standard [IEC60052]_ tabulates the disruptive-discharge
+voltage of standard sphere gaps — two equal spheres of diameter
+:math:`D = 2R` between 2 cm and 200 cm, one of them earthed — as a
+function of gap spacing, for voltage calibration.  Because the field
+between two spheres is available in closed form (bispherical series,
+:ref:`Chap:FieldDistributions`), these tables are a demanding test of the
+inception criterion in a *non-uniform* field over a wide range of
+:math:`pd` without any numerical field calculation.
+
+Reference data (not included)
+-----------------------------
+
+.. important::
+
+   The disruptive-discharge voltages of IEC 60052 are copyrighted by the
+   International Electrotechnical Commission and are **not distributed with
+   this repository**.  The comparison figure is therefore not part of the
+   documentation build; the calculation itself runs without it.
+
+If you hold a copy of the standard you can reproduce the full comparison
+locally.  Place one file per sphere diameter in ``examples/iec60052/``, named
+``iec60052_<D>cm.dat``, with columns :math:`pd` (bar·mm; equal to the spacing
+in mm at 1 bar) and voltage (kV, peak); ``#`` comment lines are ignored.
+Every reference overlay in ``docs/figures/iec60052.tex`` is guarded by
+``\IfFileExists``, so the next ``make -C docs figures`` picks up whichever
+diameters you supplied and silently omits the rest.  See
+``examples/iec60052/README.md``.
+
+Running the calculation
+-----------------------
+
+For each diameter the sphere-sphere geometry is selected with the radius
+in mm, and :math:`pd` is swept at the fixed pressure of 1 bar so that the
+gap spacing varies.  Both the full scheme and the no-detachment variant
+(``mechanisms/air/nodetachment.json``) are computed, and the streamer criterion
+:math:`I_\alpha = 18` is solved alongside:
+
+.. code-block:: bash
+
+   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
+       --pd-min 1 --pd-max 1000 --pd-num 100 \
+       --field sphere-sphere 1000 \
+       --streamer-criterion 18 --no-plot \
+       --write-to-file examples/iec60052/sim_200cm.dat
+
+This is the :math:`D = 200` cm case; ``examples/iec60052/run.sh`` runs the
+whole set (10, 15, 25, 50, 75, 100, 150, 200 cm) with a :math:`pd` range
+matched to each table:
+
+.. literalinclude:: ../../../examples/iec60052/run.sh
+   :language: bash
+   :start-at: MECH=
+
+The sphere-sphere geometry is symmetric: both polarities are written to
+the output file but contain identical values.  The default adaptive grid
+(``--dx 5 200 0.03``) is used; each diameter takes a few minutes.
+
+Reading the output
+------------------
+
+Each ``sim_<D>cm.dat`` has the layout described in :ref:`Chap:Inception`.
+For this command the relevant columns are
+
+.. code-block:: text
+
+   Column 1:  pd_bar_mm
+   Column 5:  U_kV[Baseline, p=1.0 bar (sphere=positive)]        <- full scheme
+   Column 15: U_kV[No detachment, p=1.0 bar (sphere=positive)]   <- no detachment
+   Column 25: U_kV[alpha=eta, p=1.0 bar]                         <- alpha = eta reference
+   Column 28: U_kV[Streamer (C=18.0), Baseline, p=1.0 bar]       <- streamer criterion
+
+(the header names every column; the numbering depends on the number of
+configurations and polarities).
+
+Result
+------
+
+The comparison figure is **not built with the documentation**.  Without the
+IEC tables it would show the computed curves with nothing to compare them
+against, and the eight sphere diameters are by far the most expensive
+calculation in the repository — about three quarters of the total figure
+cost.  The pgfplots source ``docs/figures/iec60052.tex`` is maintained all
+the same (see :ref:`Chap:Infrastructure`), so once the reference tables are
+in place it can be built on its own:
+
+.. code-block:: bash
+
+   make -C docs/figures iec60052
+
+which writes ``docs/source/figures/iec60052.pdf`` and ``.png``: breakdown
+voltage vs. :math:`pd` with the IEC values as symbols and the inception
+criterion as lines, for sphere diameters 10–200 cm, plus the no-detachment
+calculation and the streamer criterion for :math:`D = 200` cm.
+
+The calculation agrees with the standard to within about ±10 % over the
+whole :math:`pd` range.  The two reference curves show what is lost with
+the classical criteria: both the streamer criterion and the calculation
+without electron detachment predict consistently higher voltages,
+particularly at large :math:`pd`, where the error exceeds 30 % —
+several hundred kV for the largest gaps.  Since the only difference
+between the full and the no-detachment curve is the multiplier on
+reactions 5 and 6 of :ref:`Chap:AirScheme`, the gap between them is a
+direct measure of how much negative-ion detachment lowers the inception
+voltage.
+
+Variations to try
+-----------------
+
+* **Cross-section spread.**  Swap ``mechanisms/air/nodetachment.json`` for
+  ``mechanisms/air/databases.json`` to see how much of the answer comes from
+  the choice of electron cross sections.
+* **A different propagator.**  ``--method magnus2 --dx 40 40`` replaces the
+  adaptive midpoint grid with a fixed fourth-order one; compare both the run
+  time and the resulting curve.
+* **An asymmetric gap.**  ``--field sphere-plane 500`` puts one sphere
+  against a plane, which is *not* symmetric, so the output carries both
+  polarities and the polarity effect at large :math:`pd` becomes visible.

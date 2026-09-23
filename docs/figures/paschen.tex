@@ -1,0 +1,68 @@
+% The classical Paschen curve: Incept1D vs the closed form of the Townsend model.
+%
+% Data files (in the working directory when this is compiled):
+%   sim.dat           incept1d pdiv output from examples/paschen/run.sh
+%   closed_form.dat   analytic U(pd) from examples/paschen/closed_form.py
+%
+% Both are computed from the same coefficients, so nothing third-party is
+% involved and the figure always reflects the current solver.
+%
+% 0-based column indices (\thisrowno) into sim.dat; 1-based layout:
+%    1  pd_bar_mm
+%    5  U_kV[Helium]      15  U_kV[Argon]      25  U_kV[Air]
+% and into closed_form.dat:
+%    1  pd_bar_mm   2  U_helium   3  U_argon   4  U_air
+\documentclass[10pt]{article}
+\input{preamble.tex}
+\usepackage[paperwidth=15cm,paperheight=9.4cm,margin=0in]{geometry}
+
+\pgfplotsset{
+  solver/.style={very thick, no marks},
+  exact/.style={only marks, mark=o, mark size=2.0pt,
+                mark options={thin, fill=white, fill opacity=0.9}},
+}
+\setlength{\figwidth}{14cm}
+\setlength{\figheight}{9cm}
+
+\begin{document}
+\centering
+\begin{tikzpicture}
+  \begin{axis}[
+      anchor=south west,
+      axis y line=left,
+      axis x line=bottom,
+      font=\small,
+      width=\figwidth,
+      height=\figheight,
+      grid=both,
+      minor grid style={very thin, densely dotted},
+      axis line style={thick, black},
+      unbounded coords=jump,
+      xmode=log, ymode=log,
+      xmin=5e-3, xmax=1e2,
+      ymin=1e2, ymax=1e5,
+      cycle list name=exotic,
+      ylabel={$U$ (\si{\volt})},
+      xlabel={$pd$ (\si{\bar\milli\meter})},
+      boxedlegend,
+      legend style={at={(0.5, 0.97)}, anchor=north, legend columns=4},
+    ]
+
+    % Solver: lines.  Closed form: open markers in the same colour.
+    \addplot+[solver] table[x expr=\thisrowno{0}, y expr=\thisrowno{4}*1000] {sim.dat};
+    \addplot[exact, forget plot, black] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}*1000] {closed_form.dat};
+
+    \addplot+[solver] table[x expr=\thisrowno{0}, y expr=\thisrowno{14}*1000] {sim.dat};
+    \addplot[exact, forget plot, black] table[x expr=\thisrowno{0}, y expr=\thisrowno{2}*1000] {closed_form.dat};
+
+    \addplot+[solver] table[x expr=\thisrowno{0}, y expr=\thisrowno{24}*1000] {sim.dat};
+    \addplot[exact, forget plot, black] table[x expr=\thisrowno{0}, y expr=\thisrowno{3}*1000] {closed_form.dat};
+
+    \addlegendentry{Helium};
+    \addlegendentry{Argon};
+    \addlegendentry{Air};
+    \addplot[exact, black] coordinates {(1e-9,1e-9)};
+    \addlegendentry{closed form};
+  \end{axis}
+\end{tikzpicture}
+\end{document}

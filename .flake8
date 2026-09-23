@@ -6,13 +6,10 @@ extend-ignore =
     # The codebase deliberately hand-aligns assignments/parameters/keywords
     # in places (e.g. `self._eref   = eref`); these are purely cosmetic and
     # are not part of the style black/flake8 disagree on above.
-    E221, E251, E272, E127, E128,
-    # Scripts and mechanism files use `sys.path.insert(...)` immediately
-    # before the import it enables, since there is no package/src layout
-    # (see CLAUDE.md); this is intentional, not an ordering mistake.
-    E402
+    E221, E251, E272, E127, E128
 exclude =
     .git,
     __pycache__,
-    Docs/_build,
-    Docs/_build/*
+    build,
+    docs/build,
+    docs/build/*
