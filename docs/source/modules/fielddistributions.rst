@@ -158,11 +158,19 @@ the line in the direction that makes ``start`` the electrode of interest.
 Sweeps
 ~~~~~~
 
-* With neither ``--p`` nor ``--d``, ``incept1d pdiv`` uses :math:`d = L`
-  and sweeps the pressure — the natural sweep for a fixed geometry.
-* With ``--p``, the gap length :math:`d` is swept.  Since :math:`f(\xi)`
-  is fixed, :math:`d \ne L` corresponds to the *same* electrode arrangement
-  scaled geometrically by :math:`d/L`.
+A tabulated line describes one geometry at one size.  Its arc length fixes
+the gap, :math:`d = L`, so a :math:`pd` sweep along a field line is a
+**pressure sweep**: the geometry is held and :math:`pd` varies through
+:math:`p` alone.  That is what ``incept1d pdiv`` does when neither ``--p``
+nor ``--d`` is given, and it is the only sweep that keeps the imported
+geometry intact.
+
+The gap length can still be set explicitly, with ``--d``, or swept, by
+fixing ``--p``.  Both are legitimate, because :math:`f(\xi)` is invariant
+under a geometric rescaling of the electrode arrangement, so :math:`d \ne L`
+solves the *same* arrangement scaled by :math:`d/L` — every electrode
+dimension, not only the gap.  It is rarely what is wanted from an imported
+line, so both are reported on stderr when they occur.
 
 Resolution
 ~~~~~~~~~~

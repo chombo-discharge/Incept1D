@@ -14,6 +14,7 @@ import importlib
 import os
 import subprocess
 import sys
+import numpy as np
 
 import pytest
 
@@ -228,6 +229,26 @@ class TestPdiv:
         out = capsys.readouterr().out
         assert rc == 0
         assert "U*/U_applied" in out, "the scale factor column is missing"
+
+    def test_a_field_line_sweeps_pressure_at_fixed_geometry(self, tmp_path, capsys):
+        """
+        C7e: a tabulated line is one geometry at one size.
+
+        Its arc length fixes the gap, so pd must vary through p alone.  A
+        swept d would silently rescale the whole electrode arrangement,
+        which is not what importing a line means.
+        """
+        out = tmp_path / "sim.dat"
+        rc = self._run_fieldline(self._fieldline(tmp_path), "--write-to-file", str(out))
+        assert rc == 0
+        assert "using d = L" in capsys.readouterr().out
+
+        data = np.genfromtxt(out)
+        pd_col, p_col, d_col = data[:, 0], data[:, 1], data[:, 2]
+        assert np.allclose(d_col, d_col[0]), "the gap length must not vary"
+        assert d_col[0] == pytest.approx(20.0), "the gap must be the arc length"
+        assert p_col.max() > p_col.min(), "the pressure must be what varies"
+        assert np.allclose(pd_col, p_col * d_col)
 
     def test_declared_excitation_is_refused_for_a_uniform_gap(self, tmp_path, capsys):
         """C7d: there the voltage is a result, so accepting it would mislead."""

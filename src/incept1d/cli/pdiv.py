@@ -17,6 +17,7 @@ combination; both polarities are solved for asymmetric field geometries.
 """
 
 import functools
+import sys
 import os
 
 import numpy as np
@@ -247,7 +248,8 @@ def run(args, parser):
 
     if not args.p and not args.d:
         if _field_dist.field_type == "fieldline":
-            # A tabulated field line has an intrinsic length: sweep p at d = L.
+            # A tabulated line is one geometry at one size, so its arc length
+            # fixes the gap and the sweep is in pressure alone.
             args.d = [float(f"{_field_dist.fieldline_length * 1e3:.6g}")]
             print(
                 f"--field fieldline: no --p/--d given, using d = L = "
@@ -255,12 +257,31 @@ def run(args, parser):
             )
         else:
             args.p = [1.0]
-    elif _field_dist.field_type == "fieldline" and args.p:
-        print(
-            "Note: --field fieldline with fixed --p sweeps the gap length d; "
-            "d ≠ L corresponds to the same electrode arrangement scaled "
-            "geometrically by d/L (f(xi) unchanged)."
-        )
+    elif _field_dist.field_type == "fieldline":
+        # Either of these leaves the imported geometry behind: f(xi) is
+        # invariant under a geometric rescaling, so a gap other than L is the
+        # same electrode arrangement at a different size -- every dimension,
+        # not just the gap.  Legitimate, but rarely what an imported line is
+        # for, so neither may happen silently.
+        _L_mm = _field_dist.fieldline_length * 1e3
+        if args.p:
+            print(
+                f"Warning: --field fieldline with fixed --p sweeps the gap "
+                f"length instead of the pressure.  Every d ≠ L = "
+                f"{_L_mm:.4g} mm is the same electrode arrangement scaled by "
+                f"d/L.  Omit --p and --d for a pressure sweep at d = L.",
+                file=sys.stderr,
+            )
+        _off = [d for d in args.d or [] if abs(d / _L_mm - 1.0) > 1e-6]
+        if _off:
+            print(
+                f"Warning: --d {', '.join(f'{d:g}' for d in _off)} mm differs "
+                f"from the arc length L = {_L_mm:.4g} mm of "
+                f"{os.path.basename(_field_dist.fieldline_path)}; the "
+                f"arrangement is solved scaled by d/L.  Omit --d to use "
+                f"d = L.",
+                file=sys.stderr,
+            )
     _N_min, _N_max, _dx_tol = parse_dx_spec(args.dx, parser)
 
     _propagator = (

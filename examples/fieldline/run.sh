@@ -8,6 +8,9 @@
 # --fieldline-voltage declares the excitation the line was computed at, which
 # is what makes U*/U_applied meaningful in either unit system.
 #
+# Both runs plot their solution.  Add --no-plot for a headless run, or set
+# MPLBACKEND=Agg; the tables are written either way.
+#
 # Usage, from the repository root:
 #
 #     bash examples/fieldline/run.sh
@@ -27,12 +30,10 @@ incept1d pdiv "$MECH" \
     --field fieldline "$OUT/line_si.csv" m \
     --fieldline-voltage 100 \
     --pd-min 1 --pd-max 100 --pd-num "$PD_NUM" \
-    --no-plot \
     --write-to-file "$OUT/sim_si.dat"
 
 incept1d pdiv "$MECH" \
     --field fieldline "$OUT/line_engineering.csv" mm \
     --fieldline-voltage 100 \
     --pd-min 1 --pd-max 100 --pd-num "$PD_NUM" \
-    --no-plot \
     --write-to-file "$OUT/sim_engineering.dat"

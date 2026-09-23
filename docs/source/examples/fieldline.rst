@@ -71,7 +71,7 @@ excitation itself, which is what ``--fieldline-voltage`` declares:
    incept1d pdiv mechanisms/air/air_pancheshnyi.py \
        --field fieldline examples/fieldline/line_engineering.csv mm \
        --fieldline-voltage 100 \
-       --pd-min 1 --pd-max 100 --pd-num 40 --no-plot
+       --pd-min 1 --pd-max 100 --pd-num 40
 
 Because the declared voltage is divided into a computed :math:`U^*`, and
 :math:`U^*` comes from the normalised shape, the resulting ratio is exact
@@ -105,13 +105,35 @@ Running the calculation
    :language: bash
    :start-at: MECH=
 
-The arc length fixes the gap at :math:`d = L = 20` mm, so the sweep is in
-pressure rather than in distance.  The line is not symmetric — :math:`|E|`
-is highest at the first tabulated point — so both polarities are computed:
-``start=positive`` means the first point is the anode.
+This is a **pressure sweep**, and for a tabulated field line it is the only
+sweep that makes sense.  The line describes one geometry at one size: its
+arc length fixes the gap at :math:`d = L = 20` mm, and :math:`pd` is varied
+by varying :math:`p` alone — here from 0.05 to 5 bar across the requested
+1 to 100 bar·mm.  Neither ``--p`` nor ``--d`` is given, which is what
+selects this mode; ``incept1d pdiv`` says so on startup:
+
+.. code-block:: text
+
+   --field fieldline: no --p/--d given, using d = L = 20 mm (arc length of the tabulated line).
+
+Fixing ``--p`` instead would sweep :math:`d`, and passing a ``--d`` other
+than :math:`L` would solve at that gap instead.  Both are defensible in
+principle, since :math:`f(\xi)` is invariant under a geometric rescaling,
+but they rescale the whole electrode arrangement rather than the gap alone
+— not usually what an imported line is for, and both are reported when they
+happen.
+
+The line is not symmetric — :math:`|E|` is highest at the first tabulated
+point — so both polarities are computed: ``start=positive`` means the first
+point is the anode.
 
 Result
 ------
+
+Each run opens a two-panel figure — the inception voltage :math:`U^*` and
+the reduced field :math:`(E/N)^*` against :math:`pd`, one curve per
+polarity — and prints the table behind it.  Add ``--no-plot``, or set
+``MPLBACKEND=Agg``, for a headless run; the tables are written either way.
 
 The two runs are compared directly:
 
