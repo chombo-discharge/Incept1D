@@ -279,7 +279,7 @@ parameters are listed in :numref:`tab_photo_groups`.
 
 .. _fig_zheleznyak_fit:
 
-.. figure:: ../figures/zheleznyakfit.*
+.. figure:: ../../figures/zheleznyakfit.*
    :width: 100%
    :align: center
 
