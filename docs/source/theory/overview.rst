@@ -18,29 +18,37 @@ The one-dimensional model
 Motivation
 ----------
 
-Paschen's law [Raizer1991]_ states that the DC breakdown voltage of a uniform-field gap is
-a universal function of the product :math:`pd` of gas pressure and electrode
-separation.  It follows from Townsend's theory: avalanche growth is
-parameterised by the first Townsend coefficient :math:`\alpha(E/N)` together
-with a cathode secondary-electron-emission (SEE) efficiency :math:`\gamma`,
-giving the classical criterion :math:`\alpha d = \ln(1 + \gamma^{-1})`.
+**Paschen's law** [Raizer1991]_ states that the DC breakdown voltage of a
+uniform-field gap is a universal function of the product :math:`pd` of gas
+pressure and electrode separation.  It follows from Townsend's theory:
+avalanche growth is parameterised by the first Townsend coefficient
+:math:`\alpha(E/N)` together with a cathode secondary-electron-emission (SEE)
+efficiency :math:`\gamma`, giving the classical criterion
+:math:`\alpha d = \ln(1 + \gamma^{-1})`.  The law is exact within its own
+assumptions, and :ref:`Chap:Examples:Paschen` reproduces it to solver
+tolerance.  Those assumptions are restrictive: a uniform field, a single
+ionizing process, and a discharge sustained entirely by feedback at the
+cathode.
 
-Paschen's law is known to be inaccurate beyond
-:math:`pd \gtrsim 1\text{–}10` bar·mm.  In electronegative gases such as air
-part of that inaccuracy comes from a mechanism that the classical theory
-omits: **negative-ion transit and detachment**.  Electron attachment does not
-necessarily remove an electron permanently.  If a negative ion drifts across
-the gap and only *later* detaches (collisionally or associatively), it
-returns its electron to the swarm mid-gap, where it keeps contributing to
-avalanche growth.  Whether this matters depends on how the negative-ion
-transit time :math:`d/v_-` compares with the detachment time — a question
-that a purely local ionization coefficient :math:`\alpha(E/N) - \eta(E/N)`
-cannot answer.
+**The streamer criterion** [Raizer1991]_ addresses the opposite regime.  At
+larger :math:`pd` a single avalanche can accumulate enough space charge to
+distort the applied field and propagate on its own, without waiting for the
+cathode.  Breakdown is then declared when the avalanche reaches a critical
+size, :math:`\int\max(\alpha - \eta, 0)\,dx \approx 18`\ –\ :math:`20`.
+This is a local criterion evaluated along the field line: it asks only how
+much net ionization an avalanche accumulates, not where the charge ends up or
+what becomes of it, and the threshold constant is empirical.
 
-``Incept1D`` therefore treats the gap as a boundary-value problem for the
-coupled fluxes of electrons, positive ions, several negative-ion species,
-and ionizing photons, and reduces "does a self-sustained discharge start in
-this gap?" to the vanishing of a determinant.
+``Incept1D`` avoids choosing between them.  Rather than asking whether an
+avalanche reaches a given size, it treats the gap as a boundary-value problem
+for the coupled fluxes of electrons, positive ions, several negative-ion
+species and ionizing photons, and asks whether a self-sustaining mode exists
+at all.  Negative-ion transit, detachment and ion conversion, two-stream
+photoionization, and both ion- and photon-induced secondary emission are
+carried as part of that system rather than folded into an effective
+coefficient, so cathode feedback and volume feedback are weighed against each
+other instead of being assumed.  The question "does a self-sustained discharge
+start in this gap?" reduces to the vanishing of a determinant.
 
 Species and governing equation
 ------------------------------
@@ -117,12 +125,19 @@ exists if and only if
 The **inception threshold** is the applied field at which this holds for
 :math:`\lambda = 0`; the **temporal growth rate** above threshold is the
 :math:`\lambda > 0` at which it holds for a fixed applied field.  Both are
-computed by the same routine, :func:`incept1d.solver.inception_det`.  The
-derivation is spread over the following pages:
+computed by the same routine, :func:`incept1d.solver.inception_det`.
 
-* :ref:`Chap:Transport` — the augmented ODE and its formal solution;
-* :ref:`Chap:Photoionization` — the two-stream photon equations;
-* :ref:`Chap:SecondaryEmission` — the cathode boundary condition;
-* :ref:`Chap:InceptionCriterion` — assembling :math:`\bm{Q}` and recovering
-  Paschen's law;
-* :ref:`Chap:AirScheme` — the dry-air reaction scheme shipped with the code.
+Where the derivation continues
+------------------------------
+
+The rest of this chapter builds :math:`\bm{Q}` one piece at a time:
+
+* :ref:`Chap:Transport` — The augmented ODE and its formal solution.
+* :ref:`Chap:Photoionization` — The two-stream photon equations.
+* :ref:`Chap:SecondaryEmission` — The cathode boundary condition.
+* :ref:`Chap:InceptionCriterion` — Assembling :math:`\bm{Q}`, and recovering
+  Paschen's law from it as a limiting case.
+* :ref:`Chap:AirScheme` — The dry-air reaction scheme shipped with the code.
+
+How the assembled criterion is then evaluated and its roots located is a
+numerical question, taken up in :ref:`Chap:Numerics`.
