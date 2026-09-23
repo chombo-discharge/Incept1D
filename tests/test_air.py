@@ -193,44 +193,51 @@ class TestGrowthRate:
         assert status in ("ok", "suspect")
         assert np.isfinite(lam) and lam > 0.0
 
-    def test_reported_lambda_is_not_a_root_of_det_Q(self, star):
-        """
-        Documents a live defect in :mod:`incept1d.growth`.
-
-        Above roughly 1.25 V* the determinant is NaN across the whole bracket
-        [0, lambda_hi] -- Q is too ill-conditioned to evaluate -- and becomes
-        finite only above it.  ``_f_brentq`` maps NaN to a negative sentinel,
-        so brentq converges on the *edge of the NaN region* rather than on a
-        zero of det Q.  The result is a growth rate that is identical for
-        every overvoltage, because that edge is set by conditioning and not by
-        the physics.
-
-        This is the same failure mode that ``_accept_root`` guards against in
-        :mod:`incept1d.inception`; ``growth`` has no equivalent check.  The
-        assertion below pins the *symptom* so the defect cannot be forgotten;
-        delete this test when the solver reports a genuine root.
-        """
-        air, pd, p, T, EN = star
-        lam, _ = find_lambda_for_voltage(
-            EN * 2.0, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
-        )
-        assert np.isfinite(lam) and lam > 0.0
-        # A genuine root would make |det Q| small here.  It is NaN instead.
-        assert np.isnan(inception_det(EN * 2.0, pd, air, p, T, UNIFORM, lam=lam))
-
-    @pytest.mark.xfail(
-        reason="growth.py converges on the NaN-region boundary above ~1.25 V*, "
-        "so lambda is independent of overvoltage; see "
-        "test_reported_lambda_is_not_a_root_of_det_Q",
-        strict=True,
-    )
     def test_growth_rate_increases_with_overvoltage(self, star):
-        """G2: the physical requirement, currently not met."""
+        """
+        G2: the physical requirement, over the range where det Q is resolvable.
+
+        Beyond roughly 1.2 V* the determinant underflows (see
+        test_unresolvable_determinant_is_reported); below it the solve is
+        sound and lambda must grow with the applied voltage.
+        """
         air, pd, p, T, EN = star
         lams = []
-        for over in (1.25, 1.6, 2.0):
-            lam, _ = find_lambda_for_voltage(
+        for over in (1.02, 1.05, 1.10, 1.15):
+            lam, status = find_lambda_for_voltage(
                 EN * over, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
             )
+            assert status in ("ok", "suspect"), f"{over}x V*: {status}"
+            assert np.isfinite(lam) and lam > 0.0
             lams.append(lam)
-        assert all(a < b for a, b in zip(lams, lams[1:]))
+        assert all(a < b for a, b in zip(lams, lams[1:])), lams
+
+    def test_unresolvable_determinant_is_reported(self, star):
+        """
+        Above roughly 1.2 V* the determinant cannot be evaluated at all.
+
+        The spectral spread of A_aug*d exceeds the double-precision underflow
+        limit (~709), so the subdominant modes of M underflow to exactly zero,
+        Q becomes rank deficient and det Q is NaN for *every* lambda.  Because
+        ``_f_brentq`` maps NaN to a negative sentinel, a run of NaN below a
+        positive value looks like a sign change, and brentq used to converge on
+        the edge of the NaN region -- reporting the same 1.9e11 s^-1 for every
+        overvoltage, since that edge is the kappa*d = 12 photon-collapse
+        threshold and does not depend on E/N.
+
+        The solver must now say so rather than return that number.  Remove this
+        test if the propagation is reformulated so the determinant survives.
+        """
+        air, pd, p, T, EN = star
+        for over in (1.25, 1.5, 2.0):
+            lam, status = find_lambda_for_voltage(
+                EN * over, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
+            )
+            assert status == "det_Q_unresolved", f"{over}x V*: {status}"
+            assert np.isnan(lam)
+
+    def test_determinant_underflows_above_that_range(self, star):
+        """The cause, asserted directly: det Q is NaN at lambda = 0 already."""
+        air, pd, p, T, EN = star
+        assert np.isfinite(inception_det(EN * 1.15, pd, air, p, T, UNIFORM))
+        assert np.isnan(inception_det(EN * 1.5, pd, air, p, T, UNIFORM))

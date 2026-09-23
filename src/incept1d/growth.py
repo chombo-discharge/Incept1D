@@ -135,8 +135,28 @@ def find_lambda_for_voltage(
         return 0.0, "ok"
 
     f_check = _det_raw(lam_star)
+
+    # A root must have det Q ≈ 0.  A *NaN* there means brentq did not find a
+    # zero at all: _f_brentq maps NaN to a negative sentinel, so a run of NaN
+    # below a positive value looks exactly like a sign change, and brentq
+    # converges on the edge of the NaN region instead.
+    #
+    # That is not hypothetical.  Above roughly 1.2·V* the spectral spread of
+    # A_aug·d exceeds the double-precision underflow limit (~709), the
+    # subdominant modes of M underflow to exactly zero, Q becomes rank
+    # deficient and _assemble_det_Q returns NaN for *every* λ.  The apparent
+    # root is then the λ at which a photon group crosses κd = 12 and leaves
+    # the augmented block, changing Q's size — which is independent of E/N,
+    # so the same λ was reported for every overvoltage.
+    #
+    # There is no way to recover a growth rate from a determinant that cannot
+    # be evaluated, so report the failure rather than the artefact.  This is
+    # the same check _accept_root performs in incept1d.inception.
+    if not np.isfinite(f_check):
+        return float("nan"), "det_Q_unresolved"
+
     f_ref = _det_raw(lam_hi)
-    if np.isfinite(f_check) and np.isfinite(f_ref) and abs(f_check) > 1e-2 * abs(f_ref):
+    if np.isfinite(f_ref) and abs(f_check) > 1e-2 * abs(f_ref):
         return lam_star, "suspect"
     return lam_star, "ok"
 
