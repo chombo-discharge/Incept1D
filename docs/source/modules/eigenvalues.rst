@@ -17,10 +17,9 @@ medium.  As shown in :ref:`Chap:InceptionCriterion`, the largest eigenvalue
 reduces to :math:`\lambda_+` of the closed-form three-species model and is
 the *apparent effective ionization coefficient*.
 
-Because eigenvalues have no inherent ordering, :func:`_track_step` uses the
-Hungarian algorithm to match each eigenvalue at one :math:`E/N` sample to
-its continuation at the next (minimising total squared distance in the
-complex plane), so that plotted tracks do not jump between unrelated modes.
+Eigenvalues have no inherent ordering, so they are matched between
+adjacent :math:`E/N` samples before plotting: a track follows one mode
+across the sweep instead of jumping to another wherever two of them cross.
 
 Inputs
 ------

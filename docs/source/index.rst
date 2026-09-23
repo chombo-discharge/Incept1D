@@ -46,7 +46,7 @@ What it does
    * - ``incept1d chombo``
      - **Transport tables.**  Export for the 3-D plasma solver
        `chombo-discharge <https://github.com/chombo-discharge/chombo-discharge>`_.
-     - :ref:`Chap:CreateChomboDischargeData`
+     - :ref:`Chap:ThirdParty`
 
 Features
 ========
@@ -233,10 +233,10 @@ Python modules
    modules/eigenvalues
    modules/ionizationintegral
    modules/lambda
-   modules/createchombodischargedata
    modules/fielddistributions
    modules/reactions
    modules/constants
+   modules/thirdparty
 
 Examples
 ********

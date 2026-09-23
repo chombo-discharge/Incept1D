@@ -3,66 +3,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Core solver: the augmented ODE, its propagators and the boundary determinant
-det Q(λ).
+Core solver: the augmented ODE, its propagators and the boundary
+determinant det Q(λ).
 
-The inception threshold is determined by the determinant condition (manuscript,
-eq. 333):
+The augmented state is θ = (y, Ψ⁺, Ψ⁻), where y = V n are the species
+fluxes and Ψ± the forward and backward photon fluxes.  Integrating
+∂_x θ = A_aug θ across the gap gives the propagator M(d), from which the
+boundary-condition matrix Q is assembled; inception is det Q(λ) = 0 at
+λ = 0.
 
-    det Q(λ) = 0   at  λ = 0
-
-where Q = [Q_0; Q_d] is the boundary-condition matrix assembled from cathode
-(Q_0) and anode (Q_d) constraints on the augmented state vector
-
-    θ = (y, Ψ⁺, Ψ⁻)^T,   y = V n  (species fluxes),
-                            Ψ⁺       (forward photon fluxes, +x direction),
-                            Ψ⁻       (backward photon fluxes, −x direction).
-
-The augmented ODE is (manuscript Eq. 252):
-
-    ∂_x θ = A_aug θ,
-
-where
-
-    A_aug = [A    B    B ]      A = R V^{-1},  B = photon absorption coupling,
-            [C   -D    0 ]
-            [-C   0    D ]      C = photon source,  D = diag(κ_j).
-
-When there are no photon species (N_γ = 0) A_aug reduces to A = R V^{-1}.
-
-Cathode boundary conditions (Q_0 θ_0 = 0, manuscript Eq. 305–310):
-
-    (Π_e + γ_+^T Π_+ − γ_Ψ^T Π_bck) θ_0 = 0    ← electron SEE
-    Π_− θ_0 = 0                                   ← negative-ion zero flux
-    Π_fwd θ_0 = 0                                 ← Ψ⁺(0) = 0 (no incoming fwd photons)
-
-Anode boundary conditions (Q_d θ_0 = 0, manuscript Eq. 319–322):
-
-    Π_+ M(d) θ_0 = 0                              ← positive-ion zero flux
-    Π_bck M(d) θ_0 = 0                            ← Ψ⁻(d) = 0 (no incoming bck photons)
-
-The full boundary matrix Q is (N_s + 2 N_γ) × (N_s + 2 N_γ).  A non-trivial
-solution exists if and only if det Q = 0 (inception threshold).
-
-The matrix exponential M(d) = exp(A_aug * d) is computed with a Padé
-approximation (scipy.linalg.expm) after eigenvalue shifting:
-
-    A_shift = A_aug − λ_max I
-    M(d) = exp(A_shift * d) * exp(λ_max * d)
-
-where λ_max = max(Re(eigenvalues(A_aug)), 0).  The shift keeps the Padé
-argument well-conditioned even for large positive eigenvalues at high E/N.
-
-For each value of p*d the critical E/N satisfying det Q = 0 is found with
-the Brent root-finding method (scipy.optimize.brentq).  The corresponding
-breakdown voltage is
-
-    V* = E* * d = (E/N)* * (p*d) * 1e-16 / (kB * T)
-
-where the last equality uses N = p * 1e5 / (kB*T) and the unit conversion
-between Townsend (1e-21 V m^2) and bar (1e5 Pa).
-
-The root of det Q in E/N at fixed p·d is found in :mod:`incept1d.inception`.
+The model and its boundary conditions are derived in the Theory chapter
+of the documentation (``docs/source/theory/``, eq. ``eq_augmented_ode``
+and ``eq_det_criterion``); how the propagator and determinant are
+actually evaluated is in ``docs/source/numerics/``.  The root of det Q in
+E/N at fixed p·d is found in :mod:`incept1d.inception`.
 """
 
 import math
@@ -76,15 +30,26 @@ from incept1d.fields import FieldDistribution  # noqa: F401
 
 
 def _build_A_aug(EN, d, mod, p, T, lam=0.0):
-    """
-    Build the augmented ODE matrix A_aug for reduced field EN and gap length d.
+    """Build the augmented ODE matrix for reduced field EN and gap length d.
 
-    Returns (A_aug, N_gamma_eff, aug_mask, n_aug).
-    aug_mask is None when N_gamma == 0.
+    Photon groups that are re-absorbed within a fraction of a step are
+    folded into A rather than propagated explicitly, so the augmented
+    system can be smaller than N_s + 2 N_γ.
 
-    lam : float
-        Temporal growth rate λ (s⁻¹). Modifies A → (R − λI)V⁻¹ and D → κ + λ/c.
-        Default 0.0 (standard inception threshold).
+    Parameters
+    ----------
+    EN, d, p, T : float
+        Reduced field (Td), gap length (m), pressure (bar), temperature (K).
+    mod : Mechanism
+        Polarity-resolved mechanism.
+    lam : float, optional
+        Temporal growth rate λ in s⁻¹; 0 is the inception threshold.
+
+    Returns
+    -------
+    tuple
+        ``(A_aug, N_gamma_eff, aug_mask, n_aug)``.  ``aug_mask`` selects the
+        explicitly propagated photon groups, and is None when N_γ = 0.
     """
     _KD_LOCAL_THRESHOLD = 12.0
     n = len(mod.SPECIES)
@@ -142,19 +107,18 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
 
 
 def _expm_shifted(M):
-    """
-    Compute expm(M) with eigenvalue shifting for numerical stability.
+    """Matrix exponential of M, shifted so that it cannot overflow.
 
-    Shifts by the true max real eigenvalue to keep expm well-conditioned without
-    over-shrinking the Qd rows.  The restoration factor is intentionally NOT applied;
-    it uniformly scales the Qd rows, leaving sign(det Q) unchanged.  Gershgorin
-    bounds were tried but cause cumulative over-shrinkage of M across N_steps
-    multiplications, making Q ill-conditioned and triggering the cond_Q > 1e14 guard.
+    M is the pre-formed argument to expm: A_aug * h for the midpoint rule,
+    or the full Ω for a Magnus expansion.
 
-    M is the pre-formed matrix argument to expm — for the midpoint rule this is
-    A_aug * d_step; for Magnus expansions it is the full Ω already formed by the
-    caller.
+    The shift factor is deliberately *not* restored.  It is a positive
+    scalar common to every row of Q_d, so it changes the magnitude of
+    det Q but not its sign, which is all the root finder uses.
     """
+    # The shift is the true largest real eigenvalue rather than a cheaper
+    # Gershgorin bound: a bound over-shrinks M, and the error compounds
+    # across the N_steps products until Q trips the conditioning guard.
     real_eigs = np.real(np.linalg.eigvals(M))
     lam_max = float(np.max(real_eigs))
     lam = lam_max if lam_max > 0.0 else 0.0
@@ -170,9 +134,8 @@ def parse_dx_spec(tokens, parser=None):
     """
     Parse a --dx token list into (N_min, N_max, tol).
 
-    Tokens are all optional; missing values fall back to the defaults
-    (N_min=5, N_max=200, tol=0.03).  N_min = N_max disables adaptation
-    (max_depth = 0) and gives a constant uniform grid of N_min steps.
+    Tokens are all optional and fall back to the module defaults.
+    N_min = N_max disables adaptation and gives a uniform grid.
 
     Parameters
     ----------
@@ -209,22 +172,20 @@ def parse_dx_spec(tokens, parser=None):
 
 def midpoint_propagator(A_func, x_lo, x_hi):
     """
-    Zeroth-order Magnus propagator (midpoint rule).
-
-    Evaluates A at the interval midpoint and returns expm(A_mid * h).
+    Midpoint-rule propagator: expm(A(x_mid) * h).
 
     Parameters
     ----------
     A_func : callable
-        A_func(x) → A_aug (ndarray).  x is a code-coordinate in metres; the
-        polarity-dependent flip and field evaluation are encapsulated by the caller.
+        ``A_func(x) -> A_aug``.  x is a code coordinate in metres; the
+        polarity flip and field evaluation are the caller's business.
     x_lo, x_hi : float
-        Subinterval bounds in code coordinates (metres).
+        Subinterval bounds in metres.
 
     Returns
     -------
     ndarray
-        Propagator matrix P = expm(A(x_mid) * h).
+        Propagator for the subinterval.
     """
     h = x_hi - x_lo
     x_mid = 0.5 * (x_lo + x_hi)
@@ -235,12 +196,7 @@ def _adaptive_midpoint_segment(
     A_func, x_lo, x_hi, tol, max_depth, P_coarse=None, _level=0, _diag=None
 ):
     """
-    Compute the midpoint propagator for [x_lo, x_hi] with adaptive step halving.
-
-    Compares the 1-step (coarse) propagator against the 2-step (halved) estimate.
-    If the relative Frobenius error exceeds tol and max_depth > 0, each half is
-    refined recursively.  Passing P_coarse from the parent avoids one expm call
-    when recursing (the parent's half-step result IS the child's coarse estimate).
+    Midpoint propagator for [x_lo, x_hi], refined by recursive step halving.
 
     Parameters
     ----------
@@ -249,20 +205,19 @@ def _adaptive_midpoint_segment(
     x_lo, x_hi : float
         Subinterval bounds in code coordinates (metres).
     tol : float
-        Relative Frobenius error threshold; refinement stops when error <= tol.
+        Relative Frobenius error at which a segment is accepted.
     max_depth : int
-        Maximum remaining recursion depth.  At depth 0 the coarse estimate is
-        returned without any halving check.
+        Remaining recursion depth.  At 0 the coarse estimate is returned
+        without a halving check.
     P_coarse : ndarray or None
-        Pre-computed 1-step propagator for [x_lo, x_hi].  Computed internally
-        when None (top-level call).
+        The parent's half-step propagator, which is this call's coarse
+        estimate.  Passing it saves one expm; None at the top level.
     _level : int
-        Current recursion depth from the initial-segment top-level call (0 = top).
-        Used only for diagnostics.
+        Recursion depth, for diagnostics only.
     _diag : list or None
-        If a list is supplied, a dict is appended for every halving check performed:
-        {'x_lo', 'x_hi', 'level', 'err', 'accepted'}.  Leaf calls at max_depth=0
-        where no halving is attempted are NOT recorded.
+        If given, one dict per halving check is appended:
+        ``{'x_lo', 'x_hi', 'level', 'err', 'accepted'}``.  Leaf calls at
+        max_depth 0 attempt no halving and are not recorded.
 
     Returns
     -------
@@ -312,19 +267,12 @@ def _adaptive_midpoint_segment(
 
 def magnus2_propagator(A_func, x_lo, x_hi):
     """
-    Second-order Magnus propagator with 2-point Gauss-Legendre quadrature.
+    Second-order Magnus propagator, with two-point Gauss-Legendre quadrature.
 
-    Ω = h/2·(A₁+A₂) + √3·h²/12·[A₂,A₁],   P = expm(Ω)
-
-    The first term is the GL2 quadrature approximation to ∫A dx; the second is
-    the leading commutator correction from the Magnus series.  The commutator
-    vanishes for a uniform field (A constant across the interval), so Magnus2
-    reduces exactly to the midpoint rule in that case.
-
-    Convergence guard: the Magnus series converges only when ∫‖A‖ dx < π.
-    If ‖Ω₁‖_F = ‖h/2·(A₁+A₂)‖_F exceeds π the interval is halved and the
-    two sub-propagators are multiplied.  This keeps Magnus2 accurate at large
-    p·d without requiring the caller to specify a finer grid.
+    The Magnus series converges only for ∫‖A‖ dx < π, so an interval whose
+    quadrature term exceeds that is halved and the two sub-propagators
+    multiplied.  The caller therefore does not have to pick a grid fine
+    enough for large p·d.
 
     Parameters
     ----------
@@ -440,20 +388,13 @@ def inception_det(
     """
     Evaluate det Q(λ) for the inception boundary-value problem.
 
-    Integrates the augmented ODE across the gap by accumulating per-subinterval
-    propagator matrices, then assembles the boundary-condition matrix Q and returns
-    its determinant.  Breakdown occurs when det Q = 0.
+    Integrates the augmented ODE across the gap, assembles the
+    boundary-condition matrix Q and returns its determinant, which vanishes
+    at inception.
 
-    For a uniform field A_aug is constant across the gap, so M(d) = expm(A_aug·d)
-    is exact and is evaluated in a single matrix exponential; N_min, N_max, tol
-    and propagator are then ignored (there is nothing for a quadrature to
-    improve on) and every setting returns the same det Q.
-
-    For a non-uniform field with the midpoint propagator the grid is adaptive:
-    each of the N_min initial segments is recursively halved until the relative Frobenius error between the
-    one-step and two-step estimates falls below tol, or the maximum refinement
-    depth (floor(log2(N_max // N_min))) is reached.  Setting N_min = N_max gives
-    a constant uniform grid (max_depth = 0, no halving attempted).
+    A uniform field is a single exact matrix exponential, so the grid and
+    propagator options are then ignored and every setting returns the same
+    det Q.  For a non-uniform field see ``docs/source/numerics/``.
 
     Parameters
     ----------
@@ -462,35 +403,27 @@ def inception_det(
     pd : float
         Product of pressure and gap length in bar·m.
     mod : Mechanism
-        Loaded mechanism (returned by load_mechanism).  Configuration parameters
-        (xi_photo, xi_emit, reaction_multipliers, gamma overrides) are baked in.
+        Loaded mechanism, with its configuration already baked in.
     p : float
         Gas pressure in bar.
     T : float
         Gas temperature in Kelvin.
     field_dist : FieldDistribution
-        Field geometry specification (uniform / sphere-plane / sphere-sphere /
-        fieldline).  For 'fieldline' the profile is a tabulated ``|E|`` along a
-        (possibly curved) field line parametrised by arc length; xi = 0 is the
-        first tabulated point.
-    N_min : int
-        Minimum (initial) number of integration segments.  Default 5.
-    N_max : int
-        Maximum total number of fine steps across the gap (adaptive budget).
-        N_max = N_min disables adaptation.  Default 200.
+        Gap geometry.
+    N_min, N_max : int
+        Initial number of segments, and the budget of fine steps the
+        adaptive refinement may spend.  Equal values disable adaptation.
     tol : float
-        Relative Frobenius error threshold for the midpoint step-halving check.
-        Default 0.03 (3 %).
+        Relative Frobenius error at which a segment is accepted.
     lam : float
-        Temporal growth rate λ (s⁻¹, default 0.0).
+        Temporal growth rate λ in s⁻¹; 0 is the inception threshold.
     positive_polarity : bool
-        True → xi = 0 electrode (sphere / field-line start) is anode (+).
-        False → xi = 0 electrode is cathode (−).
-        Ignored for uniform and sphere-sphere (symmetric) geometries.
+        True when the ξ = 0 electrode is the anode.  Ignored for the
+        symmetric geometries.
     propagator : callable
-        Propagator algorithm.  Signature: propagator(A_func, x_lo, x_hi) → ndarray.
-        Adaptive step halving is applied only when propagator is midpoint_propagator;
-        other propagators (e.g. magnus2_propagator) use N_min uniform steps.
+        ``propagator(A_func, x_lo, x_hi) -> ndarray``.  Adaptive halving is
+        applied only to :func:`midpoint_propagator`; anything else runs on
+        the uniform N_min grid.
 
     Returns
     -------

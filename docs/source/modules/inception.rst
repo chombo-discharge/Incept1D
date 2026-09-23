@@ -28,14 +28,14 @@ steps:
 4. Convert :math:`(E/N)^*` to the breakdown voltage
    :math:`U^* = (E/N)^*\,N\,d`.
 
-Steps 1–2 are :func:`incept1d.inception.find_all_breakdown_EN`; steps 3–4 are
-:func:`incept1d.inception.compute_inception_curve`.  The criterion itself is
-derived in :ref:`Chap:InceptionCriterion` and its evaluation described in
-:ref:`Chap:Numerics`.  The sweep can be run in two modes:
-**fixed pressure** (``--p``, vary :math:`d`) or **fixed gap distance**
-(``--d``, vary :math:`p`); both may be combined, and several pressures or
-distances may be given.  For a non-uniform field that is not symmetric
-(sphere-plane, field line) both polarities are computed.
+The criterion is derived in :ref:`Chap:InceptionCriterion` and how it is
+evaluated is described in :ref:`Chap:Numerics`.
+
+The sweep runs in either of two modes: **fixed pressure** (``--p``, vary
+:math:`d`) or **fixed gap distance** (``--d``, vary :math:`p`).  Both may be
+combined, and several pressures or distances may be given.  For a
+non-uniform field that is not symmetric — sphere-plane, or a field line —
+both polarities are computed.
 
 Inputs
 ------
@@ -154,12 +154,9 @@ Points where no root was found are written as ``nan``.
 API reference
 -------------
 
-``incept1d.mechanism``
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: incept1d.mechanism
-   :members:
-   :undoc-members:
+Loading the mechanism and its configurations is
+:mod:`incept1d.mechanism` (:ref:`Chap:ConfigurationOverview`); the modules
+below are the solve itself.
 
 ``incept1d.solver``
 ~~~~~~~~~~~~~~~~~~~

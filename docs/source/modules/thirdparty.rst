@@ -1,22 +1,34 @@
-.. _Chap:CreateChomboDischargeData:
+.. _Chap:ThirdParty:
 
-Transport tables — ``incept1d chombo``
-======================================
+Third-party integrations
+========================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-``incept1d chombo`` is the bridge between a mechanism file and
-the external 3-D plasma solver
+A mechanism file is a complete description of a gas chemistry, and the 1-D
+criterion is rarely the last word: once a gap is known to break down, the
+next question is usually what the discharge does in three dimensions.  The
+commands on this page export a mechanism in the form an external code
+expects, so that the *same* chemistry drives both calculations.
+
+Only ``chombo-discharge`` is supported today.  Each further integration
+gets its own subcommand and its own section here rather than changing the
+mechanism interface, which stays independent of any particular consumer.
+
+.. _Chap:CreateChomboDischargeData:
+
+``chombo-discharge`` — ``incept1d chombo``
+------------------------------------------
+
 `chombo-discharge <https://github.com/chombo-discharge/chombo-discharge>`_
-[Marskar2019]_.  It does not solve the inception problem — it exports the
-raw transport and rate-coefficient tables a fluid solver needs as a
-function of :math:`E/N`, so that the *same* chemistry used for the 1-D
-criterion can be used in a 3-D simulation of the onset.
+[Marskar2019]_ is a 3-D plasma fluid solver.  ``incept1d chombo`` exports
+the transport and rate-coefficient tables it needs as a function of
+:math:`E/N`.  It does not solve the inception problem itself.
 
 Inputs
-------
+~~~~~~
 
 .. code-block:: console
 
@@ -31,7 +43,7 @@ and ``--config-label`` (which entry to use).  The :math:`E/N` grid defaults
 to 1–10\ :sup:`6` Td with 1000 log-spaced points.
 
 Example
--------
+~~~~~~~
 
 .. code-block:: bash
 
@@ -45,7 +57,7 @@ Example
    ``MPLBACKEND=Agg``.
 
 Outputs
--------
+~~~~~~~
 
 A multi-panel sanity-check figure — ionization and attachment coefficients,
 mean energy, mobilities and diffusion coefficients, and every rate
@@ -72,7 +84,7 @@ Everything is reduced by the number density (``alpha/N``, ``mu*N``,
 ``D*N``), so one table serves every pressure the 3-D solver runs at.
 
 API reference
--------------
+~~~~~~~~~~~~~
 
 .. automodule:: incept1d.chombo
    :members:

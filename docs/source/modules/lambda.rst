@@ -16,14 +16,10 @@ then for each voltage :math:`U \in [U^*, F U^*]` solves
 :math:`\det\bm{Q}(\lambda; E/N) = 0` for the growth rate
 :math:`\lambda^* > 0`.
 
-The root in :math:`\lambda` is found by exploiting the ``NaN`` convention of
-:func:`incept1d.solver.inception_det` (see :ref:`Chap:Numerics:Determinant`): above threshold
-:math:`\det\bm{Q}(0)` is typically ``NaN`` because :math:`\bm{Q}` is nearly
-singular, so the code expands an upper bracket geometrically (×10 per step
-from 1 s\ :sup:`-1`) until a finite value with the opposite sign appears,
-then refines :math:`[0, \lambda_\mathrm{hi}]` with Brent's method.  The
-resulting root is accepted only if :math:`\det\bm{Q}(\lambda^*)` is finite —
-see :ref:`Sec:Lambda:Range` for why that check matters.
+How that root is bracketed and refined is described in
+:ref:`Chap:Numerics:RootFinding`.  It is accepted only if
+:math:`\det\bm{Q}(\lambda^*)` is finite — see :ref:`Sec:Lambda:Range` for
+why that check matters.
 
 .. _Sec:Lambda:Range:
 

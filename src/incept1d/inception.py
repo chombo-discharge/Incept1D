@@ -7,14 +7,9 @@ Inception curves: locate the roots of det Q(E/N, p·d) = 0 and track them
 across a p·d sweep, giving the (partial) discharge inception voltage
 PDIV = V*(p·d).
 
-For each value of p·d the critical E/N satisfying det Q = 0 is found with
-the Brent root-finding method (scipy.optimize.brentq) after a logarithmic
-sign-change scan.  The corresponding breakdown voltage is
-
-    V* = E* · d = (E/N)* · (p·d) · 1e-16 / (kB · T)
-
-using N = p · 1e5 / (kB·T) and the unit conversion between Townsend
-(1e-21 V m²) and bar (1e5 Pa).
+The root finding, warm starts and branch tracking are described in
+``docs/source/numerics/rootfinding.rst``; the determinant itself is
+:func:`incept1d.solver.inception_det`.
 """
 
 import math
@@ -33,34 +28,32 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
     """
     Verify that det Q is genuinely near zero at a candidate root.
 
-    Returns True if the root is accepted, False if it should be discarded.
-
-    Two failure modes are distinguished:
-
-    1. NaN-sentinel artefact: f_brentq mapped NaN → -1e-300 at a bracket
-       endpoint, creating an artificial sign change.  det_fn(root) = NaN and
-       at least one bracket fa/fb equals the sentinel (``|value| <= 1e-290``).
-       → Discard and print a warning.
-
-    2. Genuine singularity: both bracket endpoints are finite with opposite
-       signs; brentq converges to the true det Q = 0 locus where Q is exactly
-       singular so cond(Q) → ∞ and det_fn returns NaN.
-       → Accept silently (NaN here is the expected consequence of Q → 0).
-
-    3. Large finite residual: det_fn(root) is finite but ``|det Q|`` is large
-       relative to the bracket scale.
-       → Accept but print a warning.
+    A NaN at the root is expected — Q is exactly singular there — so the
+    question is whether the sign change that produced it was real.  A
+    bracket endpoint sitting at the NaN sentinel means it was not, and the
+    root is discarded with a warning.
 
     Parameters
     ----------
-    root : float        — candidate E/N root returned by brentq
-    EN_a, EN_b : float  — bracket endpoints used by brentq
-    fa, fb : float      — f_brentq values at the bracket endpoints
-                          (must be the FINAL bracket values, not the original
-                           proxy-scan values — caller is responsible)
-    pd : float          — pressure × gap length in bar·m
-    det_fn : callable   — full-resolution det function (used for residual eval)
-    mod, p, T           — mechanism, pressure, temperature passed to det_fn
+    root : float
+        Candidate E/N root returned by brentq.
+    EN_a, EN_b : float
+        Bracket endpoints used by brentq.
+    fa, fb : float
+        Values at those endpoints.  These must be the *final* bracket
+        values, not the ones from the proxy scan; the caller is
+        responsible for that.
+    pd : float
+        Pressure × gap length in bar·m.
+    det_fn : callable
+        Full-resolution determinant, for evaluating the residual.
+    mod, p, T :
+        Mechanism, pressure and temperature, passed to det_fn.
+
+    Returns
+    -------
+    bool
+        True if the root is accepted.
     """
     det_root = det_fn(root, pd, mod, p, T)
 
@@ -109,59 +102,37 @@ def find_all_breakdown_EN(
     """
     Find E/N values where det Q(E/N, pd) = 0.
 
-    A logarithmic scan over [EN_lo, EN_hi] locates every sign change in
-    det Q(EN); scipy.optimize.brentq refines each bracket independently.
-    Using n_scan=200 reduces the chance of missing a sign change when multiple
-    roots are close together.
-
-    With first_only=True the value returned is always the *globally lowest*
-    root in [EN_lo, EN_hi]; all roots are returned only when first_only=False
-    (``--all-branches``).
-
-    If EN_hints is supplied and first_only=True, a warm-start pass is
-    attempted first: the lowest hint is bracketed by
-    [hint/hint_factor, hint*hint_factor] and refined directly with brentq.
-    The resulting root is accepted — and the coarse scan skipped — only if it
-    also brackets successfully *and* no sign change is found beneath it
-    (sampled at the same points-per-decade as the full scan); otherwise the
-    full scan runs and decides.  Warm-start is intentionally disabled when
-    first_only=False (--all-branches) because new branches can appear at any
-    pd step; the coarse scan is required to detect them.
+    A logarithmic scan brackets every sign change and Brent's method
+    refines each bracket.  With ``first_only`` the value returned is
+    always the *globally lowest* root in the search range, whether it came
+    from the scan or from a warm start.
 
     Parameters
     ----------
     pd : float
         Product of pressure and gap length in bar·m.
     mod : Mechanism
-        Loaded mechanism (returned by load_mechanism).
+        Loaded mechanism.
     p : float
         Gas pressure in bar.
     T : float
         Gas temperature in Kelvin.
-    EN_lo : float
-        Lower bound of the E/N search range in Townsend.  Default 10.0 Td.
-    EN_hi : float
-        Upper bound of the E/N search range in Townsend.  Default 3e5 Td.
+    EN_lo, EN_hi : float
+        Bounds of the E/N search range in Townsend.
     n_scan : int
-        Number of points in the coarse scan.  Default 200.
+        Number of points in the coarse scan.
     first_only : bool
-        If True, return as soon as the first (lowest E/N) root is found.
-    fast_det_fn : callable or None
-        Optional cheaper det function used only for the coarse sign-change
-        scan.  Brentq refinement always uses det_fn for full accuracy.
-        If None, det_fn is used for both scan and refinement.
-    med_det_fn : callable or None
-        Optional medium-fidelity det function used for the fallback scan when
-        fast_det_fn finds no sign changes.  Cheaper than det_fn for scanning
-        but more accurate than fast_det_fn.  If None, det_fn is used as the
-        fallback.
+        Keep only the lowest root.  Warm starts apply in this mode only,
+        since in all-branches mode a new branch can appear at any pd and
+        the scan is needed to find it.
+    fast_det_fn, med_det_fn : callable or None
+        Cheaper determinants for the coarse scan and its fallback.  Brent
+        refinement always uses det_fn.  Both default to det_fn.
     EN_hints : list of float or None
-        E/N values from the previous pd point to use as warm-start brackets.
-        When all hints bracket successfully the full scan is skipped entirely.
-        Pass [] or None to disable (first pd point, or after a failed pd).
+        Roots from the previous pd point, used as warm-start brackets.
+        Pass [] or None at the first pd point, or after a failed one.
     hint_factor : float
-        Bracket half-width multiplier: each hint is bracketed by
-        [hint/hint_factor, hint*hint_factor].  Default 2.0 (one octave each way).
+        Each hint is bracketed by [hint/hint_factor, hint*hint_factor].
 
     Returns
     -------
@@ -181,13 +152,12 @@ def find_all_breakdown_EN(
 
     def _no_root_below(EN_ref):
         """
-        True when the coarse scan finds no sign change in [EN_lo, EN_ref].
+        True when no sign change lies below EN_ref.
 
-        A warm-start root is only the *lowest* root if nothing lies below it.
-        The check samples [EN_lo, EN_ref] at the same points-per-decade as the
-        full scan over [EN_lo, EN_hi], so accepting a warm-start root is
-        exactly as reliable as running the scan it replaces — just cheaper,
-        because the interval is shorter.
+        A warm-start root is the lowest root only if nothing is beneath
+        it, and this samples at the same points per decade as the full
+        scan, so accepting one is as reliable as running the scan it
+        replaces.
         """
         if EN_ref <= EN_lo:
             return True
@@ -360,24 +330,20 @@ def compute_inception_curve(
     med_det_fn=None,
 ):
     """
-    Compute inception-curve branches across a p*d sweep.
+    Compute inception-curve branches across a p·d sweep.
 
-    For each pd point roots of det Q(E/N, pd) = 0 are found via
-    find_all_breakdown_EN.  Branches are tracked by continuity: each new root
-    is matched to the existing branch whose most-recent E/N is nearest in
-    log space, using a greedy nearest-neighbour assignment.  Unmatched roots
-    start new branches.  This correctly handles saddle-node bifurcations where
-    two new low-E/N roots appear without disrupting the pre-existing branch.
+    Roots are found at each pd point and assigned to branches by
+    continuity in log(E/N); unmatched roots start new branches.
 
     Parameters
     ----------
     pd_arr : numpy.ndarray, shape (M,)
         Array of p*d values in bar·m.
     mod : Mechanism
-        Loaded mechanism (returned by load_mechanism).
+        Loaded mechanism.
     p : float or numpy.ndarray, shape (M,)
-        Gas pressure in bar.  A scalar is used for all points (fixed-p mode);
-        an array of length M allows pressure to vary per point (fixed-d mode).
+        Gas pressure in bar: a scalar for fixed-pressure mode, or one value
+        per pd point for fixed-distance mode.
     T : float
         Gas temperature in Kelvin.
     all_branches : bool

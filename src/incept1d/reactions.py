@@ -3,33 +3,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Reactions.py — declarative R-matrix assembly for mechanism files.
+Declarative assembly of the reaction-rate matrix R.
 
-Mechanism files define reactions as a list of (reaction_string, rate_callable)
-pairs.  The R-matrix is assembled automatically by parsing each string to
-determine which tracked species are produced and consumed.  Reaction multipliers
-(for Config/JSON overrides) are keyed by the same reaction strings.
+A mechanism file states its chemistry as a list of
+``(reaction_string, rate_callable)`` pairs — ``"e + N2 -> 2e + N2+"`` —
+and this module parses the strings into R, so no mechanism ever writes
+stoichiometry into a matrix by hand.  The rate callable returns a
+first-order rate in s⁻¹, with the neutral densities already folded in.
 
-Reaction string format
-----------------------
-    "e + N2 -> 2e + N2+"
-
-Rules:
-
-- Species tokens must be separated by ` + ` (spaces around the plus sign) so
-  that cation names like `N2+` are never broken apart by the tokeniser.
-- Optional leading integer stoichiometric coefficient: `2e`, `3N2`.
-- Arrow ` -> ` (spaces optional but the `->` is required).
-- Background/neutral species (N2, O2, M, O, N, …) may appear freely; they are
-  ignored during R-matrix assembly since they are not in SPECIES.
-- Exactly one SPECIES member must appear in the reactants — this is the
-  "driver" column j.
-
-Multiplier key normalisation
------------------------------
-Keys in a `reaction_multipliers` dict are normalised (spaces stripped,
-`→` replaced with `->`) before comparison, so JSON config files may use
-`"e+N2->2e+N2+"` to match the REACTIONS entry `"e + N2 -> 2e + N2+"`.
+The string grammar, the multiplier keys and the compiled fast path are
+documented in ``docs/source/modules/reactions.rst``.
 """
 
 import re
@@ -39,16 +22,18 @@ import numpy as np
 
 
 def compile_reactions(reactions, species):
-    """Pre-parse stoichiometric topology once; return list used by build_R_from_compiled.
+    """Pre-parse the stoichiometry once, for :func:`build_R_from_compiled`.
 
-    Each entry is (j, delta, rate_fn, norm_key):
-      j        — driver column index (the single tracked species in the reactants)
-      delta    — shape-(n,) net stoichiometry vector (products − reactants per species)
-      rate_fn  — the original callable rate(EN, p, T) -> float
-      norm_key — normalised reaction string for multiplier lookup
+    Call this at module load and keep the result: ``get_R`` is called at
+    every E/N sample of every integration step, so re-parsing the strings
+    there is the difference between a fast sweep and a slow one.
 
-    Call once at module load; pass the result to build_R_from_compiled on every
-    get_R invocation to avoid repeated regex parsing.
+    Returns
+    -------
+    list of tuple
+        One ``(j, delta, rate_fn, norm_key)`` per reaction: the driver
+        column, the net stoichiometry vector, the rate callable, and the
+        normalised reaction string used for multiplier lookup.
     """
     sp_idx = {s: i for i, s in enumerate(species)}
     n = len(species)
@@ -157,27 +142,23 @@ def build_R(reactions, species, EN, p, T, multipliers=None):
     Parameters
     ----------
     reactions : list of (rxn_str, rate_callable)
-        Each rate_callable has signature rate(EN, p, T) -> float and should
-        return the volumetric rate coefficient [s^-1] for that reaction.
+        ``rate(EN, p, T) -> float`` returns a first-order rate in s⁻¹.
     species : list of str
         Ordered species names; index i is row/column i of R.
     EN : float
         Reduced electric field in Townsend.
-    p : float
-        Gas pressure in bar.
-    T : float
-        Gas temperature in Kelvin.
+    p, T : float
+        Gas pressure in bar and temperature in K.
     multipliers : dict, optional
-        {reaction_string: float}.  Keys are normalised before comparison so
-        spaces are optional.  A warning is printed to stderr for any key that
-        does not match a reaction in this mechanism.
+        ``{reaction_string: float}``.  Keys are normalised before
+        comparison, and one matching no reaction is reported on stderr.
 
     Returns
     -------
     numpy.ndarray, shape (n, n)
-        Reaction matrix R; R[i,j] is the rate [s^-1] at which one carrier of
-        species j produces (positive) or destroys (negative, diagonal) one
-        particle of species i.
+        R[i, j] is the rate in s⁻¹ at which one carrier of species j
+        produces (positive) or destroys (negative) one particle of
+        species i.
     """
     if multipliers is None:
         multipliers = {}

@@ -56,7 +56,7 @@ into three layers:
    * - :mod:`incept1d.chombo`
      - Exports transport/rate-coefficient tables from a mechanism for the 3-D
        solver ``chombo-discharge``.  Not part of the inception solve.  See
-       :ref:`Chap:CreateChomboDischargeData`.
+       :ref:`Chap:ThirdParty`.
    * - :mod:`incept1d.fields`
      - Gap geometry: uniform / sphere-plane / sphere-sphere / tabulated field
        line profiles :math:`f(\xi)` and the shared ``--field`` CLI parsing.

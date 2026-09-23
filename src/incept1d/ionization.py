@@ -3,18 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Ionization integrals ∫ max(α−η, 0) dx and ∫ max(Re(λ_max), 0) dx across the gap.
+Ionization integrals across the gap.
 
-Sweeps a voltage range and plots, for every (config, p, d) combination:
-
-- ∫ max(α−η, 0) dx — classical ionisation integral
-- ∫ max(Re(λ_max(RV⁻¹)), 0) dx — integral of the leading eigenvalue of the
-  transport matrix (shown only when the mechanism exposes get_R and get_V)
-
-The field distribution is specified with the same --field syntax as
-``incept1d pdiv``.
-Use --single-voltage to evaluate at a single voltage instead, or --data-file to
-read (pressure, voltage) pairs from an experimental data file.
+Two integrals are available for a given voltage and geometry: the classical
+∫ max(α−η, 0) dx, and ∫ max(Re λ_max(R V⁻¹), 0) dx, which replaces the
+swarm coefficients with the leading eigenvalue of the transport matrix and
+so accounts for the ion chemistry the first one ignores.  Both are
+approximations to the full criterion of :mod:`incept1d.solver`, and exist
+to be compared against it.
 
 The command-line front end is :mod:`incept1d.cli.ionization`.
 """
@@ -26,17 +22,20 @@ from incept1d.fields import FieldDistribution
 
 
 def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N: int):
-    """Return ∫ max(α−η, 0) dx [m⁻¹], or NaN on overflow.
+    """Return ∫ max(α−η, 0) dx in m⁻¹, or NaN on overflow.
 
     Parameters
     ----------
-    EN_ref     : float            — E/N in Td at the reference point
-    p_val      : float            — pressure in bar
-    d_val      : float            — gap distance in metres
-    mod        :                  — loaded mechanism module (must expose alpha, eta)
-    T          : float            — temperature in K
-    field_dist : FieldDistribution — field geometry specification
-    N          : int              — number of midpoint-rule integration steps
+    EN_ref : float
+        E/N in Td at the reference point.
+    p_val, d_val, T : float
+        Pressure in bar, gap distance in metres, temperature in K.
+    mod : Mechanism
+        Loaded mechanism; must expose ``alpha`` and ``eta``.
+    field_dist : FieldDistribution
+        Gap geometry.
+    N : int
+        Number of midpoint-rule integration steps.
     """
     try:
         if field_dist.field_type == "uniform":
@@ -97,17 +96,20 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
 
 
 def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N: int):
-    """Return ∫ max(Re(λ_max(RV^{-1})), 0) dx [m⁻¹], or NaN on overflow.
+    """Return ∫ max(Re λ_max(R V⁻¹), 0) dx in m⁻¹, or NaN on overflow.
 
     Parameters
     ----------
-    EN_ref     : float            — E/N in Td at the reference point
-    p_val      : float            — pressure in bar
-    d_val      : float            — gap distance in metres
-    mod        :                  — loaded mechanism module (must expose get_R, get_V)
-    T          : float            — temperature in K
+    EN_ref : float
+        E/N in Td at the reference point.
+    p_val, d_val, T : float
+        Pressure in bar, gap distance in metres, temperature in K.
+    mod : Mechanism
+        Loaded mechanism; must expose ``get_R`` and ``get_V``.
     field_dist : FieldDistribution
-    N          : int              — number of midpoint-rule integration steps
+        Gap geometry.
+    N : int
+        Number of midpoint-rule integration steps.
     """
     try:
         if field_dist.field_type == "uniform":

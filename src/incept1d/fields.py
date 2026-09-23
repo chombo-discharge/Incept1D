@@ -3,18 +3,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Field geometry abstraction for gap-discharge computations.
+Gap geometry: the normalised field profile f(ξ) on ξ ∈ [0, 1].
 
-Provides:
-  FieldDistribution   — geometry spec independent of gap length d; .build(d) → f(xi)
-  add_field_argument  — add --field SPEC to an argparse.ArgumentParser
-  parse_field_spec    — parse a --field token list → (FieldDistribution, N)
-
-Low-level functions (moved here from Inception.py):
-  _sphere_sphere_axial_field   — exact bispherical image-charge series
-  _compute_n_steps             — minimum N for ≤ field_tol relative change in first step
-  _n_steps_sphere_cached       — LRU-cached version of _compute_n_steps for sphere geometry
-  load_fieldline               — read a tabulated ``|E|(s)`` along a (curved) field line
+Everything downstream of this module sees a gap only through f, normalised
+so that ∫f dξ = 1, so the geometry — uniform, sphere-plane, sphere-sphere,
+or a tabulated field line — is invisible to the solvers.
+:class:`FieldDistribution` is the geometry itself, independent of gap
+length; :meth:`FieldDistribution.build` turns it into f for a specific
+gap.  :func:`add_field_argument` and :func:`parse_field_spec` implement
+the ``--field`` option shared by every subcommand.
 
 The standalone field plotter is ``incept1d field`` (:mod:`incept1d.cli.field`).
 """
@@ -102,30 +99,19 @@ def load_fieldline(path, length_unit="m"):
     """
     Read a tabulated electric field along a (possibly curved) field line.
 
-    The file is a plain numeric table (whitespace- or comma-separated; header
-    and ``#`` comment lines are skipped).  The column layout is inferred from
-    the number of numeric columns:
-
-    ========  ===============================================================
-    columns   interpretation
-    ========  ===============================================================
-    2         ``s, |E|`` — arc length and field magnitude
-    4         ``x, y, z, |E|`` — position and field magnitude
-    6         ``x, y, z, Ex, Ey, Ez`` — position and field vector
-    ========  ===============================================================
-
-    For the 4- and 6-column layouts the arc length is the cumulative
-    point-to-point Euclidean distance.  Rows are used in file order: the first
-    row defines ``ξ = 0`` and the last row ``ξ = 1``.  Only ``|E|`` enters the
-    1-D model, so the sign/direction of the field vector is irrelevant.
+    A plain numeric table of 2, 4 or 6 columns; the layout is inferred from
+    the column count and documented in
+    ``docs/source/modules/fielddistributions.rst``.  Rows are used in file
+    order, so the first row is ξ = 0 and the last is ξ = 1.
 
     Parameters
     ----------
     path : str
         Path to the data file.
     length_unit : str
-        Unit of the length columns: one of ``'m'``, ``'cm'``, ``'mm'``,
-        ``'um'``.  Field units are irrelevant (the profile is normalised).
+        Unit of the length columns: ``'m'``, ``'cm'``, ``'mm'`` or
+        ``'um'``.  The field units are irrelevant, since only the shape of
+        the profile survives normalisation.
 
     Returns
     -------
@@ -202,11 +188,11 @@ def load_fieldline(path, length_unit="m"):
 @dataclasses.dataclass(eq=False)
 class FieldDistribution:
     """
-    Field geometry specification, independent of gap length d and grid resolution.
+    Gap geometry, independent of gap length and grid resolution.
 
-    Call .build(d) to obtain the normalised field callable f(xi) for a specific
-    gap length.  The number of integration steps N is a separate concern and is
-    not stored here — it is supplied by the caller (CLI arg, adaptive scheme, etc.).
+    Call :meth:`build` to obtain f(ξ) for a specific gap length.  The
+    number of integration steps is the caller's business and is
+    deliberately not stored here.
 
     Attributes
     ----------
@@ -220,12 +206,11 @@ class FieldDistribution:
     fieldline_length : float or None
         For 'fieldline': total arc length L of the tabulated line in metres.
     fieldline_voltage : float or None
-        For 'fieldline': the voltage drop ``∫|E| ds`` along the tabulated line,
-        in volts — that is, the excitation the supplied field was computed at.
-        Only the *shape* of the profile enters the solve, so this value does
-        not affect the result; it is kept so the solver can report the factor
-        by which the supplied excitation must be scaled to reach inception,
-        and so that a units mistake in the input file is obvious.
+        For 'fieldline': the voltage drop ``∫|E| ds`` along the line, in
+        volts — the excitation the file was computed at.  It does not
+        affect the solve, which sees only the shape of the profile, but it
+        lets the commands report how far that excitation is from
+        inception, and makes a units mistake in the file obvious.
     fieldline_path : str or None
         For 'fieldline': source file (for labels / output headers).
     """
@@ -244,17 +229,10 @@ class FieldDistribution:
         Build a 'fieldline' distribution from a tabulated ``|E|(s)`` file.
 
         The profile is parametrised by normalised arc length ξ = s/L and
-        normalised so that ∫₀¹ f(ξ) dξ = 1 (trapezoidal rule on the data
-        grid, consistent with the linear interpolation used in :meth:`build`).
-        Hence E_ref = V/L is the uniform-equivalent field along the line, and
-        ``V = ∫|E| ds`` is the voltage drop along the field line.
-
-        The absolute scale of the tabulated field is therefore irrelevant: a
-        line exported at 100 kV and the same line exported at 200 kV give
-        identical profiles and identical inception results.  The excitation the
-        file was computed at is nevertheless recorded as
-        :attr:`fieldline_voltage`, so the solver can report how far the
-        supplied case is from inception.
+        normalised so that ∫₀¹ f dξ = 1, which makes the gap length the arc
+        length and the reference field the mean field along the line.  The
+        absolute scale of the tabulated field therefore drops out: the same
+        line exported at 100 kV and at 200 kV gives identical results.
 
         See :func:`load_fieldline` for the accepted file layouts.
         """
@@ -315,14 +293,10 @@ class FieldDistribution:
         Returns
         -------
         f : callable
-            f(xi) → normalised field at fractional position xi ∈ [0,1].
-            xi = 0 is the sphere surface (field maximum); xi = 1 is the plane
-            / far sphere.  Satisfies ∫₀¹ f(xi) dxi = 1.
-            For uniform field, f(xi) = 1.0 everywhere.
-            For 'fieldline', f is linear interpolation of the tabulated profile
-            (xi = 0 is the first row of the data file) and is independent of
-            d: a gap length d ≠ L corresponds to the same electrode arrangement
-            scaled geometrically by d/L, which leaves f(xi) unchanged.
+            ``f(xi)`` at fractional position ξ ∈ [0, 1], with ∫₀¹ f dξ = 1.
+            ξ = 0 is the high-field electrode.  A tabulated profile is
+            linearly interpolated and does not depend on d, since f is
+            invariant under a geometric rescaling of the arrangement.
         """
         if self.field_type == "uniform":
             return lambda xi: 1.0

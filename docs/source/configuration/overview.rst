@@ -133,3 +133,15 @@ Two complete mechanisms are documented as worked examples:
 * :ref:`Chap:AirScheme` — The reference dry-air scheme: six species, a
   declarative reaction table, multigroup photoionization and a family of
   ready-made configurations.
+
+API reference
+-------------
+
+:mod:`incept1d.mechanism` is what reads all three file types: it executes
+the mechanism module, applies the ``Config`` protocol and returns a
+:class:`~incept1d.mechanism.Mechanism` with the configuration baked in.
+Every command starts here.
+
+.. automodule:: incept1d.mechanism
+   :members:
+   :undoc-members:

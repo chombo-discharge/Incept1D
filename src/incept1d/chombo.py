@@ -3,24 +3,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Transport-coefficient tables for the external 3-D plasma solver
+Transport- and rate-coefficient tables for the external 3-D plasma solver
 `chombo-discharge`, generated from a mechanism file.
 
-The command-line front end is :mod:`incept1d.cli.chombo`.
-
-Output columns
---------------
-    1      E/N [Townsend]
-    2      alpha/N [m^2]
-    3      eta/N [m^2]
-    4      Electron mean energy [eV]
-    5-6    mu*N, D*N for e
-    5-6    mu*N, D*N for N2+
-    ...    (two columns per species in SPECIES order)
-    next   Raw rate coefficient for each reaction in REACTIONS order
-
-Rate coefficients are in m^3/s (two-body) or m^6/s (three-body).
-Three-body reactions are flagged in the column header.
+Everything is tabulated against E/N and reduced by the number density, so
+one table serves every pressure.  The column layout is documented in
+``docs/source/modules/thirdparty.rst`` and written into the header of every
+file this module produces.
 """
 
 import datetime
@@ -189,18 +178,15 @@ def _neutral_reactant_description(rxn_str, species_set, mod, N):
 
 
 def generate(mod, EN_arr, p, T, reaction_multipliers):
-    """Return (columns, headers) for all EN points.
+    """Evaluate the mechanism over an E/N grid.
 
-    Column order:
-        0          E/N [Townsend]
-        1          alpha/N  [m^2]
-        2          eta/N    [m^2]
-        3          Electron mean energy [eV]
-        4..3+2n    mu*N, D*N per species
-        4+2n..     Raw rate coefficients per reaction
-
-    columns : list of 1-D numpy arrays, one per output column
-    headers : list of str, one per column (no leading '#')
+    Returns
+    -------
+    columns : list of ndarray
+        One 1-D array per output column, in the order described by
+        *headers*.
+    headers : list of str
+        One name per column, without the leading ``#``.
     """
     N = p * 1e5 / (kB * T)
     n_species = len(mod.SPECIES)

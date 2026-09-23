@@ -3,22 +3,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Temporal growth rate λ vs. voltage above inception.
+Temporal growth rate λ as a function of voltage above inception.
 
-For a fixed geometry (pd, p, T, field), finds the inception voltage V* by solving
-det Q(λ=0, EN*) = 0, then for each voltage V ∈ [V*, F·V*] finds λ* > 0 such that
-det Q(λ*, EN) = 0.  The result is the discharge growth rate as a function of applied
-voltage, with V* as the natural normalisation point.
+At the inception voltage the discharge is marginally stable: det Q(0) = 0.
+Above it, det Q(λ) = 0 has a root λ > 0, which is the rate at which the
+discharge grows in time.  This module finds the inception point first and
+then follows λ up the voltage range.
 
-The root det Q(λ) = 0 is found for fixed EN by:
-
-  1. Evaluating det Q at λ=0 to establish the reference sign.
-  2. Expanding an upper bracket geometrically (×10 per step) from 1 s⁻¹ until a
-     sign change is detected.
-  3. Refining with scipy.optimize.brentq.
-
-NaN returns from inception_det (Q nearly singular near the root) are mapped to the
-opposite-sign sentinel so brentq converges through the singularity.
+The root finding, and the NaN convention it relies on, are described in
+``docs/source/numerics/rootfinding.rst``.
 
 The command-line front end is :mod:`incept1d.cli.growth`.
 """
@@ -39,29 +32,37 @@ def find_lambda_for_voltage(
     """
     Find λ* > 0 such that det Q(λ*, EN_ref) = 0.
 
-    For EN_ref > EN* (overvoltage), det Q(λ=0) is NaN because Q is near-singular
-    (same convention as Inception.py: NaN = "above inception").  The root λ* is
-    found by locating a λ_hi where det Q is finite and positive (sub-threshold),
-    then bracketing [0, λ_hi] with brentq (NaN → -1e-300 sentinel throughout).
+    Above inception det Q(0) is NaN, because Q is numerically singular; a
+    large enough λ damps the solution and restores a finite, positive
+    determinant.  The bracket between the two is refined with Brent's
+    method.
 
     Parameters
     ----------
-    EN_ref     : float   — reduced field in Townsend
-    pd         : float   — pressure × gap in bar·m
-    mod        : Mechanism
-    p          : float   — pressure in bar
-    T          : float   — temperature in K
+    EN_ref : float
+        Reduced field in Townsend.
+    pd : float
+        Pressure × gap in bar·m.
+    mod : Mechanism
+        Loaded mechanism.
+    p, T : float
+        Pressure in bar and temperature in K.
     field_dist : FieldDistribution
+        Gap geometry.
     N_min, N_max, tol : int, int, float
+        Integration grid, as for :func:`incept1d.solver.inception_det`.
     propagator : callable
-    lam_scale  : float or None
-        Approximate λ scale in s⁻¹ for the upper-bracket search.  If None,
-        estimated from the dominant ionisation eigenvalue × electron speed.
+        Propagator algorithm.
+    lam_scale : float or None
+        Approximate λ scale in s⁻¹ for the bracket search.  Estimated from
+        the dominant ionization eigenvalue and the electron speed if None.
 
     Returns
     -------
-    lam_star : float   — growth rate in s⁻¹ (NaN on failure)
-    status   : str     — 'ok', 'suspect', or reason for failure
+    lam_star : float
+        Growth rate in s⁻¹, NaN if no root could be resolved.
+    status : str
+        'ok', 'suspect', or the reason for failure.
     """
 
     def _det_raw(lam_val):
@@ -180,20 +181,32 @@ def compute_lambda_curve(
 
     Parameters
     ----------
-    EN_star     : float   — inception E/N in Townsend
-    pd          : float   — pressure × gap in bar·m
-    ...
+    EN_star : float
+        Inception E/N in Townsend, the lower end of the sweep.
+    pd : float
+        Pressure × gap in bar·m.
+    mod : Mechanism
+        Loaded mechanism.
+    p, T : float
+        Pressure in bar and temperature in K.
+    field_dist : FieldDistribution
+        Gap geometry.
+    N_min, N_max, tol : int, int, float
+        Integration grid, as for :func:`incept1d.solver.inception_det`.
+    propagator : callable
+        Propagator algorithm.
+    n_voltages : int
+        Number of voltages in the sweep.
+    v_max_factor : float
+        Upper end of the sweep, as a multiple of V*.
 
     Returns
     -------
-    list of (V_kV, V_ratio, EN_ref, lam_star, tau_ns, nu_ion, status)
-        V_kV    — voltage in kV
-        V_ratio — V / V*
-        EN_ref  — reduced field in Townsend
-        lam_star — growth rate in s⁻¹
-        tau_ns  — e-folding time in ns
-        nu_ion  — ionisation frequency scale in s⁻¹ (max eigenvalue × v_e)
-        status  — 'ok' or diagnostic string
+    list of tuple
+        One ``(V_kV, V_ratio, EN_ref, lam_star, tau_ns, nu_ion, status)``
+        per voltage: the voltage in kV and as a multiple of V*, the reduced
+        field, the growth rate in s⁻¹, the e-folding time in ns, the
+        ionization frequency scale in s⁻¹, and the per-point status.
     """
     V_star = EN_star * pd * 1e-16 / (_kB * T)  # inception voltage in V
     voltages_V = np.geomspace(V_star, v_max_factor * V_star, n_voltages)
