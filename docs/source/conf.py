@@ -14,7 +14,6 @@ or ``make html`` from inside ``docs/``.
 import os
 import subprocess
 import sys
-import warnings
 
 # autodoc imports the `incept1d` package.  Normally it is installed in the
 # build environment (`pip install -e .`); putting `src/` first on sys.path
@@ -30,11 +29,6 @@ sys.path.insert(0, os.path.join(_REPO_ROOT, "src"))
 import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
-
-# A stale apt-installed ``mpl_toolkits`` next to a pip-installed matplotlib
-# emits a harmless "Unable to import Axes3D" warning on every import; keep it
-# out of the build log so real Sphinx warnings stay visible.
-warnings.filterwarnings("ignore", message="Unable to import Axes3D")
 
 # -- Project information -----------------------------------------------------
 
