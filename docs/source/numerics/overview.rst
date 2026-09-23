@@ -35,7 +35,7 @@ Throughout this chapter :math:`h` is the width of an integration segment,
 :math:`\|\cdot\|_F` the Frobenius norm, and ``expm`` the matrix
 exponential as implemented by :func:`scipy.linalg.expm` (Padé
 approximation with scaling and squaring).  The augmented matrix
-:math:`\bm{\mathcal{A}}` is small — :math:`N_s + 2N_\gamma^\mathrm{eff}`,
-i.e. 6 to 18 for the air schemes — so every linear-algebra operation is
-cheap; the cost of a calculation is dominated by the *number* of
-propagator evaluations.
+:math:`\bm{\mathcal{A}}` is small — :math:`N_s + 2N_\gamma^\mathrm{eff}` is
+of order ten for a realistic chemistry — so every linear-algebra operation is
+cheap; the cost of a calculation is dominated by the *number* of propagator
+evaluations.

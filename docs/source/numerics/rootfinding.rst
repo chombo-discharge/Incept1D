@@ -52,8 +52,8 @@ disabled in ``--all-branches`` mode because new branches can appear at any
 A hint only records where the root was at the *previous* :math:`pd` point,
 so refining it is not by itself enough: a new, lower root may have appeared
 since.  This is not hypothetical — near the left-branch asymptote the lowest
-root of the dry-air mechanism drops from :math:`2.9\times10^{5}` to
-:math:`2.4\times10^{3}` Td between two adjacent :math:`pd` points.  The
+root can drop by two orders of magnitude between two adjacent :math:`pd`
+points, and in an electronegative gas it does.  The
 warm-start root is therefore accepted, and the coarse scan skipped, only
 when a second scan over :math:`[E/N_\mathrm{lo}, E/N_\mathrm{warm}]` finds
 no sign change beneath it.  That scan samples at the same points per decade
@@ -76,13 +76,14 @@ lowest :math:`pd`.
 Root finding in :math:`\lambda`
 -------------------------------
 
-:func:`Lambda.find_lambda_for_voltage` solves :math:`\det\bm{Q}(\lambda;
-E/N) = 0` at fixed :math:`E/N` above threshold:
+:func:`incept1d.growth.find_lambda_for_voltage` solves
+:math:`\det\bm{Q}(\lambda; E/N) = 0` at fixed :math:`E/N` above threshold,
+in three steps:
 
-1. evaluate :math:`\det\bm{Q}(0)` to establish the reference sign
-   (``NaN`` is treated as negative, per the convention above);
-2. expand an upper bracket geometrically, :math:`\lambda_\mathrm{hi} = 1,
+1. Evaluate :math:`\det\bm{Q}(0)` to establish the reference sign
+   (``NaN`` is treated as negative, per the convention above).
+2. Expand an upper bracket geometrically, :math:`\lambda_\mathrm{hi} = 1,
    10, 100, \ldots` s\ :sup:`-1`, until the sign flips — a large positive
    :math:`\lambda` always damps the solution, since :math:`\bm{A} =
-   (\bm{R} - \lambda\bm{I})\bm{V}^{-1}`;
-3. refine :math:`[0, \lambda_\mathrm{hi}]` with Brent's method.
+   (\bm{R} - \lambda\bm{I})\bm{V}^{-1}`.
+3. Refine :math:`[0, \lambda_\mathrm{hi}]` with Brent's method.

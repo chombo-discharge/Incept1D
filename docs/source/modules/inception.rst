@@ -18,15 +18,16 @@ function of :math:`pd`.
 What it does
 ------------
 
-For every point of a logarithmic :math:`pd` sweep the command
+For every point of a logarithmic :math:`pd` sweep the command takes four
+steps:
 
-1. evaluates :math:`\det\bm{Q}(0; E/N)` on a coarse logarithmic scan of
-   :math:`E/N` to find every sign change,
-2. refines each bracket with Brent's method to obtain the root(s),
-3. matches the roots to those found at the previous :math:`pd` point so that
-   each solution *branch* is tracked continuously,
-4. converts :math:`(E/N)^*` to the breakdown voltage :math:`U^* = (E/N)^*
-   N d`.
+1. Evaluate :math:`\det\bm{Q}(0; E/N)` on a coarse logarithmic scan of
+   :math:`E/N` to find every sign change.
+2. Refine each bracket with Brent's method to obtain the root(s).
+3. Match the roots to those found at the previous :math:`pd` point, so that
+   each solution *branch* is tracked continuously.
+4. Convert :math:`(E/N)^*` to the breakdown voltage
+   :math:`U^* = (E/N)^*\,N\,d`.
 
 Steps 1–2 are :func:`incept1d.inception.find_all_breakdown_EN`; steps 3–4 are
 :func:`incept1d.inception.compute_inception_curve`.  The sweep can be run in two modes:

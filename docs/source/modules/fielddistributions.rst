@@ -57,7 +57,8 @@ tabulated field line the arc length fixes :math:`d = L`, so only fixed-
 The ``FieldDistribution`` class
 -------------------------------
 
-:class:`FieldDistribution` is a small dataclass holding the geometry type
+:class:`~incept1d.fields.FieldDistribution` is a small dataclass holding the
+geometry type
 and, where applicable, the sphere radius or the tabulated profile;
 :meth:`FieldDistribution.build` turns that static description into the
 callable :math:`f(\xi)` for a specific gap length.

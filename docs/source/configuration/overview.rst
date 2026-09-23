@@ -73,18 +73,18 @@ How the three fit together
 --------------------------
 
 :func:`incept1d.mechanism.load_mechanism` is the only place these files meet.
-Given a module path and a raw dictionary it:
+Given a module path and a raw dictionary, it takes five steps:
 
-1. looks for ``config.py`` next to the module.  If present, it builds
+1. Look for ``config.py`` next to the module.  If present, build
    ``Config.from_dict(raw, mech_dir)``; if absent and a dictionary was
-   supplied, it raises;
-2. injects ``config.pre_exec_vars()`` into the module namespace **before** the
-   module body runs, so module-level constants can be overridden;
-3. executes the module and checks it against
-   :data:`incept1d.mechanism.REQUIRED_ATTRS`, naming anything missing;
-4. calls ``config.post_exec_init(mod)`` for work that needs the executed
-   module — fitting a photoionization model, for instance;
-5. wraps the result in a :class:`~incept1d.mechanism.Mechanism` with
+   supplied, raise.
+2. Inject ``config.pre_exec_vars()`` into the module namespace **before** the
+   module body runs, so module-level constants can be overridden.
+3. Execute the module and check it against
+   :data:`incept1d.mechanism.REQUIRED_ATTRS`, naming anything missing.
+4. Call ``config.post_exec_init(mod)`` for work that needs the executed
+   module — fitting a photoionization model, for instance.
+5. Wrap the result in a :class:`~incept1d.mechanism.Mechanism` with
    ``config.mechanism_params()``, which bakes rate multipliers, scale factors
    and per-polarity overrides into the accessors.
 

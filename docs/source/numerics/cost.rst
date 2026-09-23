@@ -11,8 +11,8 @@ What a calculation costs
 ------------------------
 
 The cost of a calculation is the number of propagator evaluations times the
-cost of one.  For the six-species dry-air scheme with three photon groups
-(:math:`\dim\bm{\mathcal{A}} = 12`), measured on a laptop:
+cost of one.  Measured on a laptop, for a chemistry with
+:math:`\dim\bm{\mathcal{A}} = 12`:
 
 .. list-table::
    :header-rows: 1
@@ -83,8 +83,9 @@ result:
 * **Propagator cross-check.**  ``--method midpoint`` and ``--method
   magnus2`` converge to the same answer; a persistent difference points to
   an under-resolved profile.
-* **Closed-form limit.**  ``mechanisms/air/paschen.json`` reduces the chemistry to the
-  case with an analytic answer (:eq:`eq_standard_paschen`).
+* **Closed-form limit.**  Reducing the chemistry to a single ionizing
+  reaction with no attachment gives a case with an analytic answer
+  (:eq:`eq_standard_paschen`) that the solver must reproduce.
 * **Root residual.**  The ``[det Q check]`` messages printed during a run
   flag roots whose residual is large relative to the bracket
   (:ref:`Chap:Numerics:RootFinding`); a clean run prints none.

@@ -17,8 +17,9 @@ Uniform field
 For a uniform field :math:`\bm{\mathcal{A}}` is constant and
 :math:`\bm{M}(d) = e^{\bm{\mathcal{A}}d}` is evaluated with
 :func:`scipy.linalg.expm` (Padé approximation with scaling and squaring).
-The full augmented matrix is small (:math:`N_s + 2N_\gamma`, i.e. 6–18 for
-the air schemes), so a single ``expm`` costs microseconds.
+The full augmented matrix is small — a handful of species and photon groups,
+so :math:`N_s + 2N_\gamma` is of order ten — and a single ``expm`` costs
+microseconds.
 
 This is the *exact* propagator, not a quadrature of it, so the grid options
 have nothing to refine: ``--dx`` and ``--method`` are accepted but ignored
@@ -97,7 +98,7 @@ default 200), so the total number of fine steps never exceeds
 gives a fixed uniform grid.
 
 The initial :math:`N_{\min}` is additionally raised by
-:func:`FieldDistributions._compute_n_steps` for sphere geometries so that
+:func:`incept1d.fields._compute_n_steps` for sphere geometries so that
 the field does not change by more than a set fraction over the first step
 near the sphere, where :math:`f(\xi)` is steepest.
 
