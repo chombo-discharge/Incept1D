@@ -84,6 +84,12 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
     return True
 
 
+#: How far beyond a proxy bracket the full determinant is searched before the
+#: bracket is declared unconfirmed.  A uniform-field proxy misplaces a root of
+#: a strongly non-uniform field by up to ~30 %, so this leaves margin on top.
+_CONFIRM_FACTOR = 1.6
+
+
 def find_all_breakdown_EN(
     pd,
     mod,
@@ -240,7 +246,13 @@ def find_all_breakdown_EN(
     EN_scan = np.logspace(np.log10(EN_lo), np.log10(EN_hi), n_scan)
 
     def _scan_with(sfn):
-        """Coarse sign-change scan using sfn; Brentq refinement always uses det_fn."""
+        """Coarse sign-change scan using sfn; Brentq refinement always uses det_fn.
+
+        Returns ``(roots, unconfirmed)``.  ``unconfirmed`` is True when a
+        bracket reported by *sfn* could not be confirmed with the full
+        determinant, which matters when *sfn* is a proxy: the caller must
+        then not trust the roots that were found above it.
+        """
 
         def f_s(EN):
             val = sfn(EN, pd, mod, p, T)
@@ -248,16 +260,20 @@ def find_all_breakdown_EN(
 
         D = np.array([f_s(en) for en in EN_scan])
         local_roots = []
+        unconfirmed = False
         for i in range(len(EN_scan) - 1):
             if D[i] * D[i + 1] < 0.0:
                 EN_a, EN_b = EN_scan[i], EN_scan[i + 1]
                 fa, fb = f_brentq(EN_a), f_brentq(EN_b)
                 if fa * fb >= 0.0:
-                    # Proxy scan bracket doesn't hold for the full det; widen by
-                    # one scan step on each side and re-scan with the full det.
-                    lo = EN_scan[max(0, i - 1)]
-                    hi = EN_scan[min(len(EN_scan) - 1, i + 2)]
-                    fine = np.logspace(np.log10(lo), np.log10(hi), 30)
+                    # The proxy bracket does not hold for the full determinant.
+                    # The two disagree on where a root sits by as much as tens
+                    # of per cent for a strongly non-uniform field, which is
+                    # many scan steps, so the confirmation window is a fixed
+                    # factor rather than a step count.
+                    lo = max(EN_lo, EN_a / _CONFIRM_FACTOR)
+                    hi = min(EN_hi, EN_b * _CONFIRM_FACTOR)
+                    fine = np.logspace(np.log10(lo), np.log10(hi), 40)
                     fine_v = [f_brentq(en) for en in fine]
                     found = False
                     for k in range(len(fine) - 1):
@@ -267,6 +283,11 @@ def find_all_breakdown_EN(
                             found = True
                             break
                     if not found:
+                        # Either the proxy invented a root, or the real one lies
+                        # outside the window.  Both are only resolvable with the
+                        # full determinant, and skipping on would silently
+                        # promote a higher root to "lowest".
+                        unconfirmed = True
                         continue
                 root = scipy.optimize.brentq(
                     f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
@@ -307,15 +328,19 @@ def find_all_breakdown_EN(
                         break
                 if first_only and local_roots:
                     break
-        return local_roots
+        return local_roots, unconfirmed
 
-    roots = _scan_with(scan_fn)
-    if not roots and fast_det_fn is not None:
-        # Fast scan found no sign changes; fall back to the full det_fn scan.
+    roots, unconfirmed = _scan_with(scan_fn)
+    if fast_det_fn is not None and (not roots or unconfirmed):
+        # Either the fast scan found no sign change at all, or one of its
+        # brackets could not be confirmed.  In both cases only the full
+        # determinant can settle it; in the second case the roots above the
+        # unconfirmed bracket must be discarded, since the lowest of them is
+        # not necessarily the lowest root.
         # med_det_fn is intentionally not used here: it almost never brackets
         # roots that fast_det missed, so using it only adds scan overhead before
         # the full fallback (which is always needed anyway).
-        roots = _scan_with(det_fn)
+        roots, _ = _scan_with(det_fn)
     return roots
 
 

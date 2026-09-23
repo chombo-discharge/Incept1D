@@ -16,9 +16,8 @@ Root finding in :math:`E/N`
 1. **Coarse scan.**  :math:`\det\bm{Q}` is evaluated on 200 log-spaced
    points between 10 Td and :math:`3\times10^5` Td and every sign change is
    bracketed.  For non-uniform fields the scan uses a cheap proxy — a
-   single-step uniform-field determinant, with a 5-step version as fallback
-   — and the bracket is re-validated (and widened if needed) with the full
-   determinant before refinement.
+   single-step uniform-field determinant — and each bracket is confirmed
+   with the full determinant before refinement.
 2. **Refinement.**  Each bracket is refined with
    :func:`scipy.optimize.brentq` (``xtol=1e-8``, ``rtol=1e-14``).  ``NaN``
    values are mapped to a tiny negative sentinel (:math:`-10^{-300}`) so
@@ -37,6 +36,25 @@ Root finding in :math:`E/N`
 
 By default only the lowest root is kept (``first_only``); with
 ``--all-branches`` every root is returned.
+
+Confirming a proxy bracket
+..........................
+
+The proxy is a different geometry, so it is reliable for *detecting* that a
+root is nearby but not for locating it: for a strongly non-uniform field it
+places the lowest root tens of per cent away from where the full
+determinant has it, which is several scan steps.  A bracket is therefore
+confirmed by re-scanning :math:`[E/N_a/1.6,\; E/N_b \times 1.6]` with the
+full determinant, a window sized to that error rather than to the scan
+resolution.
+
+If the sign change is still not found, the bracket is *unconfirmed*: either
+the proxy invented a root, or the real one lies outside even that window,
+and only the full determinant can tell which.  The whole scan is then
+repeated with it.  Skipping the bracket instead would be worse than slow —
+it would silently promote the next root up to "lowest", which in an
+electronegative gas can be two orders of magnitude higher in :math:`E/N`
+and shows up as isolated points far above an otherwise smooth curve.
 
 Warm starts
 ...........

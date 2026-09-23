@@ -241,3 +241,81 @@ class TestGrowthRate:
         air, pd, p, T, EN = star
         assert np.isfinite(inception_det(EN * 1.15, pd, air, p, T, UNIFORM))
         assert np.isnan(inception_det(EN * 1.5, pd, air, p, T, UNIFORM))
+
+
+class TestNonUniformRootSelection:
+    """The coarse scan runs on a proxy; the answer must still be the lowest root."""
+
+    #: Sphere-sphere gap and pd at which the uniform-field proxy misplaces the
+    #: lowest root by about 10 %, and where air has three roots in the search
+    #: range -- so a dropped bracket has somewhere worse to land.
+    SPHERE_R_M = 50e-3
+    D_M = 0.200
+    PD_VALUES = (1.0e-2, 1.0975e-2, 1.2619e-2)
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def sphere_dets(cls):
+        """The full determinant and the proxy the CLI pairs it with."""
+        fd = FieldDistribution("sphere-sphere", sphere_R=cls.SPHERE_R_M)
+        full = functools.partial(
+            inception_det,
+            field_dist=fd,
+            N_min=5,
+            N_max=200,
+            tol=0.03,
+            positive_polarity=True,
+            propagator=midpoint_propagator,
+        )
+        proxy = functools.partial(
+            inception_det,
+            field_dist=UNIFORM,
+            N_min=1,
+            N_max=1,
+            tol=0.03,
+            propagator=midpoint_propagator,
+        )
+        return full, proxy
+
+    @staticmethod
+    def _brute_force_lowest(det_fn, pd, mod, p, T):
+        """Lowest sign change of the full determinant, found without any proxy."""
+        grid = np.logspace(np.log10(10.0), np.log10(3e5), 400)
+        prev_en, prev_v = None, None
+        for en in grid:
+            v = det_fn(en, pd, mod, p, T)
+            v = v if np.isfinite(v) else 0.0
+            if prev_v is not None and prev_v * v < 0.0:
+                return prev_en, en
+            prev_en, prev_v = en, v
+        return None
+
+    @pytest.mark.parametrize("pd_bar_mm", PD_VALUES)
+    def test_proxy_bracket_failure_does_not_promote_a_higher_root(
+        self, air, sphere_dets, pd_bar_mm
+    ):
+        """
+        A6: the reported root must be the lowest root of the full determinant.
+
+        For a strongly non-uniform field the proxy used by the coarse scan
+        puts the lowest root tens of per cent from where the full determinant
+        has it.  When such a bracket failed to confirm it was skipped, and the
+        next bracket up was reported as the inception field -- two orders of
+        magnitude high, as isolated points on an otherwise smooth curve.
+        """
+        full, proxy = sphere_dets
+        pd = pd_bar_mm * 1e-3
+        p = pd / self.D_M
+
+        bracket = self._brute_force_lowest(full, pd, air, p, 293.0)
+        assert bracket, f"no root at all at pd = {pd_bar_mm} bar*mm"
+
+        got = find_all_breakdown_EN(
+            pd, air, p, 293.0, first_only=True, det_fn=full, fast_det_fn=proxy
+        )
+        assert got, f"no root returned at pd = {pd_bar_mm} bar*mm"
+        lo, hi = bracket
+        assert lo <= got[0] <= hi, (
+            f"reported {got[0]:.4g} Td, but the lowest root of the full "
+            f"determinant is in [{lo:.4g}, {hi:.4g}] Td"
+        )
