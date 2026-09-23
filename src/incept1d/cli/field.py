@@ -41,9 +41,47 @@ def add_arguments(parser):
     )
 
 
+#: Field units by their value in V/m.  Two spellings can share a factor, so
+#: the message names both rather than guessing which one the author meant.
+_FIELD_UNITS = {
+    1.0: "V/m",
+    1e2: "V/cm",
+    1e3: "kV/m or V/mm",
+    1e5: "kV/cm",
+    1e6: "kV/mm or MV/m",
+    1e9: "MV/mm or GV/m",
+}
+
+
+def _implied_field_unit(fd):
+    """Say what field unit reconciles the line integral with the excitation.
+
+    ``∫|E| ds`` is computed in whatever unit the file's field column uses,
+    while the declared excitation is in volts.  Their ratio is therefore
+    that unit expressed in V/m, which turns an unlabelled column into a
+    statement the reader can confirm or reject at a glance.
+    """
+    if not fd.fieldline_integral:
+        return "cannot compare: ∫|E| ds is zero"
+    factor = fd.fieldline_applied_voltage / fd.fieldline_integral
+    for value, name in _FIELD_UNITS.items():
+        if abs(factor / value - 1.0) < 0.02:
+            if value == 1.0:
+                return "consistent with |E| tabulated in V/m"
+            return (
+                f"consistent with |E| tabulated in {name} "
+                f"(×{value:.0e} V/m); the solve is unaffected either way"
+            )
+    return (
+        f"∫|E| ds × {factor:.4g} = the declared excitation, which matches no "
+        f"common field unit — check the column, the length unit, or whether "
+        f"the line spans the whole gap"
+    )
+
+
 def run(args, parser):
     """Run the command with parsed *args*; *parser* is used for ``parser.error``."""
-    fd = parse_field_spec(args.field, parser)
+    fd = parse_field_spec(args.field, parser, applied_voltage_kv=args.fieldline_voltage)
     N = args.N
     if args.d is None:
         if fd.field_type != "fieldline":
@@ -61,13 +99,19 @@ def run(args, parser):
     print(f"Geometry:  {geom_str}")
     if fd.field_type == "fieldline":
         print(
-            f"U_file   = {fd.fieldline_voltage/1e3:.6g} kV"
-            f"   (= ∫|E| ds in the field units of the file)"
+            f"∫|E| ds  = {fd.fieldline_integral:.6g}"
+            f"   (in the field units of the file × m)"
         )
-        print(
-            "           only the shape of f(ξ) enters the solve, so this is a "
-            "units check, not an input"
-        )
+        if fd.fieldline_applied_voltage is not None:
+            u_kv = fd.fieldline_applied_voltage / 1e3
+            print(f"U_applied = {u_kv:.6g} kV   (--fieldline-voltage)")
+            print(f"           {_implied_field_unit(fd)}")
+        else:
+            print(
+                "           a voltage only if the file is in V/m, which the "
+                "file does not say; pass --fieldline-voltage to report"
+            )
+            print("           the inception voltage relative to the excitation")
     print(f"f(0) = {f(0.0):.6f}")
     print(f"f(1) = {f(1.0):.6f}")
     print(f"N = {N}  (cell width = {d_mm / N:.3f} mm)")

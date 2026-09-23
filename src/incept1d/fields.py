@@ -205,12 +205,16 @@ class FieldDistribution:
         normalised field ``f(ξ) = |E|/⟨|E|⟩`` with ∫₀¹ f dξ = 1 (trapezoidal).
     fieldline_length : float or None
         For 'fieldline': total arc length L of the tabulated line in metres.
-    fieldline_voltage : float or None
-        For 'fieldline': the voltage drop ``∫|E| ds`` along the line, in
-        volts — the excitation the file was computed at.  It does not
-        affect the solve, which sees only the shape of the profile, but it
-        lets the commands report how far that excitation is from
-        inception, and makes a units mistake in the file obvious.
+    fieldline_integral : float or None
+        For 'fieldline': ``∫|E| ds`` along the line, in the file's own field
+        units times metres.  It is a voltage only if the file tabulates
+        ``|E|`` in V/m, which the file does not say and this module cannot
+        know, so it is reported as a units check and never used as one.
+    fieldline_applied_voltage : float or None
+        For 'fieldline': the excitation the line was computed at, in volts,
+        as declared by the caller.  The solve sees only the shape of the
+        profile, so this does not affect the result; it is what the
+        inception voltage is reported relative to.
     fieldline_path : str or None
         For 'fieldline': source file (for labels / output headers).
     """
@@ -220,7 +224,8 @@ class FieldDistribution:
     fieldline_xi: Optional[np.ndarray] = None
     fieldline_f: Optional[np.ndarray] = None
     fieldline_length: Optional[float] = None
-    fieldline_voltage: Optional[float] = None
+    fieldline_integral: Optional[float] = None
+    fieldline_applied_voltage: Optional[float] = None
     fieldline_path: Optional[str] = None
 
     @classmethod
@@ -247,7 +252,7 @@ class FieldDistribution:
             fieldline_f=E / mean_E,
             fieldline_length=L,
             # ∫|E| ds = L ∫|E| dξ = L ⟨|E|⟩, in the field units of the file.
-            fieldline_voltage=mean_E * L,
+            fieldline_integral=mean_E * L,
             fieldline_path=path,
         )
 
@@ -350,9 +355,24 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
             "Grid resolution is set separately via --dx."
         ),
     )
+    parser.add_argument(
+        "--fieldline-voltage",
+        type=float,
+        default=None,
+        metavar="U_KV",
+        help=(
+            "Excitation in kV at which a tabulated field line was computed.  "
+            "Only the shape of the profile enters the solve, so this does not "
+            "change the result; it is what the inception voltage is reported "
+            "relative to.  Without it no such ratio is reported, since the "
+            "field units of the file are unknown."
+        ),
+    )
 
 
-def parse_field_spec(spec: list, parser=None) -> "FieldDistribution":
+def parse_field_spec(
+    spec: list, parser=None, applied_voltage_kv=None
+) -> "FieldDistribution":
     """
     Parse a --field token list into a FieldDistribution.
 
@@ -363,6 +383,10 @@ def parse_field_spec(spec: list, parser=None) -> "FieldDistribution":
     parser : argparse.ArgumentParser or None
         If given, error messages are routed through parser.error(); otherwise
         a ValueError is raised.
+    applied_voltage_kv : float or None
+        Value of ``--fieldline-voltage``.  Meaningful only for a tabulated
+        field line; supplying it for any other geometry is an error, since
+        there the voltage is an output rather than a property of the input.
 
     Returns
     -------
@@ -375,6 +399,11 @@ def parse_field_spec(spec: list, parser=None) -> "FieldDistribution":
         raise ValueError(msg)
 
     field_type = spec[0]
+    if applied_voltage_kv is not None and field_type != "fieldline":
+        _err(
+            "--fieldline-voltage applies only to '--field fieldline'; for "
+            "every other geometry the voltage is a result, not an input"
+        )
     if field_type == "uniform":
         return FieldDistribution(field_type="uniform")
 
@@ -389,9 +418,14 @@ def parse_field_spec(spec: list, parser=None) -> "FieldDistribution":
             _err("--field fieldline requires a data file path")
         unit = spec[2] if len(spec) > 2 else "m"
         try:
-            return FieldDistribution.from_fieldline(spec[1], unit)
+            fd = FieldDistribution.from_fieldline(spec[1], unit)
         except (OSError, ValueError) as exc:
             _err(f"--field fieldline: {exc}")
+        if applied_voltage_kv is not None:
+            if applied_voltage_kv <= 0.0:
+                _err("--fieldline-voltage must be positive")
+            fd.fieldline_applied_voltage = applied_voltage_kv * 1e3
+        return fd
 
     _err(
         f"Unknown field type: {field_type!r}. "

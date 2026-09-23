@@ -279,3 +279,70 @@ class TestParseFieldSpec:
     def test_label_mentions_the_geometry(self, tmp_path):
         assert "uniform" in FieldDistribution("uniform").label
         assert "50" in FieldDistribution("sphere-plane", 50e-3).label
+
+
+class TestFieldLineScaling:
+    """The file's units must not reach the answer."""
+
+    @staticmethod
+    def _write(tmp_path, name, s_col, e_col):
+        path = tmp_path / name
+        np.savetxt(path, np.c_[s_col, e_col])
+        return str(path)
+
+    @pytest.fixture
+    def two_unit_systems(self, tmp_path):
+        """The same 20 mm, 2:1 linear ramp at 100 kV, written two ways."""
+        s_mm = np.linspace(0.0, 20.0, 41)
+        e_kv_mm = np.linspace(20.0 / 3.0, 10.0 / 3.0, 41)
+        si = self._write(tmp_path, "si.csv", s_mm * 1e-3, e_kv_mm * 1e6)
+        eng = self._write(tmp_path, "eng.csv", s_mm, e_kv_mm)
+        return si, eng
+
+    def test_profile_is_independent_of_the_units(self, two_unit_systems):
+        """F20: the normalised profile is what the solver sees, and it is units-free."""
+        si, eng = two_unit_systems
+        a = parse_field_spec(["fieldline", si, "m"])
+        b = parse_field_spec(["fieldline", eng, "mm"])
+        assert a.fieldline_length == pytest.approx(b.fieldline_length)
+        assert a.fieldline_f == pytest.approx(b.fieldline_f)
+        xi = np.linspace(0.0, 1.0, 17)
+        fa, fb = a.build(a.fieldline_length), b.build(b.fieldline_length)
+        assert [fa(x) for x in xi] == pytest.approx([fb(x) for x in xi])
+
+    def test_field_integral_is_not_claimed_to_be_a_voltage(self, two_unit_systems):
+        """F21: the integral carries the file's own units, and differs between them.
+
+        It is kept as a units check, which is only useful if it is reported
+        as what it is.  The length column is converted to metres either way,
+        so the two differ by exactly the field-unit ratio: 1 kV/mm is
+        1e6 V/m, and 1e5 V vs 0.1 kV*m/mm is that factor.
+        """
+        si, eng = two_unit_systems
+        a = parse_field_spec(["fieldline", si, "m"])
+        b = parse_field_spec(["fieldline", eng, "mm"])
+        assert a.fieldline_integral == pytest.approx(1e5, rel=1e-6)
+        assert b.fieldline_integral == pytest.approx(0.1, rel=1e-6)
+        assert a.fieldline_integral / b.fieldline_integral == pytest.approx(1e6)
+        assert a.fieldline_applied_voltage is None
+        assert b.fieldline_applied_voltage is None
+
+    def test_declared_excitation_survives_both_unit_systems(self, two_unit_systems):
+        """F22: --fieldline-voltage is what a reported ratio may be divided by."""
+        si, eng = two_unit_systems
+        for path, unit in ((si, "m"), (eng, "mm")):
+            fd = parse_field_spec(["fieldline", path, unit], applied_voltage_kv=100.0)
+            assert fd.fieldline_applied_voltage == pytest.approx(1e5)
+
+    def test_declared_excitation_is_rejected_for_other_geometries(self):
+        """F23: for every other geometry the voltage is a result, not an input."""
+        for spec in (["uniform"], ["sphere-plane", "50"], ["sphere-sphere", "50"]):
+            with pytest.raises(ValueError, match="only to"):
+                parse_field_spec(spec, applied_voltage_kv=100.0)
+
+    def test_a_nonpositive_excitation_is_rejected(self, two_unit_systems):
+        """F24: a ratio against zero or a negative voltage is meaningless."""
+        si, _ = two_unit_systems
+        for bad in (0.0, -1.0):
+            with pytest.raises(ValueError, match="positive"):
+                parse_field_spec(["fieldline", si, "m"], applied_voltage_kv=bad)

@@ -173,17 +173,22 @@ class TestPdiv:
         )
         assert line.split(":", 1)[1].strip(), "header declares no pressures"
 
-    def test_fieldline_through_the_cli(self, tmp_path, capsys):
-        """C7: --field fieldline is accepted and reports the input excitation."""
+    @staticmethod
+    def _fieldline(tmp_path):
+        """A 20 mm line whose |E| falls by half, in unstated field units."""
         line = tmp_path / "line.dat"
         line.write_text("\n".join(f"{s} {2.0 - 0.05 * s}" for s in range(0, 21)))
-        rc = _run(
+        return str(line)
+
+    def _run_fieldline(self, line, *extra):
+        return _run(
             "pdiv",
             TOY,
             "--field",
             "fieldline",
-            str(line),
+            line,
             "mm",
+            *extra,
             "--pd-min",
             "1",
             "--pd-max",
@@ -192,9 +197,42 @@ class TestPdiv:
             "3",
             "--no-plot",
         )
+
+    def test_fieldline_through_the_cli(self, tmp_path, capsys):
+        """C7: --field fieldline is accepted and solves."""
+        rc = self._run_fieldline(self._fieldline(tmp_path))
         out = capsys.readouterr().out
         assert rc == 0
-        assert "U*/U_file" in out, "the scale factor column is missing"
+        assert "E/N (Td)" in out
+
+    def test_no_ratio_is_reported_without_a_declared_excitation(self, tmp_path, capsys):
+        """
+        C7b: an undeclared excitation must produce no ratio, not a wrong one.
+
+        The field units of the file are unknown, so the line integral is not
+        a voltage and nothing can be divided by it.  Reporting the ratio
+        anyway made the same line in kV/mm disagree with itself in V/m by
+        six orders of magnitude.
+        """
+        rc = self._run_fieldline(self._fieldline(tmp_path))
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "U*/U_applied" not in out
+        assert "U*/U_file" not in out
+
+    def test_declared_excitation_is_reported_as_a_ratio(self, tmp_path, capsys):
+        """C7c: --fieldline-voltage brings the ratio column back, correctly."""
+        rc = self._run_fieldline(
+            self._fieldline(tmp_path), "--fieldline-voltage", "100"
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "U*/U_applied" in out, "the scale factor column is missing"
+
+    def test_declared_excitation_is_refused_for_a_uniform_gap(self, tmp_path, capsys):
+        """C7d: there the voltage is a result, so accepting it would mislead."""
+        rc = _run("pdiv", TOY, "--fieldline-voltage", "100", "--no-plot")
+        assert rc != 0
 
 
 class TestArgumentValidation:

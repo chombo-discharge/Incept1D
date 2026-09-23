@@ -176,7 +176,9 @@ def run(args, parser):
     if args.n_voltages < 2:
         parser.error("--n-voltages must be >= 2")
 
-    _field_dist = parse_field_spec(args.field, parser)
+    _field_dist = parse_field_spec(
+        args.field, parser, applied_voltage_kv=args.fieldline_voltage
+    )
     _N_min, _N_max, _tol = parse_dx_spec(args.dx, parser)
     _propagator = (
         midpoint_propagator if args.method == "midpoint" else magnus2_propagator

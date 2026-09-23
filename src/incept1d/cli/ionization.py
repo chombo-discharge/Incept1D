@@ -219,7 +219,9 @@ def run(args, parser):
             parser.error("--voltage-hi must be greater than --voltage-lo.")
 
     # ---- Field specification --------------------------------------------
-    _field_dist = parse_field_spec(args.field, parser)
+    _field_dist = parse_field_spec(
+        args.field, parser, applied_voltage_kv=args.fieldline_voltage
+    )
     _N = args.N
     _field_str = _field_dist.label
 

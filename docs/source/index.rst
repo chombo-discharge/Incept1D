@@ -247,6 +247,7 @@ Examples
    :hidden:
 
    examples/paschen
+   examples/fieldline
    examples/iec60052
    examples/electra
 

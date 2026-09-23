@@ -111,6 +111,22 @@ path = ["mechanisms/air/o2m_mobility.txt", "mechanisms/air/o3m_mobility.txt"]
 SPDX-FileCopyrightText = "Viehland database, www.lxcat.net/Viehland"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 
+# ---------------------------------------------------------------------------
+# Generated example output
+# ---------------------------------------------------------------------------
+# These are git-ignored build products of examples/*/run.sh, but `reuse lint`
+# scans the working tree, so a reader who runs an example as the docs tell
+# them to would otherwise see the lint fail on their own output.
+
+[[annotations]]
+path = [
+  "examples/**/sim*.dat",
+  "examples/paschen/closed_form.dat",
+  "examples/fieldline/line_*.csv",
+]
+SPDX-FileCopyrightText = "2026 SINTEF Energy Research"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
 # NOTE: the IEC 60052 sphere-gap voltages and the CIGRE ELECTRA Table C2
 # breakdown curve are NOT redistributed here -- both are copyrighted by their
 # publishers.  The worked examples compute our own curves and overlay those

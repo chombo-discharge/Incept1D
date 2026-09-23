@@ -117,6 +117,23 @@ Example (``line.csv``, lengths in mm):
    ...
    20.0     3.1
 
+Declaring the excitation
+........................
+
+The length unit is declared on the command line, but the **field** unit is
+not, and the file does not reveal it.  That is enough for the solve, which
+sees only the normalised shape, but not for reporting how far the supplied
+excitation is from inception.  ``--fieldline-voltage U_KV`` declares that
+excitation, and the commands then report :math:`U^*/U_\mathrm{applied}`,
+the factor by which the excitation must be scaled to reach inception.  The
+ratio is exact whatever the field column is in, because :math:`U^*` comes
+from the shape alone.  Without the flag no ratio is reported.
+
+The line integral :math:`\int|E|\,ds` is printed in the file's own units as
+a check: if the file is in V/m it must equal the declared excitation, and a
+disagreement means a wrong length unit, a wrong column, or a line that does
+not span the whole gap.  :ref:`Chap:Examples:FieldLine` works this through.
+
 How the line is used
 ....................
 

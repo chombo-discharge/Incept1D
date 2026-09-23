@@ -241,7 +241,9 @@ def run(args, parser):
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
-    _field_dist = parse_field_spec(args.field, parser)
+    _field_dist = parse_field_spec(
+        args.field, parser, applied_voltage_kv=args.fieldline_voltage
+    )
 
     if not args.p and not args.d:
         if _field_dist.field_type == "fieldline":
@@ -639,25 +641,23 @@ def run(args, parser):
                         **{**plot_kw, "color": col, "label": b_label},
                     )
 
-                # Print summary table for this branch.  For a tabulated field
-                # line the absolute scale of the input is arbitrary, so the
-                # useful quantity is how far the supplied excitation is from
-                # inception: U* / V_file.
-                _vfile = (
-                    _field_dist.fieldline_voltage
-                    if _field_dist.field_type == "fieldline"
-                    else None
-                )
-                _scale_hdr = f"  {'U*/U_file':>11}" if _vfile else ""
+                # Print summary table for this branch.  Only the shape of a
+                # tabulated field line enters the solve, so the useful extra
+                # quantity is how far the declared excitation is from
+                # inception: U* / U_applied.  Without --fieldline-voltage
+                # there is nothing to divide by -- the field units of the
+                # file are unknown -- and the column is omitted.
+                _vfile = _field_dist.fieldline_applied_voltage
+                _scale_hdr = f"  {'U*/U_applied':>14}" if _vfile else ""
                 print(
                     f"\n  {'pd (bar·mm)':>14}  {'p (bar)':>10}  {'d (mm)':>8}  "
                     f"{'E/N (Td)':>12}  {'U (kV)':>12}  {'E (V/m)':>14}{_scale_hdr}  "
                     f"[{pol_label} (branch {b_idx + 1})]"
                 )
-                print("  " + "-" * (90 + (13 if _vfile else 0)))
+                print("  " + "-" * (90 + (16 if _vfile else 0)))
                 step = max(1, len(br_pd) // 20)
                 for j in range(0, len(br_pd), step):
-                    _scale = f"  {br_V[j]/_vfile:>11.4f}" if _vfile else ""
+                    _scale = f"  {br_V[j]/_vfile:>14.4f}" if _vfile else ""
                     print(
                         f"  {br_pd[j]*1e3:>14.4e}  "
                         f"{br_p[j]:>10.4g}  "
@@ -893,11 +893,18 @@ def run(args, parser):
                 fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
                 fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
                 fh.write(
-                    f"# U_file:      {_field_dist.fieldline_voltage/1e3:.6g} kV "
-                    f"(= ∫|E| ds along the tabulated line; only the shape of "
-                    f"the profile enters the solve, so U*/U_file is the factor "
-                    f"the supplied excitation must be scaled by)\n"
+                    f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "
+                    f"(field units of the file × m; a voltage only if the "
+                    f"file tabulates |E| in V/m)\n"
                 )
+                if _field_dist.fieldline_applied_voltage is not None:
+                    fh.write(
+                        f"# U_applied:   "
+                        f"{_field_dist.fieldline_applied_voltage/1e3:.6g} kV "
+                        f"(--fieldline-voltage; only the shape of the profile "
+                        f"enters the solve, so U*/U_applied is the factor the "
+                        f"excitation must be scaled by to reach inception)\n"
+                    )
                 fh.write(
                     "# Polarity:    start=positive → first tabulated point is "
                     "anode (+),  start=negative → cathode (−)\n"
