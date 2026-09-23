@@ -104,6 +104,13 @@ def load_fieldline(path, length_unit="m"):
     ``docs/source/modules/fielddistributions.rst``.  Rows are used in file
     order, so the first row is ξ = 0 and the last is ξ = 1.
 
+    The single position column of a 2-column file may be an arc length or a
+    coordinate, in either direction; both are read the same way, since the
+    arc length is accumulated from it.  That only describes the line
+    correctly when the line is straight, or when the column is an arc length
+    already — one coordinate of a *curved* line understates the distance
+    travelled, and such a line needs the 4- or 6-column layout.
+
     Parameters
     ----------
     path : str
@@ -119,6 +126,8 @@ def load_fieldline(path, length_unit="m"):
         Arc length in metres, starting at 0, strictly increasing.
     E : ndarray
         Field magnitude (arbitrary units, ≥ 0) at each ``s``.
+    reading : str
+        How the position columns were read, for the caller to report.
     """
     if length_unit not in _LENGTH_UNITS:
         raise ValueError(
@@ -146,20 +155,43 @@ def load_fieldline(path, length_unit="m"):
     data = np.asarray(rows, dtype=float)
 
     if ncol == 2:
-        s = data[:, 0] * scale
+        # The first column is either an arc length already or a position
+        # along the line, and the file does not say which.  It does not have
+        # to: accumulating |Δ| reads an increasing arc length back unchanged,
+        # and a decreasing column can only be a coordinate, so the two
+        # readings differ only where the arc-length one is impossible.
+        x = data[:, 0]
+        dx = np.diff(x)
+        if np.any(dx > 0.0) and np.any(dx < 0.0):
+            raise ValueError(
+                f"{path}: the position column runs both up and down, so it is "
+                f"neither an arc length nor a coordinate along a straight "
+                f"line.  Sort the rows along the line, or use the 4- or "
+                f"6-column layout, which gets the arc length from the "
+                f"positions and handles a curved line correctly."
+            )
+        s = np.concatenate(([0.0], np.cumsum(np.abs(dx))))
+        s *= scale
         E = data[:, 1]
+        reading = (
+            "decreasing coordinate"
+            if np.any(dx < 0.0)
+            else "arc length or increasing coordinate"
+        )
     elif ncol == 4:
         s = np.concatenate(
             ([0.0], np.cumsum(np.linalg.norm(np.diff(data[:, :3], axis=0), axis=1)))
         )
         s *= scale
         E = data[:, 3]
+        reading = "cumulative distance between positions"
     elif ncol == 6:
         s = np.concatenate(
             ([0.0], np.cumsum(np.linalg.norm(np.diff(data[:, :3], axis=0), axis=1)))
         )
         s *= scale
         E = np.linalg.norm(data[:, 3:6], axis=1)
+        reading = "cumulative distance between positions"
     else:
         raise ValueError(
             f"{path}: expected 2 (s,|E|), 4 (x,y,z,|E|) or 6 (x,y,z,Ex,Ey,Ez) "
@@ -170,8 +202,8 @@ def load_fieldline(path, length_unit="m"):
     s = s - s[0]
     if len(s) < 2:
         raise ValueError(f"{path}: need at least two points along the field line")
-    if np.any(np.diff(s) < 0.0):
-        raise ValueError(f"{path}: arc length must be monotonically increasing")
+    # Every layout now accumulates distance, so s is non-decreasing by
+    # construction and the direction the line was traced in does not matter.
     # Drop duplicate positions (zero-length segments) to keep interpolation sane.
     keep = np.concatenate(([True], np.diff(s) > 0.0))
     s, E = s[keep], E[keep]
@@ -179,7 +211,7 @@ def load_fieldline(path, length_unit="m"):
         raise ValueError(f"{path}: field line has zero length")
     if not np.all(np.isfinite(E)) or np.all(E == 0.0):
         raise ValueError(f"{path}: field magnitude must be finite and not all zero")
-    return s, E
+    return s, E, reading
 
 
 # ── Field distribution class ──────────────────────────────────────────────────
@@ -205,6 +237,9 @@ class FieldDistribution:
         normalised field ``f(ξ) = |E|/⟨|E|⟩`` with ∫₀¹ f dξ = 1 (trapezoidal).
     fieldline_length : float or None
         For 'fieldline': total arc length L of the tabulated line in metres.
+    fieldline_reading : str or None
+        For 'fieldline': how the position columns were read, so that the
+        commands can say it rather than leave the reader to guess.
     fieldline_integral : float or None
         For 'fieldline': ``∫|E| ds`` along the line, in the file's own field
         units times metres.  It is a voltage only if the file tabulates
@@ -224,6 +259,7 @@ class FieldDistribution:
     fieldline_xi: Optional[np.ndarray] = None
     fieldline_f: Optional[np.ndarray] = None
     fieldline_length: Optional[float] = None
+    fieldline_reading: Optional[str] = None
     fieldline_integral: Optional[float] = None
     fieldline_applied_voltage: Optional[float] = None
     fieldline_path: Optional[str] = None
@@ -241,7 +277,7 @@ class FieldDistribution:
 
         See :func:`load_fieldline` for the accepted file layouts.
         """
-        s, E = load_fieldline(path, length_unit)
+        s, E, reading = load_fieldline(path, length_unit)
         L = float(s[-1])
         xi = s / L
         _trapz = getattr(np, "trapezoid", None) or np.trapz  # numpy ≥2.0 / <2.0
@@ -251,6 +287,7 @@ class FieldDistribution:
             fieldline_xi=xi,
             fieldline_f=E / mean_E,
             fieldline_length=L,
+            fieldline_reading=reading,
             # ∫|E| ds = L ∫|E| dξ = L ⟨|E|⟩, in the field units of the file.
             fieldline_integral=mean_E * L,
             fieldline_path=path,

@@ -99,6 +99,10 @@ def run(args, parser):
     print(f"Geometry:  {geom_str}")
     if fd.field_type == "fieldline":
         print(
+            f"Arc length = {fd.fieldline_length*1e3:.6g} mm"
+            f"   (from the {fd.fieldline_reading})"
+        )
+        print(
             f"∫|E| ds  = {fd.fieldline_integral:.6g}"
             f"   (in the field units of the file × m)"
         )

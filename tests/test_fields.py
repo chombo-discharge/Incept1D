@@ -196,19 +196,18 @@ class TestFieldLineRobustness:
             "1.0; 1.5   # trailing comment\n"
             "2.0 1.0\n"
         )
-        s, E = load_fieldline(str(p), "mm")
+        s, E, _ = load_fieldline(str(p), "mm")
         assert len(s) == 3
         assert E == pytest.approx([2.0, 1.5, 1.0])
 
     def test_duplicate_positions_are_dropped(self, tmp_path):
         p = _write_line(tmp_path / "dup.dat", [(0.0, 1.0), (0.0, 1.0), (1.0, 2.0)])
-        s, E = load_fieldline(p)
+        s, E, _ = load_fieldline(p)
         assert len(s) == 2
 
     @pytest.mark.parametrize(
         "rows, match",
         [
-            ([(0.0, 1.0), (-1.0, 1.0)], "monotonically increasing"),
             ([(0.0, 1.0), (0.0, 1.0)], "zero length"),
             ([(0.0, 0.0), (1.0, 0.0)], "finite and not all zero"),
             ([(0.0, 1.0)], "at least two points"),
@@ -219,6 +218,61 @@ class TestFieldLineRobustness:
         p = _write_line(tmp_path / "bad.dat", rows)
         with pytest.raises(ValueError, match=match):
             load_fieldline(p)
+
+    def test_a_line_traced_backwards_reads_the_same(self, tmp_path):
+        """
+        F10c: the direction a line was traced in is not the reader's business.
+
+        A two-column export often carries a signed axis coordinate rather
+        than an arc length, and whether it runs up or down depends on which
+        electrode the trace started from.  Both give the same line.
+        """
+        fwd = _write_line(tmp_path / "f.dat", [(0.0, 3.0), (1.0, 2.0), (2.0, 1.0)])
+        back = _write_line(tmp_path / "b.dat", [(-5.0, 3.0), (-6.0, 2.0), (-7.0, 1.0)])
+        s_f, e_f, _ = load_fieldline(fwd)
+        s_b, e_b, _ = load_fieldline(back)
+        assert s_f == pytest.approx(s_b)
+        assert e_f == pytest.approx(e_b)
+        assert s_f[-1] == pytest.approx(2.0)
+
+    def test_an_offset_coordinate_is_measured_from_the_first_row(self, tmp_path):
+        """F10d: only distances along the line matter, not where it sits."""
+        p = _write_line(tmp_path / "off.dat", [(-0.055, 2.0), (-0.065, 1.0)])
+        s, _, _ = load_fieldline(p, "m")
+        assert s[0] == 0.0
+        assert s[-1] == pytest.approx(0.010)
+
+    def test_two_column_arc_length_is_still_taken_as_given(self, tmp_path):
+        """F10e: a column that already is an arc length must not change."""
+        p = _write_line(tmp_path / "arc.dat", [(0.0, 3.0), (0.5, 2.0), (2.0, 1.0)])
+        s, _, _ = load_fieldline(p)
+        assert s == pytest.approx([0.0, 0.5, 2.0])
+
+    def test_a_column_running_both_ways_is_rejected(self, tmp_path):
+        """
+        F10f: this is the one reading the file cannot settle.
+
+        An increasing column reads the same as an arc length or as a
+        coordinate, and a decreasing one can only be a coordinate.  A column
+        that does both is neither, and is most often one coordinate of a
+        curved line, where the distance travelled is understated.
+        """
+        p = _write_line(
+            tmp_path / "zig.dat", [(0.0, 3.0), (2.0, 2.0), (1.0, 2.0), (3.0, 1.0)]
+        )
+        with pytest.raises(ValueError, match="both up and down"):
+            load_fieldline(p)
+
+    def test_how_the_position_column_was_read_is_reported(self, tmp_path):
+        """F10g: the caller must be able to say which reading was used."""
+        up = _write_line(tmp_path / "up.dat", [(0.0, 3.0), (1.0, 1.0)])
+        down = _write_line(tmp_path / "down.dat", [(-0.05, 3.0), (-0.06, 1.0)])
+        xyz = _write_line(
+            tmp_path / "xyz.dat", [(0.0, 0.0, 0.0, 3.0), (1.0, 0.0, 0.0, 1.0)]
+        )
+        assert "coordinate" in load_fieldline(up)[2]
+        assert load_fieldline(down)[2] == "decreasing coordinate"
+        assert "cumulative distance" in load_fieldline(xyz)[2]
 
     def test_wrong_column_count_is_rejected(self, tmp_path):
         p = _write_line(tmp_path / "c3.dat", [(0.0, 1.0, 2.0), (1.0, 1.0, 2.0)])

@@ -92,19 +92,27 @@ number of numeric columns:
    * - Columns
      - Interpretation
    * - 2
-     - ``s  |E|`` — arc length and field magnitude
+     - ``s  |E|`` — position along the line and field magnitude
    * - 4
      - ``x  y  z  |E|`` — position and field magnitude
    * - 6
      - ``x  y  z  Ex  Ey  Ez`` — position and field vector
 
-For the 4- and 6-column layouts the arc length is the cumulative
-point-to-point Euclidean distance.  Rows are used in file order: the
-**first row defines** :math:`\xi = 0` and the last :math:`\xi = 1`.  Only
+The arc length is accumulated from the positions in every layout: the
+point-to-point Euclidean distance for the 4- and 6-column forms, and
+:math:`|\Delta s|` for the 2-column one.  The first column of a 2-column
+file therefore does not have to be an arc length already — a signed axis
+coordinate works, and so does one that runs downwards, which is what an
+export gives when the line was traced from the other electrode.  A column
+that *is* an increasing arc length is unchanged by this.
+
+Rows are used in file order: the **first row defines** :math:`\xi = 0` and
+the last :math:`\xi = 1`, whichever way the coordinate runs.  Only
 :math:`|E|` enters the model, so the direction of the field vector and the
 absolute field units are irrelevant — the profile is normalised.  ``UNIT``
 (``m``, ``cm``, ``mm``, ``um``; default ``m``) is the unit of the length
-columns.
+columns, and getting it wrong is what the check under
+`Declaring the excitation`_ is for.
 
 Example (``line.csv``, lengths in mm):
 
