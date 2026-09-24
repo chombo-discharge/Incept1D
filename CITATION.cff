@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: >-
+  If you publish results obtained with Incept1D, you must cite the paper
+  below ("preferred-citation"), which presents the model the code
+  implements.
+title: Incept1D
+abstract: >-
+  Discharge inception in a 1-D drift-reaction model: inception curves,
+  growth rates and transport tables.
+type: software
+authors:
+  - family-names: Marskar
+    given-names: Robert
+    affiliation: SINTEF Energy Research
+    orcid: "https://orcid.org/0000-0003-1706-9736"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/chombo-discharge/Incept1D"
+url: "https://chombo-discharge.github.io/Incept1D/"
+doi: 10.5281/zenodo.21916821
+keywords:
+  - gas discharge
+  - discharge inception
+  - partial discharge inception voltage
+  - plasma
+# Add volume, pages and doi (and remove "status") once the paper is published.
+preferred-citation:
+  type: article
+  status: submitted
+  title: "Role of negative-ion kinetics for electrical breakdown in air gaps"
+  authors:
+    - family-names: Marskar
+      given-names: Robert
+      affiliation: SINTEF Energy Research
+      orcid: "https://orcid.org/0000-0003-1706-9736"
+    - family-names: Franck
+      given-names: Christian
+      affiliation: >-
+        Institute for Power Systems and High Voltage Technology, ETH Zurich
+      orcid: "https://orcid.org/0000-0002-2201-7327"
+  journal: "Journal of Physics D: Applied Physics"
+  year: 2026
