@@ -19,8 +19,8 @@ solvers.  Everything downstream only ever needs a normalised field profile
 so that the "reference" reduced field :math:`E_\mathrm{ref}/N` used on the
 axes of every plot and output file is always the *mean* field
 :math:`U/d`, whatever the geometry.  :math:`\xi = 0` is the high-field
-electrode (sphere surface, or either plate for a uniform field) and
-:math:`\xi = 1` the low-field side.
+electrode (sphere surface, inner conductor, or either plate for a uniform
+field) and :math:`\xi = 1` the low-field side.
 
 Geometries
 ----------
@@ -42,6 +42,11 @@ Geometries
    * - ``sphere-sphere R``
      - Two equal spheres of radius :math:`R` (mm) at :math:`\pm U/2`.
        Exact bispherical series.  Symmetric.
+   * - ``coaxial A B``
+     - Coaxial cylinders with inner radius :math:`a` and outer radius
+       :math:`b` (mm).  Exact radial field, see `Coaxial cylinders`_.  Not
+       symmetric: ``incept1d pdiv`` computes both polarities
+       (``inner=positive`` / ``inner=negative``).
    * - ``fieldline FILE [UNIT]``
      - Tabulated :math:`|E|` along an arbitrary (curved) field line from
        an external electrostatic solver.  See below.
@@ -51,8 +56,45 @@ electrode arrangement, :meth:`~incept1d.fields.FieldDistribution.build` returns 
 profile for any :math:`d`: a :math:`pd` sweep at fixed pressure corresponds
 to scaled copies of the same geometry (sphere radius *and* gap scale
 together), while a sweep at fixed :math:`d` varies only the pressure.  For a
-tabulated field line the arc length fixes :math:`d = L`, so only fixed-
-:math:`d` sweeps are meaningful.
+tabulated field line the arc length fixes :math:`d = L`, and for coaxial
+cylinders the radii fix :math:`d = b - a`, so only fixed-:math:`d` sweeps are
+meaningful there.
+
+Coaxial cylinders
+-----------------
+
+Between coaxial cylinders at potential difference :math:`U` the field is
+radial and exact,
+
+.. math::
+
+   E(r) = \frac{U}{r\,\ln(b/a)}, \qquad a \le r \le b .
+
+With :math:`r = a + \xi\,(b - a)` and :math:`d = b - a`, the normalised
+profile is
+
+.. math::
+
+   f(\xi) = \frac{\rho - 1}{\big(1 + \xi(\rho - 1)\big)\ln\rho},
+   \qquad \rho = \frac{b}{a},
+
+which integrates to one exactly and depends on the radius ratio alone.
+The field at the inner conductor, where inception starts, is
+
+.. math::
+
+   E(a) = \frac{U}{a\,\ln(b/a)} = f(0)\,\frac{U}{d}.
+
+The radial direction is a field line, so the 1-D model is integrated along a
+radius; the growth of the cross-section with :math:`r` is neglected, as the
+spreading of flux tubes is for every other geometry.
+
+The radii fix the gap at :math:`d = b - a`, and a :math:`pd` sweep is a
+**pressure sweep** at that gap, exactly as for a tabulated field line (see
+`Sweeps`_): ``incept1d pdiv`` without ``--p``/``--d`` uses :math:`d = b - a`
+and reports against :math:`p`, ``--p`` is refused, and a ``--d`` other than
+:math:`b - a` solves the arrangement scaled by :math:`d/(b-a)` and says so.
+:ref:`Chap:Examples:Coaxial` works through a wire in a cylinder.
 
 The ``FieldDistribution`` class
 -------------------------------
@@ -229,6 +271,7 @@ field-line file before using it in a solve.
 .. code-block:: bash
 
    incept1d field --field sphere-plane 50 --d 20
+   incept1d field --field coaxial 1 10
    incept1d field --field fieldline line.csv mm
 
 API reference
@@ -237,4 +280,4 @@ API reference
 .. automodule:: incept1d.fields
    :members:
    :undoc-members:
-   :private-members: _sphere_sphere_axial_field, _compute_n_steps
+   :private-members: _sphere_sphere_axial_field, _coaxial_field, _compute_n_steps

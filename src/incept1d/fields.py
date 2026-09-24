@@ -7,7 +7,7 @@ Gap geometry: the normalised field profile f(ξ) on ξ ∈ [0, 1].
 
 Everything downstream of this module sees a gap only through f, normalised
 so that ∫f dξ = 1, so the geometry — uniform, sphere-plane, sphere-sphere,
-or a tabulated field line — is invisible to the solvers.
+coaxial cylinders, or a tabulated field line — is invisible to the solvers.
 :class:`FieldDistribution` is the geometry itself, independent of gap
 length; :meth:`FieldDistribution.build` turns it into f for a specific
 gap.  :func:`add_field_argument` and :func:`parse_field_spec` implement
@@ -49,6 +49,26 @@ def _sphere_sphere_axial_field(xi, alpha, a_focal, d):
     z_n = a_focal * np.cosh(na) / sinh_na
     q_n = 0.5 * a_focal / sinh_na
     return float(np.sum(q_n * (1.0 / (z_n - z) ** 2 + 1.0 / (z_n + z) ** 2))) * d
+
+
+# ── Coaxial cylinders ────────────────────────────────────────────────────────
+
+
+def _coaxial_field(xi, ratio):
+    """
+    Exact normalised radial field between coaxial cylinders, b/a = ratio.
+
+    E(r) = U / (r ln(b/a)) with r = a + ξ(b − a), so that
+
+        f(ξ) = (ρ − 1) / ((1 + ξ(ρ − 1)) ln ρ),   ρ = b/a,
+
+    and ∫₀¹ f dξ = 1 exactly.  ξ = 0 is the inner conductor.  f depends on
+    the radius ratio alone, and tends to 1 as ρ → 1.
+    """
+    t = ratio - 1.0
+    if t < 1e-12:
+        return 1.0
+    return t / ((1.0 + xi * t) * math.log1p(t))
 
 
 # ── Step-count helpers (kept for backward compatibility / plot_sphere_plane.py) ──
@@ -229,9 +249,12 @@ class FieldDistribution:
     Attributes
     ----------
     field_type : str
-        One of 'uniform', 'sphere-plane', 'sphere-sphere', 'fieldline'.
+        One of 'uniform', 'sphere-plane', 'sphere-sphere', 'coaxial',
+        'fieldline'.
     sphere_R : float or None
         Sphere radius in metres.  None unless field_type is a sphere geometry.
+    coax_a, coax_b : float or None
+        For 'coaxial': inner and outer conductor radii in metres, a < b.
     fieldline_xi, fieldline_f : ndarray or None
         For 'fieldline': tabulated normalised arc length ξ = s/L ∈ [0,1] and
         normalised field ``f(ξ) = |E|/⟨|E|⟩`` with ∫₀¹ f dξ = 1 (trapezoidal).
@@ -256,6 +279,8 @@ class FieldDistribution:
 
     field_type: str
     sphere_R: Optional[float] = None
+    coax_a: Optional[float] = None
+    coax_b: Optional[float] = None
     fieldline_xi: Optional[np.ndarray] = None
     fieldline_f: Optional[np.ndarray] = None
     fieldline_length: Optional[float] = None
@@ -308,7 +333,22 @@ class FieldDistribution:
         have any shape.  Used by quadrature helpers that would otherwise
         assume a single active region starting at ξ = 0.
         """
-        return self.field_type in ("uniform", "sphere-plane")
+        return self.field_type in ("uniform", "sphere-plane", "coaxial")
+
+    @property
+    def fixed_gap_length(self) -> Optional[float]:
+        """
+        Gap length in metres when the geometry itself fixes it, else None.
+
+        A tabulated field line is pinned at its arc length, and a coaxial
+        arrangement at ``b − a``.  For these a pd sweep is a pressure sweep,
+        since any other d is the arrangement at a different size.
+        """
+        if self.field_type == "fieldline":
+            return self.fieldline_length
+        if self.field_type == "coaxial":
+            return self.coax_b - self.coax_a
+        return None
 
     @property
     def label(self) -> str:
@@ -319,6 +359,11 @@ class FieldDistribution:
             return (
                 f"field line {os.path.basename(self.fieldline_path)}, "
                 f"L = {self.fieldline_length * 1e3:.4g} mm"
+            )
+        if self.field_type == "coaxial":
+            return (
+                f"coaxial, a = {self.coax_a * 1e3:.4g} mm, "
+                f"b = {self.coax_b * 1e3:.4g} mm"
             )
         R_mm = self.sphere_R * 1e3
         return f"{self.field_type}, R = {R_mm:.4g} mm"
@@ -337,8 +382,9 @@ class FieldDistribution:
         f : callable
             ``f(xi)`` at fractional position ξ ∈ [0, 1], with ∫₀¹ f dξ = 1.
             ξ = 0 is the high-field electrode.  A tabulated profile is
-            linearly interpolated and does not depend on d, since f is
-            invariant under a geometric rescaling of the arrangement.
+            linearly interpolated and, like the coaxial profile, does not
+            depend on d, since f is invariant under a geometric rescaling
+            of the arrangement.
         """
         if self.field_type == "uniform":
             return lambda xi: 1.0
@@ -350,6 +396,14 @@ class FieldDistribution:
                 return float(np.interp(xi, _xi, _f))
 
             return f_fl
+
+        if self.field_type == "coaxial":
+            ratio = self.coax_b / self.coax_a
+
+            def f_cx(xi, _ratio=ratio):
+                return _coaxial_field(xi, _ratio)
+
+            return f_cx
 
         if self.field_type == "sphere-plane":
             alpha = float(np.arccosh(1.0 + d / self.sphere_R))
@@ -384,6 +438,8 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
             "Field distribution.  'uniform' (default): spatially uniform field.  "
             "'sphere-plane R_mm': sphere-plane gap with sphere radius R_mm in mm.  "
             "'sphere-sphere R_mm': symmetric sphere-sphere gap.  "
+            "'coaxial A_mm B_mm': coaxial cylinders with inner radius A_mm and "
+            "outer radius B_mm in mm (gap b - a, inner conductor at xi = 0).  "
             "'fieldline FILE [UNIT]': tabulated |E| along a (curved) field line "
             "read from FILE — numeric columns 's |E|', 'x y z |E|' or "
             "'x y z Ex Ey Ez' (CSV or whitespace; header lines skipped); "
@@ -450,6 +506,17 @@ def parse_field_spec(
         sphere_R = float(spec[1]) * 1e-3  # mm → m
         return FieldDistribution(field_type=field_type, sphere_R=sphere_R)
 
+    if field_type == "coaxial":
+        if len(spec) != 3:
+            _err("--field coaxial requires an inner and an outer radius in mm")
+        try:
+            a, b = float(spec[1]) * 1e-3, float(spec[2]) * 1e-3  # mm → m
+        except ValueError:
+            _err(f"--field coaxial: radii must be numbers, got {spec[1:]}")
+        if not 0.0 < a < b:
+            _err("--field coaxial: need 0 < inner radius < outer radius")
+        return FieldDistribution(field_type="coaxial", coax_a=a, coax_b=b)
+
     if field_type == "fieldline":
         if len(spec) < 2:
             _err("--field fieldline requires a data file path")
@@ -466,7 +533,8 @@ def parse_field_spec(
 
     _err(
         f"Unknown field type: {field_type!r}. "
-        "Use 'uniform', 'sphere-plane', 'sphere-sphere', or 'fieldline'."
+        "Use 'uniform', 'sphere-plane', 'sphere-sphere', 'coaxial', or "
+        "'fieldline'."
     )
 
 

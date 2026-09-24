@@ -246,44 +246,55 @@ def run(args, parser):
         args.field, parser, applied_voltage_kv=args.fieldline_voltage
     )
 
+    # A tabulated field line (arc length) and a coaxial arrangement (b - a)
+    # are one geometry at one size: the geometry fixes the gap, and the
+    # sweep is in pressure alone.
+    _fixed_d = _field_dist.fixed_gap_length
+    if _field_dist.field_type == "fieldline":
+        _L_what = (
+            f"the arc length L = {{L:.4g}} mm of "
+            f"{os.path.basename(_field_dist.fieldline_path)}"
+        )
+    else:
+        _L_what = "L = b - a = {L:.4g} mm"
     if not args.p and not args.d:
-        if _field_dist.field_type == "fieldline":
-            # A tabulated line is one geometry at one size, so its arc length
-            # fixes the gap and the sweep is in pressure alone.
-            args.d = [float(f"{_field_dist.fieldline_length * 1e3:.6g}")]
+        if _fixed_d is not None:
+            args.d = [float(f"{_fixed_d * 1e3:.6g}")]
+            _why = (
+                "arc length of the tabulated line"
+                if _field_dist.field_type == "fieldline"
+                else "outer minus inner radius"
+            )
             print(
-                f"--field fieldline: no --p/--d given, using d = L = "
-                f"{args.d[0]:.4g} mm (arc length of the tabulated line)."
+                f"--field {_field_dist.field_type}: no --p/--d given, using "
+                f"d = L = {args.d[0]:.4g} mm ({_why})."
             )
         else:
             args.p = [1.0]
-    elif _field_dist.field_type == "fieldline":
-        _L_mm = _field_dist.fieldline_length * 1e3
+    elif _fixed_d is not None:
+        _L_mm = _fixed_d * 1e3
         if args.p:
             # Fixing the pressure makes the gap the swept variable, so every
-            # point of the sweep is a differently sized copy of the imported
-            # arrangement.  A tabulated line is one geometry at one size, so
+            # point of the sweep is a differently sized copy of the
+            # arrangement.  The geometry is one arrangement at one size, so
             # there is no reading of that sweep worth offering.
             _pd = args.p[0] * _L_mm
             parser.error(
-                f"--p cannot be used with --field fieldline: it would sweep "
-                f"the gap length, and every d \u2260 L = {_L_mm:.4g} mm is the "
-                f"electrode arrangement at a different size.  Omit --p for a "
-                f"pressure sweep at d = L, or for the single point "
-                f"p = {args.p[0]:.4g} bar use --pd-min {_pd:.6g} --pd-max "
-                f"{_pd:.6g} --pd-num 1."
+                f"--p cannot be used with --field {_field_dist.field_type}: it "
+                f"would sweep the gap length, and every d \u2260 L = "
+                f"{_L_mm:.4g} mm is the electrode arrangement at a different "
+                f"size.  Omit --p for a pressure sweep at d = L, or for the "
+                f"single point p = {args.p[0]:.4g} bar use --pd-min {_pd:.6g} "
+                f"--pd-max {_pd:.6g} --pd-num 1."
             )
-        # An explicit --d other than the arc length rescales the arrangement
-        # too, but it does so once and on purpose, so it is reported rather
-        # than refused.
+        # An explicit --d other than L rescales the arrangement too, but it
+        # does so once and on purpose, so it is reported rather than refused.
         _off = [d for d in args.d or [] if abs(d / _L_mm - 1.0) > 1e-6]
         if _off:
             print(
                 f"Warning: --d {', '.join(f'{d:g}' for d in _off)} mm differs "
-                f"from the arc length L = {_L_mm:.4g} mm of "
-                f"{os.path.basename(_field_dist.fieldline_path)}; the "
-                f"arrangement is solved scaled by d/L.  Omit --d to use "
-                f"d = L.",
+                f"from {_L_what.format(L=_L_mm)}; the arrangement is solved "
+                f"scaled by d/L.  Omit --d to use d = L.",
                 file=sys.stderr,
             )
     _N_min, _N_max, _dx_tol = parse_dx_spec(args.dx, parser)
@@ -315,12 +326,12 @@ def run(args, parser):
         np.log10(args.pd_min * 1e-3), np.log10(args.pd_max * 1e-3), args.pd_num
     )
 
-    # A tabulated field line pins the gap at its arc length, so p*d is the
-    # pressure times a constant and carries nothing the pressure does not.
+    # A geometry that pins the gap (field line, coaxial) makes p*d the
+    # pressure times a constant, carrying nothing the pressure does not.
     # Report the sweep in pressure there, and in p*d everywhere else.
-    _sweep_is_pressure = _field_dist.field_type == "fieldline"
+    _sweep_is_pressure = _fixed_d is not None
     if _sweep_is_pressure:
-        _L_m = _field_dist.fieldline_length
+        _L_m = _fixed_d
 
         def _x(pd):
             """Sweep coordinate for plots and tables: pressure in bar."""
@@ -424,6 +435,8 @@ def run(args, parser):
             return polarity  # "positive" / "negative"
         if _field_dist.field_type == "fieldline":
             return f"start={polarity}"  # xi = 0 (first data row) is anode/cathode
+        if _field_dist.field_type == "coaxial":
+            return f"inner={polarity}"  # inner conductor is anode/cathode
         return f"sphere={polarity}"  # "sphere=positive" / "sphere=negative"
 
     def _branch0_grids(branches):
@@ -949,6 +962,15 @@ def run(args, parser):
                 fh.write(
                     "# Polarity:    sphere=positive → sphere is anode (+),  "
                     "sphere=negative → sphere is cathode (−)\n"
+                )
+            if _field_dist.field_type == "coaxial":
+                fh.write(
+                    f"# Radii:       a = {_field_dist.coax_a*1e3:.6g} mm, "
+                    f"b = {_field_dist.coax_b*1e3:.6g} mm\n"
+                )
+                fh.write(
+                    "# Polarity:    inner=positive → inner conductor is anode "
+                    "(+),  inner=negative → inner conductor is cathode (−)\n"
                 )
             if _field_dist.field_type == "fieldline":
                 fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")

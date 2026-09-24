@@ -70,7 +70,7 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 |---|---|
 | `constants.py` | Physical constants (`kB`, `Q`, `c_light`) from `scipy.constants`. Everything else imports from here instead of hardcoding constants. |
 | `reactions.py` | Declarative reaction-string parser (`"e + N2 -> 2e + N2+"`) that assembles the reaction-rate matrix `R` (`build_R` / the pre-compiled fast path `compile_reactions` + `build_R_from_compiled`). Used by mechanism files, not by the solvers directly. |
-| `fields.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere / tabulated field-line profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`. Shared `--field` CLI parsing (`add_field_argument` / `parse_field_spec`). |
+| `fields.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere / coaxial / tabulated field-line profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`. Shared `--field` CLI parsing (`add_field_argument` / `parse_field_spec`). |
 | `mechanism.py` | `load_mechanism` execs a mechanism file + optional JSON config (`read_json_configs`) into a `Mechanism` object; `REQUIRED_ATTRS` is the mechanism interface. |
 | `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping (`parse_dx_spec`, `DX_*_DEFAULT`), `_assemble_det_Q`, and `inception_det` which evaluates `det Q(λ)` for given `E/N`, `p·d`, geometry. |
 | `inception.py` | `find_all_breakdown_EN` finds the `E/N` roots of `det Q = 0`; `compute_inception_curve` tracks them (branches) over a `p·d` sweep → the inception curve PDIV(p·d). CLI: `cli/pdiv.py`. |
@@ -203,8 +203,8 @@ version of the same rules, so change both together.
   paragraph saying what the command answers, then Inputs, Examples, Outputs
   and API reference.
 
-- **Figures** are built, not shipped: `docs/figures/Makefile` runs
-  `examples/*/run.sh` and the mechanism helpers, compiles the pgfplots
+- **Figures** are built, not shipped: `docs/figures/Makefile` runs the
+  examples' `incept1d` commands and the mechanism helpers, compiles the pgfplots
   `.tex` sources, and drops PDF/PNG into the git-ignored
   `docs/source/figures/`; `make html` triggers it. `make figures` builds
   only the self-contained figures and takes seconds. Figures that compare
@@ -220,9 +220,14 @@ version of the same rules, so change both together.
   the PR, and confirm that cases the change should *not* affect are
   unchanged.
 
-- **Examples**: `examples/<name>/` holds a `run.sh` that reproduces the
-  calculation; the docs page lives in `docs/source/examples/` and the figure
-  source in `docs/figures/<name>.tex`. Keep the three in sync — column
-  indices in the `.tex` follow the `--write-to-file` header layout. Where a
+- **Examples**: `examples/<name>/` holds a `README.md`, not a script: what
+  the example shows and represents, and one main `incept1d` command (the
+  first ```` ```bash ```` block starting with `incept1d`) that a reader can
+  paste and change. The docs page in `docs/source/examples/<name>.rst`
+  shows that same command, and `docs/figures/Makefile` repeats it headless
+  (plus any extra cases the figure needs) — `tests/test_docs.py` checks
+  that the command parses and that the docs page matches the README. The
+  figure source is `docs/figures/<name>.tex`; column indices follow the
+  `--write-to-file` header layout. Where a
   comparison needs data we cannot ship, the example documents the expected
   filename and column layout instead, and the figure is opt-in.

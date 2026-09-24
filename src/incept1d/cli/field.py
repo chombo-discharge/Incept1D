@@ -28,8 +28,9 @@ def add_arguments(parser):
         default=None,
         metavar="D_mm",
         help=(
-            "Gap distance in mm (required unless --field fieldline, where it "
-            "defaults to the arc length of the tabulated line)."
+            "Gap distance in mm (required unless --field fieldline or coaxial, "
+            "where it defaults to the arc length of the tabulated line or to "
+            "b - a)."
         ),
     )
     parser.add_argument(
@@ -84,9 +85,9 @@ def run(args, parser):
     fd = parse_field_spec(args.field, parser, applied_voltage_kv=args.fieldline_voltage)
     N = args.N
     if args.d is None:
-        if fd.field_type != "fieldline":
+        if fd.fixed_gap_length is None:
             parser.error("--d is required for this field type")
-        args.d = fd.fieldline_length * 1e3
+        args.d = fd.fixed_gap_length * 1e3
     d_mm = args.d
     d = d_mm * 1e-3
     f = fd.build(d)

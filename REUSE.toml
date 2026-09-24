@@ -114,7 +114,7 @@ SPDX-License-Identifier = "LicenseRef-LXCat"
 # ---------------------------------------------------------------------------
 # Generated example output
 # ---------------------------------------------------------------------------
-# These are git-ignored build products of examples/*/run.sh, but `reuse lint`
+# These are git-ignored outputs of the examples' commands, but `reuse lint`
 # scans the working tree, so a reader who runs an example as the docs tell
 # them to would otherwise see the lint fail on their own output.
 

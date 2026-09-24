@@ -56,8 +56,8 @@ so a new gas is a new file rather than a patch to the solver
 (:ref:`Chap:NewMechanisms`).  Dry air is shipped, with several ready-made
 variants.
 
-**Any gap geometry.**  Uniform, sphere-plane and sphere-sphere gaps are
-analytic.  A **tabulated field line** from an external electrostatic solver
+**Any gap geometry.**  Uniform, sphere-plane, sphere-sphere and coaxial gaps
+are analytic.  A **tabulated field line** from an external electrostatic solver
 is read straight from file, curvature included (:ref:`Chap:FieldLines`).
 
 **A criterion that does not assume the answer.**  Rather than asking whether
@@ -248,6 +248,7 @@ Examples
 
    examples/paschen
    examples/fieldline
+   examples/coaxial
    examples/iec60052
    examples/electra
 

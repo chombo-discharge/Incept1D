@@ -12,6 +12,7 @@ Sphinx or the built figures, which are git-ignored build products.
 """
 
 import re
+import shlex
 from pathlib import Path
 
 import pytest
@@ -78,26 +79,92 @@ def test_image_is_a_figure_the_makefile_builds(rst, target):
     )
 
 
+@pytest.mark.parametrize("rst,target", list(_image_directives()), ids=str)
+def test_image_leaves_the_format_to_the_builder(rst, target):
+    """D2b: a figure is referenced as ``figures/<name>.*``, never by extension.
+
+    The builder picks PDF or PNG.  An explicit extension also makes the
+    ``dummy`` build require the file, and figures are build products that a
+    clean checkout does not have -- so it passes wherever the figure happens
+    to have been built and fails in CI.
+    """
+    assert target.endswith(".*"), (
+        f"{rst.relative_to(SOURCE)} references {target}; use "
+        f"{target.rsplit('.', 1)[0]}.* instead"
+    )
+
+
 EXAMPLES = ROOT / "examples"
 
-_OUT_RE = re.compile(r"^OUT=\$\{OUT:-(.*)\}\s*$", re.M)
-
-
-@pytest.mark.parametrize(
-    "run_sh", sorted(EXAMPLES.glob("*/run.sh")), ids=lambda p: p.parent.name
+#: One directory per worked example, each with a README and a docs page.
+EXAMPLE_DIRS = sorted(
+    d for d in EXAMPLES.iterdir() if d.is_dir() and not d.name.startswith((".", "_"))
 )
-def test_example_writes_into_its_own_directory(run_sh):
-    """D3: an example's default output directory is the example's own.
 
-    The docs tell the reader to run ``bash examples/<name>/run.sh`` and then
-    look in ``examples/<name>/``.  The figure Makefile always passes ``OUT``,
-    so a wrong default is invisible to every automated build and shows up
-    only for someone following the documentation.
+_BASH_BLOCK_RE = re.compile(r"^```bash\n(.*?)^```", re.M | re.S)
+
+
+def _normalise(text):
+    """Join backslash continuations and collapse whitespace."""
+    return " ".join(re.sub(r"\\\s*\n", " ", text).split())
+
+
+def _main_command(example):
+    """The README's main command: its first ``bash`` block running incept1d."""
+    readme = (example / "README.md").read_text()
+    for block in _BASH_BLOCK_RE.findall(readme):
+        if block.lstrip().startswith("incept1d "):
+            return _normalise(block)
+    return None
+
+
+def test_there_are_examples_to_check():
+    """Guard against the collection silently matching nothing."""
+    assert len(EXAMPLE_DIRS) >= 5
+
+
+@pytest.mark.parametrize("example", EXAMPLE_DIRS, ids=lambda p: p.name)
+def test_example_is_a_readme_not_a_script(example):
+    """D3: an example is documented commands, not a script to run blindly.
+
+    The reader should see the command and change it, so the README carries
+    it; the figure Makefile carries its own copy for the build.
     """
-    m = _OUT_RE.search(run_sh.read_text())
-    assert m, f"{run_sh.relative_to(ROOT)} has no 'OUT=${{OUT:-...}}' default"
-    default = m.group(1)
-    expected = f"examples/{run_sh.parent.name}"
-    assert (
-        default == expected
-    ), f"{run_sh.relative_to(ROOT)} defaults to '{default}', not '{expected}'"
+    assert (example / "README.md").is_file(), f"{example.name} has no README.md"
+    assert not list(example.glob("*.sh")), f"{example.name} still has a script"
+    assert _main_command(example), (
+        f"examples/{example.name}/README.md has no ```bash block starting "
+        f"with 'incept1d'"
+    )
+
+
+@pytest.mark.parametrize("example", EXAMPLE_DIRS, ids=lambda p: p.name)
+def test_main_command_is_valid(example):
+    """D4: the README command parses, and names files that exist.
+
+    Parsing uses the real ``incept1d`` parser without running anything, so
+    a renamed or removed option breaks this test rather than the reader.
+    """
+    from incept1d.cli import build_parser
+
+    argv = shlex.split(_main_command(example))
+    assert argv[0] == "incept1d"
+    args = build_parser().parse_args(argv[1:])
+    for path in [args.mechanism, *getattr(args, "configs", [])]:
+        assert (ROOT / path).is_file(), f"{example.name}: {path} does not exist"
+    out = getattr(args, "write_to_file", None)
+    assert out is None or Path(out).parent == Path("examples") / example.name, (
+        f"{example.name}: the main command writes to {out}, not into "
+        f"examples/{example.name}/"
+    )
+
+
+@pytest.mark.parametrize("example", EXAMPLE_DIRS, ids=lambda p: p.name)
+def test_docs_page_shows_the_main_command(example):
+    """D5: the documentation page runs exactly what the README runs."""
+    page = SOURCE / "examples" / f"{example.name}.rst"
+    assert page.is_file(), f"no docs page {page.relative_to(ROOT)}"
+    assert _main_command(example) in _normalise(page.read_text()), (
+        f"{page.relative_to(ROOT)} does not show the main command of "
+        f"examples/{example.name}/README.md"
+    )

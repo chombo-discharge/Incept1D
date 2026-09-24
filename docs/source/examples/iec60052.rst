@@ -49,16 +49,13 @@ gap spacing varies.  Both the full scheme and the no-detachment variant
    incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
        --pd-min 1 --pd-max 1000 --pd-num 100 \
        --field sphere-sphere 1000 \
-       --streamer-criterion 18 --no-plot \
+       --streamer-criterion 18 \
        --write-to-file examples/iec60052/sim_200cm.dat
 
-This is the :math:`D = 200` cm case; ``examples/iec60052/run.sh`` runs the
-whole set (10, 15, 25, 50, 75, 100, 150, 200 cm) with a :math:`pd` range
-matched to each table:
-
-.. literalinclude:: ../../../examples/iec60052/run.sh
-   :language: bash
-   :start-at: MECH=
+This is the :math:`D = 200` cm case.  The figure uses all eight diameters
+(10, 15, 25, 50, 75, 100, 150 and 200 cm), each with a :math:`pd` range
+matched to its table; ``examples/iec60052/README.md`` lists the radius and
+``--pd-max`` for each.
 
 The sphere-sphere geometry is symmetric: both polarities are written to
 the output file but contain identical values.  The default adaptive grid

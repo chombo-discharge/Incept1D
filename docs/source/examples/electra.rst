@@ -42,9 +42,14 @@ the no-detachment variant and the streamer criterion are computed
 alongside.  At small :math:`pd` the propagator is cheap, so the adaptive
 grid budget is reduced (``--dx 5 25 0.05``) to keep the run short:
 
-.. literalinclude:: ../../../examples/electra/run.sh
-   :language: bash
-   :start-at: incept1d pdiv
+.. code-block:: bash
+
+   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
+       --pd-min 5E-3 --pd-max 500 --pd-num 100 \
+       --field sphere-sphere 1000 \
+       --streamer-criterion 18 \
+       --dx 5 25 0.05 \
+       --write-to-file examples/electra/sim.dat
 
 Reading the output
 ------------------

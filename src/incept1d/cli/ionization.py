@@ -637,6 +637,11 @@ def _write_results(
         fh.write(f"# Field type:  {field_dist.field_type}\n")
         if field_dist.sphere_R is not None:
             fh.write(f"# Sphere R:    {field_dist.sphere_R*1e3:.4g} mm,  N = {N}\n")
+        if field_dist.field_type == "coaxial":
+            fh.write(
+                f"# Radii:       a = {field_dist.coax_a*1e3:.6g} mm, "
+                f"b = {field_dist.coax_b*1e3:.6g} mm,  N = {N}\n"
+            )
         if field_dist.field_type == "fieldline":
             fh.write(
                 f"# Field line:  {field_dist.fieldline_path},  "

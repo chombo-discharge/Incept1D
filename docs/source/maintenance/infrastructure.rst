@@ -43,8 +43,9 @@ The figures in :ref:`Chap:Examples:Paschen` and :ref:`Chap:Photoionization`
 are **built, not shipped**.  Each is the product of two committed
 ingredients:
 
-1. **The calculation** — ``examples/*/run.sh`` (which call ``incept1d pdiv``)
-   and ``mechanisms/air/zheleznyak.py``, producing ``.dat`` files with a
+1. **The calculation** — the ``incept1d pdiv`` commands of the examples,
+   each documented in ``examples/<name>/README.md`` and repeated, headless,
+   in ``docs/figures/Makefile``, and ``mechanisms/air/zheleznyak.py``, producing ``.dat`` files with a
    metadata header that records the git commit and the full command line.
 2. **The plot** — a pgfplots source in ``docs/figures/`` that reads the
    ``.dat`` files by column and is compiled with ``pdflatex``.

@@ -136,7 +136,7 @@ jobs:
           path: |
             docs/build/figures/iec60052/sim_*.dat
             docs/build/figures/electra/sim.dat
-          key: curves-${{ hashFiles('src/incept1d/**', 'mechanisms/**', 'examples/**/run.sh') }}
+          key: curves-${{ hashFiles('src/incept1d/**', 'mechanisms/**', 'docs/figures/Makefile') }}
 
       - name: Build documentation figures
         working-directory: ${{ github.workspace }}/docs
