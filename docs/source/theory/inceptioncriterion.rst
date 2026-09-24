@@ -69,11 +69,12 @@ of small matrix exponentials.
 
 .. admonition:: Code
 
-   :func:`incept1d.solver._assemble_det_Q` builds :math:`\bm{Q}` from
+   :func:`incept1d.solver._det_Q` builds :math:`\bm{Q}` from
    :math:`\bm{M}(d)`, the mechanism's row selectors and SEE yields, and
    returns :math:`\det\bm{Q}` (row-normalised, via a signed
    log-determinant, with ``NaN`` returned when :math:`\bm{Q}` is
-   ill-conditioned).  :func:`incept1d.solver.inception_det` is the end-to-end
+   ill-conditioned, or evaluated without forming :math:`\bm{M}` if
+   requested).  :func:`incept1d.solver.inception_det` is the end-to-end
    evaluation for given :math:`E/N`, :math:`pd`, :math:`\lambda`, and field
    geometry.  Root-finding in :math:`E/N` is done by
    :func:`incept1d.inception.find_all_breakdown_EN`; root-finding in :math:`\lambda`

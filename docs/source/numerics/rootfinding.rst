@@ -95,13 +95,25 @@ Root finding in :math:`\lambda`
 -------------------------------
 
 :func:`incept1d.growth.find_lambda_for_voltage` solves
-:math:`\det\bm{Q}(\lambda; E/N) = 0` at fixed :math:`E/N` above threshold,
-in three steps:
+:math:`\det\bm{Q}(\lambda; E/N) = 0` at fixed :math:`E/N` above threshold
+for the growth rate of the dominant mode, which is the **largest** real
+root (:ref:`Sec:Lambda:Range` explains why).  Every evaluation uses the
+compound-matrix route where :math:`\bm{Q}` is singular
+(:ref:`Chap:Numerics:Determinant`), so no ``NaN`` convention is involved:
 
-1. Evaluate :math:`\det\bm{Q}(0)` to establish the reference sign
-   (``NaN`` is treated as negative, per the convention above).
-2. Expand an upper bracket geometrically, :math:`\lambda_\mathrm{hi} = 1,
-   10, 100, \ldots` s\ :sup:`-1`, until the sign flips — a large positive
-   :math:`\lambda` always damps the solution, since :math:`\bm{A} =
-   (\bm{R} - \lambda\bm{I})\bm{V}^{-1}`.
-3. Refine :math:`[0, \lambda_\mathrm{hi}]` with Brent's method.
+1. Evaluate :math:`\det\bm{Q}(0)`.  If it has the sub-threshold sign, the
+   voltage is below inception and :math:`\lambda^* = 0`.
+2. Start from :math:`\lambda_\mathrm{hi} = 10\,\nu_\mathrm{ion}`, ten times
+   the fastest local ionization rate in the gap — well above any rate at
+   which the gap as a whole can grow — and raise it by decades until
+   :math:`\det\bm{Q}(\lambda_\mathrm{hi})` has the sub-threshold sign.
+3. Scan **down** by a factor of three until the sign changes.  Since no
+   root lies above the dominant one, the first sign change met from above
+   brackets it; scanning up from zero could stop at a slower mode instead.
+   Two roots closer than the scan factor can be missed, but roots from
+   different feedback loops are usually orders of magnitude apart.
+4. Refine the bracket with Brent's method.
+5. Check that :math:`\det\bm{Q}` changes sign across
+   :math:`\lambda^*(1 \pm 10^{-4})`.  Brent's method also converges on a
+   discontinuity — :math:`\bm{Q}` changes size where a photon group crosses
+   :math:`\kappa_j d = 12` — which is reported as ``suspect``.

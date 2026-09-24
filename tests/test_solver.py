@@ -13,7 +13,12 @@ import scipy.linalg
 from incept1d.constants import c_light
 from incept1d.fields import FieldDistribution
 from incept1d.solver import (
+    _additive_compound,
+    _boundary_rows,
     _build_A_aug,
+    _compound_index,
+    _det_Q_compound,
+    _det_Q_norm,
     _expm_shifted,
     inception_det,
     magnus2_propagator,
@@ -355,3 +360,115 @@ class TestPolarityEquivalence:
 
         assert det(toy, True) == det(toy, False)
         assert det(overridden, True) != pytest.approx(det(overridden, False))
+
+
+class TestCompoundRoute:
+    """The singular-Q fallback must return the same number as the direct route."""
+
+    @pytest.mark.parametrize("n, k", [(3, 1), (4, 2), (6, 2), (6, 3)])
+    def test_additive_compound_generates_the_compound(self, n, k):
+        """exp(Ω^[k]) acts on k×k minors exactly as exp(Ω) acts on vectors."""
+        rng = np.random.default_rng(n * 10 + k)
+        Omega = rng.normal(size=(n, n))
+        P = scipy.linalg.expm(Omega)
+        subsets = _compound_index(n, k)[0]
+        minors = np.array(
+            [[np.linalg.det(P[np.ix_(r, c)]) for c in subsets] for r in subsets]
+        )
+        assert scipy.linalg.expm(_additive_compound(Omega, k)) == pytest.approx(
+            minors, rel=1e-9, abs=1e-12
+        )
+
+    @staticmethod
+    def _routes(mod, EN, pd, lam=0.0, n_steps=1, p=1.0, T=293.0):
+        d = pd / p
+        A, Ng, mask, n_aug = _build_A_aug(EN, d, mod, p, T, lam=lam)
+        Q0, S = _boundary_rows(EN, mod, p, T, Ng, mask, n_aug)
+        exponents = [A * d / n_steps] * n_steps
+        M = np.linalg.matrix_power(scipy.linalg.expm(A * d / n_steps), n_steps)
+        with np.errstate(over="ignore", invalid="ignore"):
+            direct = _det_Q_norm(np.vstack([Q0, S @ (M / np.abs(M).max())]))
+            compound = _det_Q_compound(exponents, Q0, S)
+        return direct, compound
+
+    @pytest.mark.parametrize("EN", [150.0, 300.0, 400.0, 600.0])
+    @pytest.mark.parametrize("lam", [0.0, 1e5])
+    @pytest.mark.parametrize("n_steps", [1, 7])
+    def test_equals_the_direct_route(self, toy, EN, lam, n_steps):
+        direct, compound = self._routes(toy, EN, 20e-3, lam, n_steps)
+        assert np.isfinite(direct)
+        assert compound == pytest.approx(direct, rel=1e-7)
+
+    # A hand-built gap the toy cannot provide: electrons and two positive
+    # ions, so the anode block S M has two rows that can become parallel.
+    # Ions feed nothing back, as in the air mechanisms.  Rows of Q0/S and
+    # the generator in the order (e, ion1, ion2).
+    Q0_TWO_IONS = np.array([[1.0, 1e-3, 2e-3]])
+    S_TWO_IONS = np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+
+    @staticmethod
+    def _generator(a, c1=300.0, c2=320.0):
+        """Electron growth a, ion production, ion-mode growth c1, c2 (1/m)."""
+        return np.array(
+            [
+                [a, 0.0, 0.0],
+                [0.6 * abs(a) + 50.0, c1, 0.0],
+                [0.4 * abs(a) + 50.0, 0.0, c2],
+            ]
+        )
+
+    def _exact(self, exponents):
+        """Row-normalised det [Q0; S M] in 300-digit arithmetic."""
+        mp = pytest.importorskip("mpmath")
+        mp.mp.dps = 300
+        M = mp.eye(3)
+        for Om in exponents:
+            M = mp.expm(mp.matrix(Om.tolist())) * M
+        Q = mp.matrix(3, 3)
+        rows = [list(self.Q0_TWO_IONS[0])] + [
+            [sum(self.S_TWO_IONS[r, j] * M[j, c] for j in range(3)) for c in range(3)]
+            for r in range(2)
+        ]
+        for r, row in enumerate(rows):
+            norm = mp.sqrt(sum(mp.mpf(v) ** 2 for v in row))
+            for c in range(3):
+                Q[r, c] = row[c] / norm
+        return float(mp.det(Q))
+
+    @pytest.mark.parametrize("scale", [1.0, 30.0, 300.0])
+    def test_uniform_gap_with_widely_separated_modes(self, scale):
+        """
+        The ion modes run far ahead of the electrons: at scale 300 they are
+        ~10^4 e-folds apart and the direct route has long since failed.
+        """
+        exponents = [self._generator(200.0, 300.0 * scale, 320.0 * scale) * 0.01]
+        exact = self._exact(exponents)
+        with np.errstate(over="ignore", invalid="ignore"):
+            got = _det_Q_compound(exponents, self.Q0_TWO_IONS, self.S_TWO_IONS)
+        assert np.sign(got) == np.sign(exact)
+        assert got == pytest.approx(exact, rel=1e-6, abs=1e-280)
+
+    @pytest.mark.parametrize("n_steps", [10, 200])
+    @pytest.mark.parametrize("c", [6000.0, 9000.0, 10500.0, 11000.0])
+    def test_transiently_tiny_electrons(self, n_steps, c):
+        """
+        Electrons decay by 160 e-folds over the first half of the gap and
+        avalanche by 600 over the second, so in mid-gap their component is
+        far below the ions' yet decides the sign at the anode.  That defeats
+        re-orthonormalisation (Godunov–Conte), which mixes components; and
+        for the two smaller ion growth rates c the rows S M are parallel, so
+        the direct route fails too.  The root lies between c = 10500 and
+        11000, so the sign flips across the parametrisation.
+        """
+        d = 0.04
+        h = d / n_steps
+        exponents = [
+            self._generator(-8000.0 if i < n_steps // 2 else 30000.0, c, 1.07 * c) * h
+            for i in range(n_steps)
+        ]
+        exact = self._exact(exponents)
+        assert exact != 0.0
+        with np.errstate(over="ignore", invalid="ignore"):
+            got = _det_Q_compound(exponents, self.Q0_TWO_IONS, self.S_TWO_IONS)
+        assert np.sign(got) == np.sign(exact)
+        assert got == pytest.approx(exact, rel=1e-6)

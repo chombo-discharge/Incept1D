@@ -19,6 +19,8 @@ actually evaluated is in ``docs/source/numerics/``.  The root of det Q in
 E/N at fixed p·d is found in :mod:`incept1d.inception`.
 """
 
+import functools
+import itertools
 import math
 
 import numpy as np
@@ -170,6 +172,11 @@ def parse_dx_spec(tokens, parser=None):
     return N_min, N_max, tol
 
 
+def _midpoint_exponent(A_func, x_lo, x_hi):
+    """Exponent of the midpoint rule on [x_lo, x_hi]: A(x_mid) · h."""
+    return A_func(0.5 * (x_lo + x_hi)) * (x_hi - x_lo)
+
+
 def midpoint_propagator(A_func, x_lo, x_hi):
     """
     Midpoint-rule propagator: expm(A(x_mid) * h).
@@ -187,16 +194,14 @@ def midpoint_propagator(A_func, x_lo, x_hi):
     ndarray
         Propagator for the subinterval.
     """
-    h = x_hi - x_lo
-    x_mid = 0.5 * (x_lo + x_hi)
-    return _expm_shifted(A_func(x_mid) * h)
+    return _expm_shifted(_midpoint_exponent(A_func, x_lo, x_hi))
 
 
 def _adaptive_midpoint_segment(
     A_func, x_lo, x_hi, tol, max_depth, P_coarse=None, _level=0, _diag=None
 ):
     """
-    Midpoint propagator for [x_lo, x_hi], refined by recursive step halving.
+    Midpoint exponents for [x_lo, x_hi], refined by recursive step halving.
 
     Parameters
     ----------
@@ -209,9 +214,10 @@ def _adaptive_midpoint_segment(
     max_depth : int
         Remaining recursion depth.  At 0 the coarse estimate is returned
         without a halving check.
-    P_coarse : ndarray or None
-        The parent's half-step propagator, which is this call's coarse
-        estimate.  Passing it saves one expm; None at the top level.
+    P_coarse : tuple or None
+        The parent's half-step ``(exponent, propagator)``, which is this
+        call's coarse estimate.  Passing it saves one expm; None at the top
+        level.
     _level : int
         Recursion depth, for diagnostics only.
     _diag : list or None
@@ -221,23 +227,32 @@ def _adaptive_midpoint_segment(
 
     Returns
     -------
-    ndarray
-        Propagator matrix for [x_lo, x_hi].
+    list of ndarray
+        Step exponents covering [x_lo, x_hi] from cathode to anode; the
+        propagator is the ordered product of their exponentials.  They are
+        returned rather than multiplied so that :func:`_det_Q` can also carry
+        them across the gap without forming the product, which is what
+        loses the subdominant modes (see :func:`_propagate_compound`).
     """
     if P_coarse is None:
-        P_coarse = midpoint_propagator(A_func, x_lo, x_hi)
+        Om = _midpoint_exponent(A_func, x_lo, x_hi)
+        P_coarse = (Om, _expm_shifted(Om))
     if max_depth == 0:
-        return P_coarse
+        return [P_coarse[0]]
 
     x_mid = 0.5 * (x_lo + x_hi)
-    P_l = midpoint_propagator(A_func, x_lo, x_mid)
-    P_r = midpoint_propagator(A_func, x_mid, x_hi)
+    Om_l = _midpoint_exponent(A_func, x_lo, x_mid)
+    Om_r = _midpoint_exponent(A_func, x_mid, x_hi)
+    P_l, P_r = _expm_shifted(Om_l), _expm_shifted(Om_r)
     P_fine = P_r @ P_l
 
+    # The accuracy test compares whole propagators.  They are dominated by
+    # the leading mode, which is what the step size has to resolve; the
+    # subdominant modes are kept separately, by the subspace propagation.
     norm_ref = np.linalg.norm(P_fine, "fro")
     if norm_ref < 1e-300:
         norm_ref = 1.0
-    err = np.linalg.norm(P_fine - P_coarse, "fro") / norm_ref
+    err = np.linalg.norm(P_fine - P_coarse[1], "fro") / norm_ref
 
     accepted = err <= tol
     if _diag is not None:
@@ -252,27 +267,47 @@ def _adaptive_midpoint_segment(
         )
 
     if accepted:
-        return P_fine
+        return [Om_l, Om_r]
 
     # Error too large — refine each half, passing the already-computed half-step
     # propagators as the coarse estimates for the sub-calls.
-    P_l_fine = _adaptive_midpoint_segment(
-        A_func, x_lo, x_mid, tol, max_depth - 1, P_l, _level + 1, _diag
+    return _adaptive_midpoint_segment(
+        A_func, x_lo, x_mid, tol, max_depth - 1, (Om_l, P_l), _level + 1, _diag
+    ) + _adaptive_midpoint_segment(
+        A_func, x_mid, x_hi, tol, max_depth - 1, (Om_r, P_r), _level + 1, _diag
     )
-    P_r_fine = _adaptive_midpoint_segment(
-        A_func, x_mid, x_hi, tol, max_depth - 1, P_r, _level + 1, _diag
-    )
-    return P_r_fine @ P_l_fine
+
+
+def _magnus2_exponent(A_func, x_lo, x_hi):
+    """
+    Second-order Magnus exponent Ω on [x_lo, x_hi].
+
+    Falls back to the midpoint exponent where the Magnus series is not
+    guaranteed to converge; see :func:`magnus2_propagator`.
+    """
+    h = x_hi - x_lo
+    mid = 0.5 * (x_lo + x_hi)
+    offset = h / (2.0 * math.sqrt(3.0))
+    A1 = A_func(mid - offset)
+    A2 = A_func(mid + offset)
+    Omega1 = 0.5 * h * (A1 + A2)
+    # When ‖Ω₁‖_F > π the Magnus series is not guaranteed to converge; the
+    # commutator correction would dominate and produce a wildly wrong exponent.
+    # Fall back to the midpoint rule, which uses expm(A_mid·h) directly and
+    # remains accurate for any step size via scipy's scaling-and-squaring.
+    if np.linalg.norm(Omega1, "fro") > math.pi:
+        return _midpoint_exponent(A_func, x_lo, x_hi)
+    Omega2 = (math.sqrt(3.0) * h**2 / 12.0) * (A2 @ A1 - A1 @ A2)
+    return Omega1 + Omega2
 
 
 def magnus2_propagator(A_func, x_lo, x_hi):
     """
     Second-order Magnus propagator, with two-point Gauss-Legendre quadrature.
 
-    The Magnus series converges only for ∫‖A‖ dx < π, so an interval whose
-    quadrature term exceeds that is halved and the two sub-propagators
-    multiplied.  The caller therefore does not have to pick a grid fine
-    enough for large p·d.
+    Where the Magnus series is not guaranteed to converge (∫‖A‖ dx > π) the
+    interval falls back to the midpoint rule, so the caller does not have
+    to pick a grid fine enough for large p·d.
 
     Parameters
     ----------
@@ -286,29 +321,192 @@ def magnus2_propagator(A_func, x_lo, x_hi):
     ndarray
         Propagator matrix P ≈ expm(∫_{x_lo}^{x_hi} A dx).
     """
-    h = x_hi - x_lo
-    mid = 0.5 * (x_lo + x_hi)
-    offset = h / (2.0 * math.sqrt(3.0))
-    A1 = A_func(mid - offset)
-    A2 = A_func(mid + offset)
-    Omega1 = 0.5 * h * (A1 + A2)
-    # When ‖Ω₁‖_F > π the Magnus series is not guaranteed to converge; the
-    # commutator correction would dominate and produce a wildly wrong exponent.
-    # Fall back to the midpoint rule, which uses expm(A_mid·h) directly and
-    # remains accurate for any step size via scipy's scaling-and-squaring.
-    if np.linalg.norm(Omega1, "fro") > math.pi:
-        return midpoint_propagator(A_func, x_lo, x_hi)
-    Omega2 = (math.sqrt(3.0) * h**2 / 12.0) * (A2 @ A1 - A1 @ A2)
-    return _expm_shifted(Omega1 + Omega2)
+    return _expm_shifted(_magnus2_exponent(A_func, x_lo, x_hi))
 
 
-def _assemble_det_Q(M, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
+# Largest condition number allowed for one substep of the compound
+# propagation.  The k-th compound of a propagator P has condition number up
+# to cond(P)^k, so substeps are sized by cond(P) ≤ _MAX_STEP_COND^(1/k).  The
+# bound is on the condition number, not on the eigenvalue spread: A_aug is
+# strongly non-normal (electron and ion speeds differ by orders of magnitude),
+# and a step whose eigenvalues span a few e-folds can have cond(P) ~ 1e18.
+_MAX_STEP_COND = 1e8
+
+
+@functools.lru_cache(maxsize=None)
+def _compound_index(n, k):
     """
-    Assemble the boundary-condition matrix Q from the propagator M and cathode
-    boundary field EN_cathode, then return det Q (NaN if ill-conditioned or overflow).
+    Index tables for the k-th additive compound of an n×n matrix.
 
-    Must be called inside a numpy errstate(over='ignore', invalid='ignore') block.
-    mod must already be polarity-resolved (via mod.resolve(positive)).
+    Returns ``(subsets, position, rows, cols, a, b, sign)``: the k-subsets of
+    range(n) in lexicographic order, their positions, and one entry per
+    nonzero of the compound, ``K[rows, cols] += sign * Ω[a, b]``.
+    """
+    subsets = list(itertools.combinations(range(n), k))
+    position = {s: i for i, s in enumerate(subsets)}
+    rows, cols, a_, b_, sign = [], [], [], [], []
+    for subset in subsets:
+        for ia, a in enumerate(subset):
+            rest = subset[:ia] + subset[ia + 1 :]
+            for b in range(n):
+                if b in rest:
+                    continue
+                J = tuple(sorted(rest + (b,)))
+                rows.append(position[subset])
+                cols.append(position[J])
+                a_.append(a)
+                b_.append(b)
+                sign.append((-1.0) ** (ia + J.index(b)))
+    return (
+        subsets,
+        position,
+        np.array(rows),
+        np.array(cols),
+        np.array(a_),
+        np.array(b_),
+        np.array(sign),
+    )
+
+
+def _additive_compound(Omega, k):
+    """
+    The k-th additive compound Ω^[k], the generator of ∧^k exp(Ω).
+
+    exp(Ω^[k]) acts on the Plücker coordinates (the k×k minors) of an
+    n×k matrix exactly as exp(Ω) acts on the matrix itself.
+    """
+    _, _, rows, cols, a, b, sign = _compound_index(Omega.shape[0], k)
+    K = np.zeros((math.comb(Omega.shape[0], k),) * 2)
+    np.add.at(K, (rows, cols), sign * Omega[a, b])
+    return K
+
+
+def _propagate_compound(exponents, Y):
+    """
+    Carry the Plücker coordinates of span(Y) across the gap.
+
+    Forming the propagator M = ∏ exp(Ω_i) and then selecting rows of it
+    fails once the k modes the anode rows see differ in growth by more than
+    about 35 e-folds: the rows S M are then parallel to machine precision.
+    With λ > 0 that happens at once, because λ V⁻¹ separates the slow ion
+    modes by thousands of e-folds.
+
+    Re-orthonormalising the propagated subspace (Godunov–Conte) is not a
+    cure here.  Orthogonalisation mixes all components, so a component that
+    is transiently tiny — the electrons, attached in the low-field region —
+    is buried under the rounding error of the large ion components, and the
+    avalanche downstream amplifies that error to O(1).  The k×k minors of
+    the propagated n×k matrix obey a *linear* equation, dp/dx = A^[k] p,
+    whose coefficients keep every structural zero of A (positive ions feed
+    no other species), so each minor is carried with its own relative
+    accuracy and the one det Q needs is read off at the anode without
+    cancellation (the compound-matrix method).
+
+    Parameters
+    ----------
+    exponents : list of ndarray
+        Step exponents Ω_i, cathode to anode.
+    Y : ndarray
+        (n_aug, k) matrix whose span is propagated.
+
+    Returns
+    -------
+    p : ndarray
+        Plücker coordinates of ∏ exp(Ω_i) Y, scaled to max |p| = 1, ordered
+        as :func:`_compound_index`.
+    log_scale : float
+        log of the factor removed: the true coordinates are p · e^log_scale.
+    """
+    n, k = Y.shape
+    subsets = _compound_index(n, k)[0]
+    p = np.array([np.linalg.det(Y[list(rows), :]) for rows in subsets])
+    log_scale = math.log(np.abs(p).max())
+    p = p / np.abs(p).max()
+    for Omega in exponents:
+        # Size substeps so the compound propagator stays well conditioned.
+        # Splitting is exact: exp(Ω) = exp(Ω/m)^m.
+        mu = np.sort(np.real(np.linalg.eigvals(Omega)))[::-1]
+        m = max(1, math.ceil((mu[0] - mu[-1]) / math.log(_MAX_STEP_COND) * k))
+        cond_max = _MAX_STEP_COND ** (1.0 / k)
+        while np.linalg.cond(_expm_shifted(Omega / m)) > cond_max and m < 2**20:
+            m *= 2
+        # Shift by the largest eigenvalue of Ω^[k], the sum of the k largest
+        # of Ω, so that the compound propagator cannot overflow.
+        shift = float(mu[:k].sum()) / m
+        Pk = scipy.linalg.expm(
+            _additive_compound(Omega / m, k) - shift * np.eye(len(subsets))
+        )
+        done = 0
+        while done < m:
+            q = Pk @ p
+            scale = np.abs(q).max()
+            log_scale += shift + math.log(scale)
+            q = q / scale
+            done += 1
+            # Once p is an eigenvector of Pk, each remaining substep only
+            # rescales it by the same factor; skipping them is exact and is
+            # what keeps a uniform gap at large λ from costing m products.
+            # The test must be relative, coordinate by coordinate: a
+            # coordinate that is transiently tiny (electrons attached in a
+            # low-field region) can still be changing by orders of magnitude
+            # while its absolute change is far below any tolerance, and the
+            # avalanche downstream would amplify it back to O(1).
+            nz = p != 0.0
+            if (
+                done < m
+                and not np.any(q[~nz])
+                and np.max(np.abs(q[nz] / p[nz] - 1.0)) < 1e-12
+            ):
+                log_scale += (m - done) * (shift + math.log(scale))
+                p = q
+                break
+            p = q
+    return p, log_scale
+
+
+def _log_row_norm(row, exponents):
+    """
+    log ‖row · ∏ exp(Ω_i)‖, carried anode to cathode with a running scale.
+
+    Each exponent is split into substeps spanning at most 30 e-folds, so no
+    entry of a substep propagator underflows; the shifts that keep them from
+    overflowing are added back, so the result is the true norm.
+    """
+    r, log_r = np.asarray(row, dtype=float).copy(), 0.0
+    n = r.shape[0]
+    for Omega in reversed(exponents):
+        mu = np.real(np.linalg.eigvals(Omega))
+        m = max(1, math.ceil((mu.max() - mu.min()) / 30.0))
+        shift = float(mu.max()) / m
+        P = scipy.linalg.expm(Omega / m - shift * np.eye(n))
+        done = 0
+        while done < m:
+            q = r @ P
+            scale = np.abs(q).max()
+            log_r += shift + math.log(scale)
+            q = q / scale
+            done += 1
+            nz = r != 0.0
+            if (
+                done < m
+                and not np.any(q[~nz])
+                and np.max(np.abs(q[nz] / r[nz] - 1.0)) < 1e-12
+            ):
+                log_r += (m - done) * (shift + math.log(scale))
+                r = q
+                break
+            r = q
+    return log_r + math.log(np.linalg.norm(r))
+
+
+def _boundary_rows(EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
+    """
+    The two halves of the boundary-condition matrix Q.
+
+    Returns ``(Q0, S)``: Q0 holds the cathode conditions on θ(0) (electron
+    emission, no negative ions, no forward photons), and S selects the
+    components that vanish at the anode (positive ions, backward photons),
+    so that Q = [Q0; S M].  *mod* must already be polarity-resolved.
     """
     n = len(mod.SPECIES)
 
@@ -319,55 +517,140 @@ def _assemble_det_Q(M, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
 
     if N_gamma_eff == 0:
         Q0_e = Pi_e + gplus[np.newaxis, :] @ Pi_plus
-        Q0_neg = Pi_minus
-        Q0 = np.vstack([Q0_e, Q0_neg])
-        Qd = Pi_plus @ M
-    else:
-        z_gamma = np.zeros((Pi_e.shape[0], 2 * N_gamma_eff))
-        z_plus = np.zeros((Pi_plus.shape[0], 2 * N_gamma_eff))
-        z_minus = np.zeros((Pi_minus.shape[0], 2 * N_gamma_eff))
-        Pi_e_aug = np.hstack([Pi_e, z_gamma])
-        Pi_plus_aug = np.hstack([Pi_plus, z_plus])
-        Pi_minus_aug = np.hstack([Pi_minus, z_minus])
+        return np.vstack([Q0_e, Pi_minus]), Pi_plus
 
-        Pi_fwd = np.zeros((N_gamma_eff, n_aug))
-        Pi_bck = np.zeros((N_gamma_eff, n_aug))
-        for j in range(N_gamma_eff):
-            Pi_fwd[j, n + j] = 1.0
-            Pi_bck[j, n + N_gamma_eff + j] = 1.0
+    z_gamma = np.zeros((Pi_e.shape[0], 2 * N_gamma_eff))
+    z_plus = np.zeros((Pi_plus.shape[0], 2 * N_gamma_eff))
+    z_minus = np.zeros((Pi_minus.shape[0], 2 * N_gamma_eff))
+    Pi_e_aug = np.hstack([Pi_e, z_gamma])
+    Pi_plus_aug = np.hstack([Pi_plus, z_plus])
+    Pi_minus_aug = np.hstack([Pi_minus, z_minus])
 
-        g_Psi = mod.get_gamma_Psi(EN_cathode, p, T)[aug_mask]
+    Pi_fwd = np.zeros((N_gamma_eff, n_aug))
+    Pi_bck = np.zeros((N_gamma_eff, n_aug))
+    for j in range(N_gamma_eff):
+        Pi_fwd[j, n + j] = 1.0
+        Pi_bck[j, n + N_gamma_eff + j] = 1.0
 
-        Q0_e = (
-            Pi_e_aug
-            + gplus[np.newaxis, :] @ Pi_plus_aug
-            - (g_Psi[np.newaxis, :] @ Pi_bck)
-        )
-        Q0_neg = Pi_minus_aug
-        Q0_fwd = Pi_fwd
-        Q0 = np.vstack([Q0_e, Q0_neg, Q0_fwd])
+    g_Psi = mod.get_gamma_Psi(EN_cathode, p, T)[aug_mask]
 
-        Qd_plus = Pi_plus_aug @ M
-        Qd_bck = Pi_bck @ M
-        Qd = np.vstack([Qd_plus, Qd_bck])
+    Q0_e = Pi_e_aug + gplus[np.newaxis, :] @ Pi_plus_aug - g_Psi[np.newaxis, :] @ Pi_bck
+    Q0 = np.vstack([Q0_e, Pi_minus_aug, Pi_fwd])
+    return Q0, np.vstack([Pi_plus_aug, Pi_bck])
 
-    Q = np.vstack([Q0, Qd])
 
+def _det_Q_norm(Q):
+    """
+    det of Q with every row scaled to unit norm; NaN if ill-conditioned.
+
+    Row scaling removes the arbitrary scale of M relative to Q0 and leaves
+    the sign unchanged.  Must be called inside a numpy errstate block.
+    """
     if np.any(~np.isfinite(Q)):
         return np.nan
-
     row_norms = np.linalg.norm(Q, axis=1, keepdims=True)
     row_norms = np.where(row_norms < 1e-300, 1.0, row_norms)
     Q_norm = Q / row_norms
     sign, logabsdet = np.linalg.slogdet(Q_norm)
-    cond_Q = np.linalg.cond(Q_norm)
-    if cond_Q > 1e14:
+    if np.linalg.cond(Q_norm) > 1e14:
         return np.nan
     if not np.isfinite(logabsdet):
         return np.nan
     if sign == 0:
         return 0.0
     return float(sign) * min(np.exp(logabsdet), 1e300)
+
+
+def _det_Q_compound(exponents, Q0, S):
+    """
+    Row-normalised det [Q0; S M] by the compound-matrix method.
+
+    Returns the same value as forming M and taking the row-normalised
+    determinant (:func:`_det_Q_norm`), but without forming M, so it stays
+    exact where the rows S M are parallel to machine precision.  See
+    :func:`_det_Q` for the identity it rests on.
+    """
+    if S.shape[0] + Q0.shape[0] != S.shape[1]:
+        raise ValueError(
+            f"Q is {Q0.shape[0] + S.shape[0]}x{S.shape[1]}: every species must be "
+            "selected by exactly one of Pi_e, Pi_plus, Pi_minus"
+        )
+    G = Q0 @ Q0.T
+    # N0 is the anode-selected coordinates projected onto null(Q0): it
+    # varies continuously with E/N, so det T cannot change sign between
+    # evaluations.
+    N0 = S.T - Q0.T @ np.linalg.solve(G, Q0 @ S.T)
+    s_G, ld_G = np.linalg.slogdet(G)
+    s_T, ld_T = np.linalg.slogdet(np.hstack([Q0.T, N0]))
+
+    pl, log_scale = _propagate_compound(exponents, N0)
+    subsets, position = _compound_index(S.shape[1], N0.shape[1])[:2]
+    selected = [int(np.argmax(row)) for row in S]
+    # det(S Y) is the minor on rows `selected`, in S's row order.
+    order = np.argsort(selected)
+    perm_sign = np.linalg.det(np.eye(len(selected))[order])
+    coord = perm_sign * pl[position[tuple(sorted(selected))]]
+    if coord == 0.0 or not np.isfinite(log_scale):
+        return 0.0 if coord == 0.0 else np.nan
+
+    # Row norms of Q.  The rows of S M can be hundreds of e-folds below
+    # M's largest entry, so each is carried separately with its own scale.
+    log_rows = float(np.sum(np.log(np.linalg.norm(Q0, axis=1))))
+    for row in S:
+        log_rows += _log_row_norm(row, exponents)
+    log_det = ld_G - ld_T + math.log(abs(coord)) + log_scale - log_rows
+    sign = s_G * s_T * np.sign(coord)
+    # Floor the magnitude: an underflow to 0.0 would read as an exact root,
+    # and anything below 1e-290 as the root finders' NaN sentinel.
+    return float(sign) * math.exp(min(max(log_det, -644.0), 690.0))
+
+
+def _det_Q(
+    exponents, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug, resolve=False
+):
+    """
+    Row-normalised det Q for the propagator M = ∏ exp(Ω_i).
+
+    Q = [Q0; S M] (eq. ``eq_Q_system``).  The direct evaluation — form M,
+    assemble Q, take the determinant — is exact whenever Q is well
+    conditioned, and is cheap, so it is tried first.  Where it is not (the
+    anode rows S M parallel to machine precision, typically above inception
+    or at λ > 0) the same number is computed by the compound-matrix method
+    instead: with N0 spanning null(Q0) and T = [Q0ᵀ | N0],
+
+        det Q · det T = det(Q0 Q0ᵀ) · det(S M N0),
+
+    and det(S M N0) is one Plücker coordinate of M N0, which
+    :func:`_propagate_compound` carries across the gap without forming M.
+    Everything is kept in logarithms, then divided by the row norms of Q, so
+    both routes return the same value.
+
+    The compound route costs 10²–10⁴ times the direct one, so it runs only
+    when *resolve* is True.  Otherwise a singular Q returns NaN, which the
+    inception scans read as "above threshold" (true at λ = 0, where the
+    anode rows become parallel only above inception).
+
+    Must be called inside a numpy errstate(over='ignore', invalid='ignore')
+    block.  Returns NaN if the requested routes cannot evaluate it.
+    """
+    Q0, S = _boundary_rows(EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug)
+
+    # Direct route.  M is carried with a running scale so it cannot overflow;
+    # a positive scalar on M does not change the row-normalised determinant.
+    M = np.eye(n_aug)
+    log_M = 0.0
+    for Omega in exponents:
+        M = _expm_shifted(Omega) @ M
+        scale = np.abs(M).max()
+        if not np.isfinite(scale) or scale == 0.0:
+            return np.nan
+        M /= scale
+        log_M += math.log(scale)
+    direct = _det_Q_norm(np.vstack([Q0, S @ M]))
+    if np.isfinite(direct) or not resolve:
+        return direct
+
+    return _det_Q_compound(exponents, Q0, S)
 
 
 def polarities_equivalent(mod, field_dist):
@@ -408,6 +691,7 @@ def inception_det(
     positive_polarity=True,
     propagator=midpoint_propagator,
     diag_list=None,
+    resolve=False,
 ):
     """
     Evaluate det Q(λ) for the inception boundary-value problem.
@@ -441,13 +725,18 @@ def inception_det(
         Relative Frobenius error at which a segment is accepted.
     lam : float
         Temporal growth rate λ in s⁻¹; 0 is the inception threshold.
+    resolve : bool
+        Evaluate det Q even where Q is numerically singular, by the
+        compound-matrix method (see :func:`_det_Q`), instead of returning
+        NaN.  Needed for λ > 0; much slower.
     positive_polarity : bool
         True when the ξ = 0 electrode is the anode.  Ignored for the
         symmetric geometries.
     propagator : callable
-        ``propagator(A_func, x_lo, x_hi) -> ndarray``.  Adaptive halving is
-        applied only to :func:`midpoint_propagator`; anything else runs on
-        the uniform N_min grid.
+        :func:`midpoint_propagator` (adaptive halving) or
+        :func:`magnus2_propagator` (uniform N_min grid).  It selects the
+        quadrature; how the step exponents are combined is up to
+        :func:`_det_Q`.
 
     Returns
     -------
@@ -466,15 +755,14 @@ def inception_det(
     # nothing for the midpoint rule or the adaptive grid to improve on, and the
     # N_min−1 matrix products are pure roundoff.  Magnus2 also reduces to this
     # (its commutator term vanishes for constant A), so the shortcut applies
-    # whichever propagator was requested.  _expm_shifted drops the same scalar
-    # factor exp(λ_max·d) that the stepped product drops as N factors of
-    # exp(λ_max·h), so det Q is identical, not merely equivalent.
+    # whichever propagator was requested.  The compound route still splits
+    # the single exponent A_aug·d into substeps, but that split is exact
+    # (exp(Ω) = exp(Ω/m)^m), not a quadrature.
     if field_dist.field_type == "uniform":
         A_aug, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
             EN_ref, d, eff, p, T, lam=lam
         )
         with np.errstate(over="ignore", invalid="ignore"):
-            M = _expm_shifted(A_aug * d)
             if diag_list is not None:
                 diag_list.append(
                     {
@@ -493,7 +781,17 @@ def inception_det(
                         ],
                     }
                 )
-            return _assemble_det_Q(M, EN_ref, eff, p, T, N_gamma_eff, aug_mask, n_aug)
+            return _det_Q(
+                [A_aug * d],
+                EN_ref,
+                eff,
+                p,
+                T,
+                N_gamma_eff,
+                aug_mask,
+                n_aug,
+                resolve,
+            )
 
     f = field_dist.build(d)
     d_step = d / N_min
@@ -514,7 +812,7 @@ def inception_det(
     _, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
         EN_ref * f(xi_first), d, eff, p, T, lam=lam
     )
-    M = np.eye(n_aug)
+    exponents = []
 
     with np.errstate(over="ignore", invalid="ignore"):
         if propagator is midpoint_propagator:
@@ -524,7 +822,7 @@ def inception_det(
             # uniform grid with no halving attempted.
             for i in range(N_min):
                 seg_diag = [] if diag_list is not None else None
-                P = _adaptive_midpoint_segment(
+                exponents += _adaptive_midpoint_segment(
                     A_func,
                     i * d_step,
                     (i + 1) * d_step,
@@ -541,11 +839,26 @@ def inception_det(
                             "halvings": seg_diag,
                         }
                     )
-                M = P @ M
-        else:
+        elif propagator is magnus2_propagator:
             for i in range(N_min):
-                M = propagator(A_func, i * d_step, (i + 1) * d_step) @ M
+                exponents.append(
+                    _magnus2_exponent(A_func, i * d_step, (i + 1) * d_step)
+                )
+        else:
+            raise ValueError(
+                "propagator must be midpoint_propagator or magnus2_propagator"
+            )
 
         xi_cathode = 1.0 if positive_polarity else 0.0
         EN_cathode = EN_ref * f(xi_cathode)
-        return _assemble_det_Q(M, EN_cathode, eff, p, T, N_gamma_eff, aug_mask, n_aug)
+        return _det_Q(
+            exponents,
+            EN_cathode,
+            eff,
+            p,
+            T,
+            N_gamma_eff,
+            aug_mask,
+            n_aug,
+            resolve,
+        )

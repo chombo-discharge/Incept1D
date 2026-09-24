@@ -304,7 +304,7 @@ def run(args, parser):
     _config_idx = {}
     for label, config, polarity, rows in curve_records:
         idx = _config_idx.setdefault(config, len(_config_idx))
-        V_ratio_arr = np.array([r[1] for r in rows])
+        V_arr = np.array([r[0] for r in rows])  # kV
         lam_arr = np.array([r[3] for r in rows])
         tau_arr = np.array([r[4] for r in rows])
         kw = dict(
@@ -315,17 +315,17 @@ def run(args, parser):
             label=label,
         )
 
-        mask = np.isfinite(lam_arr)
-        ax1.semilogy(V_ratio_arr[mask], lam_arr[mask], **kw)
+        mask = np.isfinite(lam_arr) & (lam_arr > 0.0)  # λ = 0 at V* has no log
+        ax1.semilogy(V_arr[mask], lam_arr[mask], **kw)
         mask2 = np.isfinite(tau_arr)
-        ax2.semilogy(V_ratio_arr[mask2], tau_arr[mask2], **kw)
+        ax2.semilogy(V_arr[mask2], tau_arr[mask2], **kw)
 
-    ax1.set_xlabel(r"$V / V^*$")
+    ax1.set_xlabel("Voltage (kV)")
     ax1.set_ylabel(r"$\lambda$  (s$^{-1}$)")
     ax1.set_title("Temporal growth rate")
     ax1.grid(True, which="both", ls="--", alpha=0.4)
 
-    ax2.set_xlabel(r"$V / V^*$")
+    ax2.set_xlabel("Voltage (kV)")
     ax2.set_ylabel(r"$\tau = 1/\lambda$  (ns)")
     ax2.set_title("e-folding time")
     ax2.grid(True, which="both", ls="--", alpha=0.4)

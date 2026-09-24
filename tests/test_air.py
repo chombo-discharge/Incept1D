@@ -212,6 +212,92 @@ class TestGrowthRate:
             lams.append(lam)
         assert all(a < b for a, b in zip(lams, lams[1:])), lams
 
+    def test_sphere_plane_against_the_plain_product(self, air):
+        """
+        Positive polarity, 40 mm gap at 10 bar, 1.5 V*: electrons attach in
+        the low-field region near the plane and avalanche ~450 e-folds near
+        the sphere.  In air the positive ions feed no other species, so a
+        plain product of step propagators keeps every entry to its own
+        relative precision, and det [Q0; S M] from it is exact -- provided
+        nothing over- or underflows.  In float64 that holds below the root
+        (near 6e6 s^-1) but not above it, and rescaling M does not help: it
+        flushes the electron entries, hundreds of e-folds below the largest,
+        to zero.  So the reference is float64 below the root and mpmath,
+        whose exponent range is unbounded, across it.
+        """
+        import scipy.linalg
+
+        from incept1d.solver import _boundary_rows, _build_A_aug, _midpoint_exponent
+
+        mp = pytest.importorskip("mpmath")
+        # det Q cancels across much of the dynamic range of S M, so the
+        # reference carries more digits than that range spans.
+        mp.mp.dps = 400
+        p, T, pd = 10.0, 293.0, 400e-3
+        d = pd / p
+        n = len(air.SPECIES)
+        fd = FieldDistribution("sphere-plane", 50e-3)
+        f = fd.build(d)
+        EN = 1.5 * 77.82
+        Q0, S = _boundary_rows(EN * f(1.0), air, p, T, 0, None, n)
+
+        def exponents(lam, N):
+            A_func = lambda x: _build_A_aug(  # noqa: E731
+                EN * f((d - x) / d), d, air, p, T, lam=lam
+            )[0]
+            return [
+                _midpoint_exponent(A_func, i * d / N, (i + 1) * d / N) for i in range(N)
+            ]
+
+        def leibniz(Q):
+            # mpmath's LU treats pivots below its tolerance as zero, which
+            # these matrices (entries 10^900 apart) trigger; the 720-term
+            # permutation sum has no pivots.
+            import itertools
+
+            total = mp.mpf(0)
+            for perm in itertools.permutations(range(n)):
+                term = mp.mpf(1)
+                for r, c in enumerate(perm):
+                    term *= Q[r, c]
+                    if term == 0:
+                        break
+                else:
+                    inversions = sum(
+                        1 for i in range(n) for j in range(i) if perm[j] > perm[i]
+                    )
+                    total += -term if inversions % 2 else term
+            return total
+
+        def resolved(lam, N):
+            return inception_det(EN, pd, air, p, T, fd, N, N, lam=lam, resolve=True)
+
+        # Fine grid, float64, below the root.
+        for lam in (1e5, 1e6, 3e6):
+            M = np.eye(n)
+            for Om in exponents(lam, 800):
+                M = scipy.linalg.expm(Om) @ M
+            exact = np.linalg.det(np.vstack([Q0, S @ M]))
+            assert np.isfinite(exact) and exact < 0.0
+            assert resolved(lam, 800) < 0.0, f"lam={lam:g}"
+
+        # Coarse grid, mpmath, across the root.
+        signs = []
+        for lam in (1e6, 3e6, 1e7, 3e7):
+            M = mp.eye(n)
+            for Om in exponents(lam, 50):
+                M = mp.expm(mp.matrix(Om.tolist())) * M
+            Q = mp.matrix(np.vstack([Q0, np.zeros_like(S)]).tolist())
+            SM = mp.matrix(S.tolist()) * M
+            for r in range(S.shape[0]):
+                for c in range(n):
+                    Q[Q0.shape[0] + r, c] = SM[r, c]
+            exact = int(mp.sign(leibniz(Q)))
+            assert exact != 0
+            assert np.sign(resolved(lam, 50)) == exact, f"lam={lam:g}"
+            signs.append(exact)
+        assert -1 in signs and 1 in signs, "the root must be crossed"
+
     def test_sphere_plane_growth_rates_differ_by_polarity(self, air):
         """
         Each polarity has its own V* and its own lambda at the same V/V*.
@@ -245,35 +331,55 @@ class TestGrowthRate:
             lams[positive] = lam
         assert lams[True] != pytest.approx(lams[False], rel=1e-3)
 
-    def test_unresolvable_determinant_is_reported(self, star):
+    def test_high_overvoltage_is_resolved(self, star):
         """
-        Above roughly 1.2 V* the determinant cannot be evaluated at all.
+        Up to 2 V*, where the direct determinant is NaN for every lambda.
 
-        The spectral spread of A_aug*d exceeds the double-precision underflow
-        limit (~709), so the subdominant modes of M underflow to exactly zero,
-        Q becomes rank deficient and det Q is NaN for *every* lambda.  Because
-        ``_f_brentq`` maps NaN to a negative sentinel, a run of NaN below a
-        positive value looks like a sign change, and brentq used to converge on
-        the edge of the NaN region -- reporting the same 1.9e11 s^-1 for every
-        overvoltage, since that edge is the kappa*d = 12 photon-collapse
-        threshold and does not depend on E/N.
-
-        The solver must now say so rather than return that number.  Remove this
-        test if the propagation is reformulated so the determinant survives.
+        The spread of A_aug*d there exceeds anything a formed propagator can
+        hold, and the old solver converged on the edge of the NaN region: the
+        same 1.9e11 s^-1 (the kappa*d = 12 photon-collapse threshold) at every
+        overvoltage.  The compound-matrix route evaluates det Q regardless,
+        so lambda must come out resolved and still growing with voltage.
         """
         air, pd, p, T, EN = star
-        for over in (1.25, 1.5, 2.0):
+        lams = []
+        for over in (1.15, 1.25, 1.5, 2.0):
             lam, status = find_lambda_for_voltage(
                 EN * over, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
             )
-            assert status == "det_Q_unresolved", f"{over}x V*: {status}"
-            assert np.isnan(lam)
+            assert status == "ok", f"{over}x V*: {status}"
+            lams.append(lam)
+        assert all(a < b for a, b in zip(lams, lams[1:])), lams
 
-    def test_determinant_underflows_above_that_range(self, star):
-        """The cause, asserted directly: det Q is NaN at lambda = 0 already."""
+    def test_no_root_above_the_growth_rate(self, star):
+        """
+        lambda* is the largest real root: det Q keeps one sign above it.
+
+        This is what makes it the dominant mode (every loop gain falls with
+        lambda, so no mode grows faster), and what the downward scan in
+        find_lambda_for_voltage relies on.
+        """
+        air, pd, p, T, EN = star
+        for over in (1.1, 1.5):
+            lam, status = find_lambda_for_voltage(
+                EN * over, pd, air, p, T, UNIFORM, 5, 200, 0.03, midpoint_propagator
+            )
+            assert status == "ok"
+            above = [
+                inception_det(EN * over, pd, air, p, T, UNIFORM, lam=x, resolve=True)
+                for x in lam * np.geomspace(1.001, 1e4, 25)
+            ]
+            assert all(v > 0.0 for v in above), f"{over}x V*"
+
+    def test_direct_determinant_fails_above_that_range(self, star):
+        """
+        Why the compound route is needed: the direct det Q is NaN at 1.5 V*
+        already at lambda = 0, but resolved it keeps the above-threshold sign.
+        """
         air, pd, p, T, EN = star
         assert np.isfinite(inception_det(EN * 1.15, pd, air, p, T, UNIFORM))
         assert np.isnan(inception_det(EN * 1.5, pd, air, p, T, UNIFORM))
+        assert inception_det(EN * 1.5, pd, air, p, T, UNIFORM, resolve=True) < 0.0
 
 
 class TestNonUniformRootSelection:

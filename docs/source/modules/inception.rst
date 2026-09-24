@@ -170,7 +170,7 @@ below are the solve itself.
 .. automodule:: incept1d.solver
    :members:
    :undoc-members:
-   :private-members: _build_A_aug, _assemble_det_Q, _adaptive_midpoint_segment, _expm_shifted
+   :private-members: _build_A_aug, _det_Q, _det_Q_norm, _det_Q_compound, _propagate_compound, _adaptive_midpoint_segment, _expm_shifted
 
 ``incept1d.inception``
 ~~~~~~~~~~~~~~~~~~~~~~
