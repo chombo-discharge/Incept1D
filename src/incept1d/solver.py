@@ -370,6 +370,30 @@ def _assemble_det_Q(M, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
     return float(sign) * min(np.exp(logabsdet), 1e300)
 
 
+def polarities_equivalent(mod, field_dist):
+    """
+    True when positive and negative polarity must give the same det Q.
+
+    Swapping the electrodes is a reflection of the gap, which leaves the
+    answer unchanged only if the field *and* the electrode surfaces are
+    symmetric.  A configuration with per-polarity overrides describes two
+    different cathodes, so it is asymmetric even in a uniform field.
+
+    Parameters
+    ----------
+    mod : Mechanism
+        Loaded mechanism, before polarity resolution.
+    field_dist : FieldDistribution
+        Gap geometry.
+
+    Returns
+    -------
+    bool
+        True if one polarity can stand in for the other.
+    """
+    return field_dist.is_symmetric and not mod.has_polarity_overrides
+
+
 def inception_det(
     EN_ref,
     pd,

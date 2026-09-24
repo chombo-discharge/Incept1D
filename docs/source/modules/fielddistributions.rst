@@ -37,7 +37,7 @@ Geometries
      - Sphere of radius :math:`R` (mm) above a grounded plane.  The on-axis
        field is computed *exactly* from the bispherical image-charge series
        (:func:`~incept1d.fields._sphere_sphere_axial_field` with the plane as the
-       mirror sphere).  Not symmetric: ``incept1d pdiv`` computes both polarities
+       mirror sphere).  Not symmetric: ``incept1d pdiv`` and ``incept1d growth`` compute both polarities
        (``sphere=positive`` / ``sphere=negative``).
    * - ``sphere-sphere R``
      - Two equal spheres of radius :math:`R` (mm) at :math:`\pm U/2`.
@@ -45,8 +45,8 @@ Geometries
    * - ``coaxial A B``
      - Coaxial cylinders with inner radius :math:`a` and outer radius
        :math:`b` (mm).  Exact radial field, see `Coaxial cylinders`_.  Not
-       symmetric: ``incept1d pdiv`` computes both polarities
-       (``inner=positive`` / ``inner=negative``).
+       symmetric: ``incept1d pdiv`` and ``incept1d growth`` compute both
+       polarities (``inner=positive`` / ``inner=negative``).
    * - ``fieldline FILE [UNIT]``
      - Tabulated :math:`|E|` along an arbitrary (curved) field line from
        an external electrostatic solver.  See below.
@@ -199,8 +199,8 @@ so that :math:`\int_0^1 f\,d\xi = 1`.  Consequently
 Polarity
 ~~~~~~~~
 
-The file does not say which end is the anode.  ``incept1d pdiv`` evaluates
-both polarities and labels them ``start=positive`` (the first tabulated
+The file does not say which end is the anode.  ``incept1d pdiv`` and
+``incept1d growth`` evaluate both polarities and labels them ``start=positive`` (the first tabulated
 point is the anode) and ``start=negative`` (the first point is the
 cathode).  Use the one that matches your electrode arrangement, or export
 the line in the direction that makes ``start`` the electrode of interest.

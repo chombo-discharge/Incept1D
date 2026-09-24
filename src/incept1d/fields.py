@@ -320,8 +320,29 @@ class FieldDistribution:
 
     @property
     def is_symmetric(self) -> bool:
-        """True when both polarities give the same inception result."""
+        """
+        True when the geometry is unchanged by swapping the two electrodes.
+
+        This is a statement about the field alone.  Whether the two
+        polarities give the same answer also depends on the electrode
+        surfaces; see :func:`incept1d.solver.polarities_equivalent`.
+        """
         return self.field_type in ("uniform", "sphere-sphere")
+
+    def polarity_label(self, polarity: str) -> str:
+        """
+        Name *polarity* (``"positive"`` or ``"negative"``) for this geometry.
+
+        Says which electrode is the anode in positive polarity: the sphere,
+        the inner conductor, or the first tabulated point.
+        """
+        if self.field_type == "uniform":
+            return polarity
+        if self.field_type == "fieldline":
+            return f"start={polarity}"
+        if self.field_type == "coaxial":
+            return f"inner={polarity}"
+        return f"sphere={polarity}"
 
     @property
     def is_monotone_decreasing(self) -> bool:

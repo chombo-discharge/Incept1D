@@ -37,6 +37,7 @@ from incept1d.solver import (
     midpoint_propagator,
     magnus2_propagator,
     parse_dx_spec,
+    polarities_equivalent,
 )
 from incept1d.inception import compute_inception_curve
 from incept1d.output import write_metadata_header
@@ -430,15 +431,6 @@ def run(args, parser):
         )
         return float(np.sum(np.maximum(0.0, diff)) * ds)
 
-    def _polarity_desc(polarity):
-        if _field_dist.field_type == "uniform":
-            return polarity  # "positive" / "negative"
-        if _field_dist.field_type == "fieldline":
-            return f"start={polarity}"  # xi = 0 (first data row) is anode/cathode
-        if _field_dist.field_type == "coaxial":
-            return f"inner={polarity}"  # inner conductor is anode/cathode
-        return f"sphere={polarity}"  # "sphere=positive" / "sphere=negative"
-
     def _branch0_grids(branches):
         V_g = np.full_like(pd_arr, np.nan)
         EN_g = np.full_like(pd_arr, np.nan)
@@ -528,16 +520,22 @@ def run(args, parser):
         # fast_det_fn  — uniform field, always N=1 (coarse sign-change scan)
         # med_det_fn   — N=min(5,N), modest resolution (fallback scan)
         # det_fn       — full field_dist accuracy (Brentq)
+        # A symmetric field with identical electrodes needs one solve; per-
+        # polarity overrides make the cathodes differ even in a uniform gap.
+        same_polarity = polarities_equivalent(mod, _field_dist)
         if _field_dist.field_type == "uniform":
-            det_pos = det_neg = functools.partial(
-                inception_det,
-                field_dist=_field_dist,
-                N_min=_N_min,
-                N_max=_N_max,
-                tol=_dx_tol,
-                lam=args.lam,
-                positive_polarity=True,
-                propagator=_propagator,
+            det_pos, det_neg = (
+                functools.partial(
+                    inception_det,
+                    field_dist=_field_dist,
+                    N_min=_N_min,
+                    N_max=_N_max,
+                    tol=_dx_tol,
+                    lam=args.lam,
+                    positive_polarity=positive,
+                    propagator=_propagator,
+                )
+                for positive in (True, False)
             )
             fast_det_pos = fast_det_neg = None
             med_det_pos = med_det_neg = None
@@ -559,7 +557,7 @@ def run(args, parser):
             )
             det_neg = (
                 det_pos
-                if _field_dist.is_symmetric
+                if same_polarity
                 else functools.partial(
                     inception_det,
                     field_dist=_field_dist,
@@ -571,14 +569,20 @@ def run(args, parser):
                     propagator=_propagator,
                 )
             )
-            fast_det_pos = fast_det_neg = functools.partial(
-                inception_det,
-                field_dist=_fast_fd,
-                N_min=1,
-                N_max=1,
-                tol=_dx_tol,
-                lam=args.lam,
-                propagator=_propagator,
+            # The uniform stand-in field has no orientation, but the cathode
+            # surface parameters still follow the polarity.
+            fast_det_pos, fast_det_neg = (
+                functools.partial(
+                    inception_det,
+                    field_dist=_fast_fd,
+                    N_min=1,
+                    N_max=1,
+                    tol=_dx_tol,
+                    lam=args.lam,
+                    positive_polarity=positive,
+                    propagator=_propagator,
+                )
+                for positive in (True, False)
             )
             med_det_pos = functools.partial(
                 inception_det,
@@ -592,7 +596,7 @@ def run(args, parser):
             )
             med_det_neg = (
                 med_det_pos
-                if _field_dist.is_symmetric
+                if same_polarity
                 else functools.partial(
                     inception_det,
                     field_dist=_med_fd,
@@ -605,7 +609,9 @@ def run(args, parser):
                 )
             )
 
-        print(f"\nSolving inception curve: {label} ({_polarity_desc('positive')})")
+        print(
+            f"\nSolving inception curve: {label} ({_field_dist.polarity_label('positive')})"
+        )
         branches_pos = compute_inception_curve(
             pd_arr,
             mod,
@@ -616,10 +622,12 @@ def run(args, parser):
             fast_det_fn=fast_det_pos,
             med_det_fn=med_det_pos,
         )
-        if _field_dist.is_symmetric:
+        if same_polarity:
             branches_neg = branches_pos  # symmetric; reuse same object
         else:
-            print(f"\nSolving inception curve: {label} ({_polarity_desc('negative')})")
+            print(
+                f"\nSolving inception curve: {label} ({_field_dist.polarity_label('negative')})"
+            )
             branches_neg = compute_inception_curve(
                 pd_arr,
                 mod,
@@ -644,7 +652,7 @@ def run(args, parser):
         for polarity, branches, ls_pol in polarity_pairs:
             if not branches:
                 continue
-            pol_label = f"{label} ({_polarity_desc(polarity)})"
+            pol_label = f"{label} ({_field_dist.polarity_label(polarity)})"
             for b_idx, br in enumerate(branches):
                 order = np.argsort(br["pd"])
                 br_pd = br["pd"][order]
@@ -745,7 +753,7 @@ def run(args, parser):
 
         _file_records.append(
             (
-                f"{label} ({_polarity_desc('positive')})",
+                f"{label} ({_field_dist.polarity_label('positive')})",
                 p_grid,
                 d_grid,
                 EN_pos,
@@ -755,7 +763,7 @@ def run(args, parser):
         )
         _file_records.append(
             (
-                f"{label} ({_polarity_desc('negative')})",
+                f"{label} ({_field_dist.polarity_label('negative')})",
                 p_grid,
                 d_grid,
                 EN_neg,

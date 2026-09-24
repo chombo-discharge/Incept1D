@@ -212,6 +212,39 @@ class TestGrowthRate:
             lams.append(lam)
         assert all(a < b for a, b in zip(lams, lams[1:])), lams
 
+    def test_sphere_plane_growth_rates_differ_by_polarity(self, air):
+        """
+        Each polarity has its own V* and its own lambda at the same V/V*.
+
+        Swapping the electrodes moves the cathode between the high- and
+        low-field ends of the gap, so neither quantity can be shared.
+        """
+        p, T, pd = 1.0, 293.0, 20e-3
+        fd = FieldDistribution("sphere-plane", 50e-3)
+        lams = {}
+        for positive in (True, False):
+            det_fn = functools.partial(
+                inception_det, field_dist=fd, positive_polarity=positive
+            )
+            EN = find_all_breakdown_EN(pd, air, p, T, first_only=True, det_fn=det_fn)[0]
+            lam, status = find_lambda_for_voltage(
+                EN * 1.05,
+                pd,
+                air,
+                p,
+                T,
+                fd,
+                5,
+                200,
+                0.03,
+                midpoint_propagator,
+                positive_polarity=positive,
+            )
+            assert status in ("ok", "suspect"), f"positive={positive}: {status}"
+            assert np.isfinite(lam) and lam > 0.0
+            lams[positive] = lam
+        assert lams[True] != pytest.approx(lams[False], rel=1e-3)
+
     def test_unresolvable_determinant_is_reported(self, star):
         """
         Above roughly 1.2 V* the determinant cannot be evaluated at all.

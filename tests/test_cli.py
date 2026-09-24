@@ -332,6 +332,121 @@ class TestPdiv:
         assert rc != 0
 
 
+def _columns(path):
+    """Map ``# Column`` header names of a ``--write-to-file`` output to data."""
+    names = [
+        ln.split(":", 1)[1].strip()
+        for ln in path.read_text().splitlines()
+        if ln.startswith("# Column ")
+    ]
+    data = np.atleast_2d(np.genfromtxt(path))
+    assert data.shape[1] == len(names), "header must describe the data"
+    return {n: data[:, i] for i, n in enumerate(names)}
+
+
+@pytest.fixture
+def overridden_config(tmp_path):
+    """Two different cathodes: the gap is asymmetric even when uniform."""
+    import json
+
+    cfg = tmp_path / "overridden.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "label": "Overridden",
+                "pos_override": {"gamma0": 0.05},
+                "neg_override": {"gamma0": 0.001},
+            }
+        )
+    )
+    return cfg
+
+
+class TestPolarity:
+    """Both commands report both polarities, and solve each when they differ."""
+
+    @staticmethod
+    def _pdiv(tmp_path, *extra):
+        out = tmp_path / "pdiv.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            *extra,
+            "--p",
+            "1",
+            "--pd-min",
+            "5",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        assert rc == 0
+        col = _columns(out)
+        pos = [c for n, c in col.items() if n.startswith("U_kV[") and "positive" in n]
+        neg = [c for n, c in col.items() if n.startswith("U_kV[") and "negative" in n]
+        assert len(pos) == len(neg) == 1, list(col)
+        return pos[0], neg[0]
+
+    def test_pdiv_uniform_gap_is_symmetric(self, tmp_path, capsys):
+        pos, neg = self._pdiv(tmp_path)
+        capsys.readouterr()
+        assert np.array_equal(pos, neg)
+
+    def test_pdiv_uniform_gap_follows_polarity_overrides(
+        self, tmp_path, overridden_config, capsys
+    ):
+        """A lower negative-polarity gamma needs a higher inception voltage."""
+        pos, neg = self._pdiv(tmp_path, str(overridden_config))
+        capsys.readouterr()
+        assert np.all(np.isfinite(pos)) and np.all(np.isfinite(neg))
+        assert np.all(neg > pos)
+
+    @staticmethod
+    def _growth(tmp_path, *extra):
+        out = tmp_path / "growth.dat"
+        rc = _run(
+            "growth",
+            TOY,
+            *extra,
+            "--pd",
+            "20",
+            "--n-voltages",
+            "3",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        assert rc == 0
+        return _columns(out)
+
+    def test_growth_reports_both_polarities(self, tmp_path, capsys):
+        col = self._growth(tmp_path)
+        capsys.readouterr()
+        assert list(col)[0] == "V_ratio"
+        for quantity in ("V_kV", "lambda_s-1", "tau_ns", "nu_ion_s-1"):
+            assert f"{quantity}[Baseline (positive)]" in col
+            assert f"{quantity}[Baseline (negative)]" in col
+        assert np.array_equal(
+            col["V_kV[Baseline (positive)]"], col["V_kV[Baseline (negative)]"]
+        )
+
+    def test_growth_solves_each_polarity_when_they_differ(
+        self, tmp_path, overridden_config, capsys
+    ):
+        """V* is found per polarity, so the voltage columns must differ."""
+        col = self._growth(tmp_path, str(overridden_config))
+        out = capsys.readouterr().out
+        assert "Finding inception voltage: Overridden (negative)" in out
+        V_pos = col["V_kV[Overridden (positive)]"]
+        V_neg = col["V_kV[Overridden (negative)]"]
+        assert np.all(V_neg > V_pos)
+        assert np.allclose(V_neg / V_neg[0], col["V_ratio"])
+
+
 class TestArgumentValidation:
     @pytest.mark.parametrize(
         "args",

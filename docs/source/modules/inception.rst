@@ -33,9 +33,12 @@ evaluated is described in :ref:`Chap:Numerics`.
 
 The sweep runs in either of two modes: **fixed pressure** (``--p``, vary
 :math:`d`) or **fixed gap distance** (``--d``, vary :math:`p`).  Both may be
-combined, and several pressures or distances may be given.  For a
-non-uniform field that is not symmetric — sphere-plane, or a field line —
-both polarities are computed.
+combined, and several pressures or distances may be given.  Both
+polarities are always reported.  They are solved separately unless the gap
+is symmetric under swapping the electrodes: a uniform or sphere-sphere field
+*and* a configuration without per-polarity overrides
+(:ref:`Chap:Configuration`).  Two different cathode surfaces make even a uniform
+gap asymmetric.
 
 Inputs
 ------

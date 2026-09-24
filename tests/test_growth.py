@@ -101,3 +101,34 @@ class TestLambdaCurve:
         )
         for V_kV, V_ratio, EN_ref, *_ in rows:
             assert EN_ref == pytest.approx(EN_star * V_ratio, rel=1e-9)
+
+
+class TestPolarity:
+    """The polarity reaches every det Q evaluation of the lambda solve."""
+
+    @pytest.mark.parametrize("positive", [True, False])
+    def test_polarity_is_forwarded(self, setup, monkeypatch, positive):
+        import incept1d.growth
+
+        seen = set()
+
+        def spy(*args, **kwargs):
+            seen.add(kwargs["positive_polarity"])
+            return inception_det(*args, **kwargs)
+
+        monkeypatch.setattr(incept1d.growth, "inception_det", spy)
+        mod, pd, p, T, EN_star = setup
+        compute_lambda_curve(
+            EN_star,
+            pd,
+            mod,
+            p,
+            T,
+            UNIFORM,
+            *DX,
+            midpoint_propagator,
+            3,
+            2.0,
+            positive_polarity=positive,
+        )
+        assert seen == {positive}

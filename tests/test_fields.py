@@ -462,3 +462,22 @@ class TestFieldLineScaling:
         for bad in (0.0, -1.0):
             with pytest.raises(ValueError, match="positive"):
                 parse_field_spec(["fieldline", si, "m"], applied_voltage_kv=bad)
+
+
+class TestPolarityLabel:
+    """The label names the electrode that is the anode in positive polarity."""
+
+    @pytest.mark.parametrize(
+        "field, expected",
+        [
+            (FieldDistribution("uniform"), "positive"),
+            (FieldDistribution("sphere-plane", 5e-3), "sphere=positive"),
+            (FieldDistribution("sphere-sphere", 5e-3), "sphere=positive"),
+            (FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3), "inner=positive"),
+        ],
+    )
+    def test_labels(self, field, expected):
+        assert field.polarity_label("positive") == expected
+        assert field.polarity_label("negative") == expected.replace(
+            "positive", "negative"
+        )

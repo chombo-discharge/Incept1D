@@ -92,8 +92,12 @@ Example
 Outputs
 -------
 
-The inception point is reported first (:math:`U^*` and :math:`(E/N)^*`),
-then a table with one row per voltage:
+Each configuration is solved once per polarity, with its own inception
+point, exactly as ``incept1d pdiv`` does: the two are solved separately
+unless the gap is symmetric and the configuration has no per-polarity
+overrides, in which case the negative-polarity curve repeats the positive
+one.  For each curve the inception point is reported first (:math:`U^*` and
+:math:`(E/N)^*`), then a table with one row per voltage:
 
 .. code-block:: text
 
@@ -102,7 +106,15 @@ then a table with one row per voltage:
 :math:`\tau = 1/\lambda` is the e-folding time, and the last column measures
 the growth rate against the ionization frequency, which says whether the
 discharge grows on the avalanche timescale or far more slowly.  The figure
-has two panels, :math:`\lambda` and :math:`\tau` against :math:`U/U^*`.
+has two panels, :math:`\lambda` and :math:`\tau` against :math:`U/U^*`,
+with a solid line for positive and a dashed line for negative polarity.
+
+With ``--write-to-file`` all curves share the first column, :math:`U/U^*`.
+Because :math:`U^*` differs between configurations and polarities, every
+curve then has its own four columns: the voltage in kV, :math:`\lambda`,
+:math:`\tau` and :math:`\nu_\mathrm{ion}`, named after the curve (for
+example ``lambda_s-1[Baseline (negative)]``) in the ``# Column`` lines of the
+header.
 
 A row that cannot be resolved is reported as ``NaN`` and flagged with a
 status — ``det_Q_unresolved`` means the determinant could not be evaluated

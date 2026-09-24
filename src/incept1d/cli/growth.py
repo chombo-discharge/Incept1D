@@ -27,16 +27,20 @@ from incept1d.solver import (
     midpoint_propagator,
     magnus2_propagator,
     parse_dx_spec,
+    polarities_equivalent,
 )
+
+_POLARITIES = (("positive", True), ("negative", False))
 
 
 def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_dist):
     """Write λ vs V results to a tab-separated file with metadata header."""
     SEP = "\t"
     # Build column headers from all curve labels
-    col_headers = ["V_kV", "V_ratio"]
-    for label, _ in curve_records:
+    col_headers = ["V_ratio"]
+    for label, *_ in curve_records:
         col_headers += [
+            f"V_kV[{label}]",
             f"lambda_s-1[{label}]",
             f"tau_ns[{label}]",
             f"nu_ion_s-1[{label}]",
@@ -59,18 +63,15 @@ def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_di
         for i, h in enumerate(col_headers, start=1):
             fh.write(f"# Column {i}: {h}\n")
         fh.write("#\n")
-        fh.write(SEP.join(f"{h:<{W}}" for h in col_headers) + "\n")
 
-        # All curves share the same V array (same pd/p)
-        n_pts = len(curve_records[0][1])
-        for j in range(n_pts):
-            row_vals = [
-                curve_records[0][1][j][0],  # V_kV
-                curve_records[0][1][j][1],
-            ]  # V_ratio
-            for _, rows in curve_records:
-                _, _, _, lam, tau, nu, _ = rows[j]
-                row_vals += [lam, tau, nu]
+        # Every curve is sampled on the same V/V* grid, but V* differs between
+        # configurations and polarities, so each curve carries its own V_kV.
+        first_rows = curve_records[0][-1]
+        for j in range(len(first_rows)):
+            row_vals = [first_rows[j][1]]  # V_ratio
+            for *_, rows in curve_records:
+                V_kV, _, _, lam, tau, nu, _ = rows[j]
+                row_vals += [V_kV, lam, tau, nu]
             fh.write(SEP.join(f"{v:<{W}.6e}" for v in row_vals) + "\n")
 
     print(f"\nResults written to: {out_path}")
@@ -189,56 +190,71 @@ def run(args, parser):
 
     raw_dicts = read_json_configs(args.configs) if args.configs else [{}]
 
-    # ── Find inception and compute λ curve for each config ─────────────────
-    curve_records = []  # list of (label, rows)  where rows = compute_lambda_curve(...)
+    # ── Find inception and compute λ curve for each config and polarity ────
+    # list of (label, config_label, polarity, rows)
+    # where label names the curve and rows = compute_lambda_curve(...)
+    curve_records = []
 
     for cfg_dict in raw_dicts:
         mod = load_mechanism(args.mechanism, cfg_dict)
         label = mod.label or "Baseline"
+        same = polarities_equivalent(mod, _field_dist)
+        positive_rows = None
 
-        # Build det_fn for the inception solve (λ=0).
-        det_fn = functools.partial(
-            inception_det,
-            field_dist=_field_dist,
-            N_min=_N_min,
-            N_max=_N_max,
-            tol=_tol,
-            lam=0.0,
-            positive_polarity=True,
-            propagator=_propagator,
-        )
+        for polarity, positive in _POLARITIES:
+            pol_label = f"{label} ({_field_dist.polarity_label(polarity)})"
+            if not positive and same:
+                # Symmetric gap, identical electrodes: negative mirrors positive.
+                if positive_rows is not None:
+                    curve_records.append((pol_label, label, polarity, positive_rows))
+                continue
 
-        print(
-            f"\nFinding inception voltage: {label}  "
-            f"(pd = {args.pd} bar·mm, p = {args.p} bar)"
-        )
-        roots = find_all_breakdown_EN(
-            pd_m, mod, args.p, args.T, first_only=True, det_fn=det_fn
-        )
-        if not roots:
-            print(f"  [{label}] No inception found — skipping.")
-            continue
+            # Build det_fn for the inception solve (λ=0).
+            det_fn = functools.partial(
+                inception_det,
+                field_dist=_field_dist,
+                N_min=_N_min,
+                N_max=_N_max,
+                tol=_tol,
+                lam=0.0,
+                positive_polarity=positive,
+                propagator=_propagator,
+            )
 
-        EN_star = roots[0]
-        V_star = EN_star * pd_m * 1e-16 / (_kB * args.T)
-        print(f"  V* = {V_star * 1e-3:.4f} kV   EN* = {EN_star:.2f} Td")
-        print(f"\nComputing λ(V) from V* to {args.v_max_factor:.2g}×V*:")
+            print(
+                f"\nFinding inception voltage: {pol_label}  "
+                f"(pd = {args.pd} bar·mm, p = {args.p} bar)"
+            )
+            roots = find_all_breakdown_EN(
+                pd_m, mod, args.p, args.T, first_only=True, det_fn=det_fn
+            )
+            if not roots:
+                print(f"  [{pol_label}] No inception found — skipping.")
+                continue
 
-        rows = compute_lambda_curve(
-            EN_star,
-            pd_m,
-            mod,
-            args.p,
-            args.T,
-            _field_dist,
-            _N_min,
-            _N_max,
-            _tol,
-            _propagator,
-            args.n_voltages,
-            args.v_max_factor,
-        )
-        curve_records.append((label, rows))
+            EN_star = roots[0]
+            V_star = EN_star * pd_m * 1e-16 / (_kB * args.T)
+            print(f"  V* = {V_star * 1e-3:.4f} kV   EN* = {EN_star:.2f} Td")
+            print(f"\nComputing λ(V) from V* to {args.v_max_factor:.2g}×V*:")
+
+            rows = compute_lambda_curve(
+                EN_star,
+                pd_m,
+                mod,
+                args.p,
+                args.T,
+                _field_dist,
+                _N_min,
+                _N_max,
+                _tol,
+                _propagator,
+                args.n_voltages,
+                args.v_max_factor,
+                positive_polarity=positive,
+            )
+            curve_records.append((pol_label, label, polarity, rows))
+            if positive:
+                positive_rows = rows
 
     if not curve_records:
         print("\nNo curves computed.")
@@ -246,7 +262,7 @@ def run(args, parser):
 
     # ── Console summary table ───────────────────────────────────────────────
     print()
-    for label, rows in curve_records:
+    for label, _, _, rows in curve_records:
         print(f"  {label}")
         print("  " + "-" * 78)
         print(
@@ -284,13 +300,20 @@ def run(args, parser):
     )
 
     _markers = ["o", "s", "^", "D", "v", "P", "X", "*"]
-    for idx, (label, rows) in enumerate(curve_records):
+    # One colour and marker per configuration; linestyle marks the polarity.
+    _config_idx = {}
+    for label, config, polarity, rows in curve_records:
+        idx = _config_idx.setdefault(config, len(_config_idx))
         V_ratio_arr = np.array([r[1] for r in rows])
         lam_arr = np.array([r[3] for r in rows])
         tau_arr = np.array([r[4] for r in rows])
-        color = f"C{idx}"
-        marker = _markers[idx % len(_markers)]
-        kw = dict(color=color, marker=marker, markersize=5, label=label)
+        kw = dict(
+            color=f"C{idx}",
+            marker=_markers[idx % len(_markers)],
+            markersize=5,
+            ls="-" if polarity == "positive" else "--",
+            label=label,
+        )
 
         mask = np.isfinite(lam_arr)
         ax1.semilogy(V_ratio_arr[mask], lam_arr[mask], **kw)

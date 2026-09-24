@@ -27,7 +27,18 @@ from incept1d.solver import inception_det
 
 
 def find_lambda_for_voltage(
-    EN_ref, pd, mod, p, T, field_dist, N_min, N_max, tol, propagator, lam_scale=None
+    EN_ref,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min,
+    N_max,
+    tol,
+    propagator,
+    lam_scale=None,
+    positive_polarity=True,
 ):
     """
     Find λ* > 0 such that det Q(λ*, EN_ref) = 0.
@@ -56,6 +67,9 @@ def find_lambda_for_voltage(
     lam_scale : float or None
         Approximate λ scale in s⁻¹ for the bracket search.  Estimated from
         the dominant ionization eigenvalue and the electron speed if None.
+    positive_polarity : bool
+        True when the ξ = 0 electrode is the anode, as for
+        :func:`incept1d.solver.inception_det`.
 
     Returns
     -------
@@ -77,7 +91,7 @@ def find_lambda_for_voltage(
             N_max=N_max,
             tol=tol,
             lam=lam_val,
-            positive_polarity=True,
+            positive_polarity=positive_polarity,
             propagator=propagator,
         )
 
@@ -175,6 +189,7 @@ def compute_lambda_curve(
     propagator,
     n_voltages,
     v_max_factor,
+    positive_polarity=True,
 ):
     """
     Sweep voltages from V* to v_max_factor·V* and find λ at each point.
@@ -199,6 +214,9 @@ def compute_lambda_curve(
         Number of voltages in the sweep.
     v_max_factor : float
         Upper end of the sweep, as a multiple of V*.
+    positive_polarity : bool
+        True when the ξ = 0 electrode is the anode.  *EN_star* must be the
+        inception field for the same polarity.
 
     Returns
     -------
@@ -240,6 +258,7 @@ def compute_lambda_curve(
                 tol,
                 propagator,
                 lam_scale=lam_scale,
+                positive_polarity=positive_polarity,
             )
 
         tau_ns = (

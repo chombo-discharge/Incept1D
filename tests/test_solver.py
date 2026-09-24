@@ -19,6 +19,7 @@ from incept1d.solver import (
     magnus2_propagator,
     midpoint_propagator,
     parse_dx_spec,
+    polarities_equivalent,
 )
 
 
@@ -308,3 +309,49 @@ class TestDeterminant:
             for EN in np.logspace(1, 3, 40)
         ]
         assert sum(np.isfinite(v) for v in vals) > 30
+
+
+class TestPolarityEquivalence:
+    """When may negative polarity reuse the positive-polarity answer?"""
+
+    @pytest.fixture
+    def overridden(self, toy_path):
+        from incept1d.mechanism import load_mechanism
+
+        return load_mechanism(
+            toy_path,
+            {"pos_override": {"gamma0": 0.4}, "neg_override": {"gamma0": 0.01}},
+        )
+
+    @pytest.mark.parametrize(
+        "field, expected",
+        [
+            (FieldDistribution("uniform"), True),
+            (FieldDistribution("sphere-sphere", 5e-3), True),
+            (FieldDistribution("sphere-plane", 5e-3), False),
+        ],
+    )
+    def test_geometry_decides_for_identical_electrodes(self, toy, field, expected):
+        assert polarities_equivalent(toy, field) is expected
+
+    def test_overrides_break_the_symmetry_of_a_uniform_gap(self, overridden):
+        """Two different cathodes are not a reflection of each other."""
+        assert not polarities_equivalent(overridden, FieldDistribution("uniform"))
+
+    def test_the_determinant_agrees(self, toy, overridden):
+        """
+        The helper's claim, checked against det Q itself.
+
+        In a uniform gap det Q is the same for both polarities exactly when
+        the electrodes are identical.
+        """
+        uniform = FieldDistribution("uniform")
+        args = (400.0, 20e-3)
+
+        def det(mod, positive):
+            return inception_det(
+                *args, mod, 1.0, 293.0, uniform, positive_polarity=positive
+            )
+
+        assert det(toy, True) == det(toy, False)
+        assert det(overridden, True) != pytest.approx(det(overridden, False))
