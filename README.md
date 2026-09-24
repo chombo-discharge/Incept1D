@@ -26,6 +26,19 @@ cathode rather than the avalanche decides the onset.
 📖 **[Documentation](https://chombo-discharge.github.io/Incept1D/)** — theory,
 numerics, configuration reference and worked examples.
 
+## Citing
+
+If you publish results obtained with `Incept1D`, you **must** cite the paper
+that presents the model:
+
+> R. Marskar and C. Franck, *Role of negative-ion kinetics for electrical breakdown in air gaps*, J. Phys. D: Appl. Phys. (submitted, 2026).
+
+GitHub's *Cite this repository* button (from [`CITATION.cff`](CITATION.cff))
+gives the reference in APA and BibTeX. To identify the exact version of the
+code, cite the Zenodo archive
+([doi:10.5281/zenodo.21916821](https://doi.org/10.5281/zenodo.21916821)) in
+addition to the paper.
+
 ## Features
 
 |  | |

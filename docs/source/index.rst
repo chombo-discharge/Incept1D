@@ -13,6 +13,11 @@ Welcome to the ``Incept1D`` user documentation
    <https://github.com/chombo-discharge/Incept1D>`_ together with the source
    files for this documentation.
 
+.. attention::
+
+   If you publish results obtained with ``Incept1D``, you must cite the paper
+   that presents the model — see :ref:`Chap:Citing`.
+
 What it does
 ============
 
@@ -96,8 +101,8 @@ Getting started
 How this documentation is organised
 ===================================
 
-* **Introduction** — What you need, where to get the code, and how to run a
-  first calculation.
+* **Introduction** — What you need, where to get the code, how to run a
+  first calculation, and how to cite it.
 * **Theory** — The drift-reaction model, two-stream photoionization,
   secondary emission and the determinant inception criterion.  Every
   equation is cross-referenced to the function that implements it.
@@ -175,6 +180,7 @@ Introduction
    introduction/obtaining
    introduction/installation
    introduction/quickstart
+   introduction/citing
 
 Theory
 ******
