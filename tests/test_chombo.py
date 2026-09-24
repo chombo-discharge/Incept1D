@@ -22,7 +22,7 @@ def air_path_module():
     import os
 
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(here, "mechanisms", "air", "air_pancheshnyi.py")
+    return os.path.join(here, "mechanisms", "air", "pancheshnyi", "air_pancheshnyi.py")
 
 
 @pytest.fixture(scope="module")

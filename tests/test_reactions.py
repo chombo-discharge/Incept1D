@@ -13,6 +13,7 @@ from incept1d.reactions import (
     build_R_from_compiled,
     compile_reactions,
     parse_reaction,
+    unknown_multiplier_keys,
 )
 
 SPECIES = ["e", "N2+", "O-"]
@@ -134,6 +135,15 @@ class TestMultipliers:
         )
         assert "does not match" in capsys.readouterr().err
         assert R[0, 0] == pytest.approx(5.0)
+
+    def test_unknown_keys_are_listed_as_spelled(self):
+        """R8c: the loader's check, independent of spacing and order."""
+        mult = {"e+N2 -> 2e + N2+": 1.0, "e + Xe -> 2e + Xe+": 2.0, "O2- -> e": 0.0}
+        assert unknown_multiplier_keys(self.RX, mult) == [
+            "e + Xe -> 2e + Xe+",
+            "O2- -> e",
+        ]
+        assert unknown_multiplier_keys(self.RX, {}) == []
 
     def test_unknown_key_is_reported_once(self, capsys, fresh_warnings):
         """R8b: the warning is de-duplicated, not printed per evaluation."""

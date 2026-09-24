@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-The Morrow–Lowke air mechanism, ``mechanisms/air/air_morrowlowke.py``.
+The Morrow–Lowke air mechanism, ``mechanisms/air/morrowlowke/air_morrowlowke.py``.
 
 The published fits are transcribed here a second time, independently of the
 mechanism file, in the paper's own units (E/N in V cm², N in cm⁻³, cm/s), so
@@ -32,6 +32,7 @@ ML_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "mechanisms",
     "air",
+    "morrowlowke",
     "air_morrowlowke.py",
 )
 P, T = 1.0, 293.0

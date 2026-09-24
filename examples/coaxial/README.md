@@ -17,7 +17,7 @@ From the repository root, for a 1 mm wire inside a 10 mm cylinder, from 0.1
 to 10 bar:
 
 ```bash
-incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
     --field coaxial 1 10 \
     --pd-min 0.9 --pd-max 90 --pd-num 30 \
     --dx 10 400 0.01 \

@@ -84,6 +84,26 @@ def _normalize(s: str) -> str:
 _WARNED_KEYS = set()
 
 
+def unknown_multiplier_keys(reactions, multipliers):
+    """Return the multiplier keys that match no reaction in *reactions*.
+
+    Parameters
+    ----------
+    reactions : list of (str, callable)
+        A mechanism's ``REACTIONS`` list.
+    multipliers : dict
+        ``{reaction_string: multiplier}``, spelled as in a JSON configuration.
+
+    Returns
+    -------
+    list of str
+        The keys of *multipliers*, as given, whose normalised reaction string
+        matches none of *reactions*, in their original order.
+    """
+    known = {_normalize(r) for r, _ in reactions}
+    return [k for k in multipliers if _normalize(k) not in known]
+
+
 def _warn_unknown_multipliers(norm_mult, known_keys):
     """Report multiplier keys that match no reaction in this mechanism.
 

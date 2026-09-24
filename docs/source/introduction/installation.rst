@@ -39,7 +39,7 @@ From the repository root:
 .. code-block:: bash
 
    incept1d --version
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py --pd-num 10 --no-plot
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py --pd-num 10 --no-plot
 
 should print a small table of inception fields and voltages for a uniform
 gap in dry air at 1 bar and exit without errors.
@@ -54,7 +54,7 @@ repository root:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py [CONFIG.json ...] [options]
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py [CONFIG.json ...] [options]
 
 Every subcommand accepts ``--help``.  See :ref:`Chap:QuickStart` for a
 first walk-through and :ref:`Chap:ModulesOverview` for the full description

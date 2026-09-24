@@ -44,7 +44,7 @@ grid budget is reduced (``--dx 5 25 0.05``) to keep the run short:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
        --pd-min 5E-3 --pd-max 500 --pd-num 100 \
        --field sphere-sphere 1000 \
        --streamer-criterion 18 \
@@ -99,10 +99,10 @@ Variations to try
 * **The other roots.**  ``--all-branches --plot-separate-branches`` reveals
   further roots of the determinant at low :math:`pd`; the lowest branch is
   the physical inception voltage.
-* **The textbook limit.**  ``mechanisms/air/paschen.json`` reduces the
+* **The textbook limit.**  ``mechanisms/air/pancheshnyi/paschen.json`` reduces the
   chemistry to :eq:`eq_standard_paschen`, so the difference from the
   baseline isolates the combined effect of ion conversion, detachment and
   photon feedback.
-* **The least certain inputs.**  ``mechanisms/air/see.json`` sweeps the
+* **The least certain inputs.**  ``mechanisms/air/pancheshnyi/see.json`` sweeps the
   cathode yield and the photon cone angle, which matter most near the
   Paschen minimum.

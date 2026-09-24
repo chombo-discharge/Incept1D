@@ -2,7 +2,7 @@
     "configurations": [
     {
         "label": "Baseline",
-        "cross_sections": "lisbon.txt",
+        "cross_sections": "../lxcat/lisbon.txt",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,

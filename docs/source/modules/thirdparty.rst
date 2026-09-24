@@ -47,8 +47,8 @@ Example
 
 .. code-block:: bash
 
-   incept1d chombo mechanisms/air/air_pancheshnyi.py \
-       --modifier mechanisms/air/databases.json --config-label Phelps \
+   incept1d chombo mechanisms/air/pancheshnyi/air_pancheshnyi.py \
+       --modifier mechanisms/air/pancheshnyi/databases.json --config-label Phelps \
        --min-EN 1 --max-EN 2000 --num-EN 500 --write-to-file air_phelps.dat
 
 .. note::

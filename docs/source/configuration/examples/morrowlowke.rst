@@ -7,7 +7,7 @@ Example: The Morrow–Lowke model for air
    :local:
    :depth: 1
 
-``mechanisms/air/air_morrowlowke.py`` implements the air model of
+``mechanisms/air/morrowlowke/air_morrowlowke.py`` implements the air model of
 [Morrow1997]_, which is widely used in streamer simulations.  It sits between
 the two other examples in this chapter.  Like :ref:`Chap:PaschenMechanism` it
 needs no data files, because every transport coefficient is an analytic fit
@@ -162,16 +162,17 @@ critical field, since no detachment feedback can pull it below.  In
 
 The same commands as for the other air schemes apply:
 
-* ``python3 mechanisms/air/air_morrowlowke.py`` — Plots :math:`\alpha`,
+* ``python3 mechanisms/air/morrowlowke/air_morrowlowke.py`` — Plots :math:`\alpha`,
   :math:`\eta_2`, :math:`\eta_3` and :math:`|W_\mathrm{e}|` against
   :math:`E/N`.
-* ``incept1d eigenvalues mechanisms/air/air_morrowlowke.py`` — The leading
+* ``incept1d eigenvalues mechanisms/air/morrowlowke/air_morrowlowke.py`` — The leading
   eigenvalue of :math:`\bm{R}\bm{V}^{-1}` against :math:`E/N`.
-* ``incept1d pdiv mechanisms/air/air_morrowlowke.py`` — The inception curve.
+* ``incept1d pdiv mechanisms/air/morrowlowke/air_morrowlowke.py`` — The inception curve.
 
-``mechanisms/air/config.py`` serves this mechanism unchanged.  The
-``cross_sections`` key has no effect, since there are no swarm tables to
-select.
+``mechanisms/air/morrowlowke/config.py`` is the shared air configuration
+class without the ``cross_sections`` key: the transport is analytic, so
+there are no swarm tables to select, and a configuration that names one was
+written for another mechanism and is rejected.
 
 ``incept1d chombo`` does not accept this mechanism: its tables include the
 mean electron energy, and the Morrow–Lowke model does not provide one.

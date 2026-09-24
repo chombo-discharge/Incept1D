@@ -30,7 +30,7 @@ Sphinx dummy build.  Run them on demand with
 
    pre-commit run --all-files
 
-Raw reference data under ``mechanisms/air/*.txt`` and ``mechanisms/air/*.dat`` (BOLSIG+ output,
+Raw reference data under ``mechanisms/air/`` (``*.txt`` and ``*.dat``: BOLSIG+ output,
 LXCat tables, Zheleznyak fit data) is excluded from the whitespace hooks
 and must be left byte-for-byte as provided by its source.
 
@@ -61,7 +61,7 @@ coefficient, or the assembly of :math:`\bm{\mathcal{A}}` or
 * Cite the equation of :ref:`Chap:TheoryOverview` (or the literature
   source of the new data) in the docstring and the commit message;
 * Update the corresponding theory page if the model itself changed;
-* Check the closed-form limit with ``mechanisms/air/paschen.json``
+* Check the closed-form limit with ``mechanisms/air/pancheshnyi/paschen.json``
   (:eq:`eq_standard_paschen`) and re-run one of the examples;
 * Extend the test suite (:ref:`Chap:TestSuite`) where the change has a
   checkable consequence.
@@ -69,9 +69,11 @@ coefficient, or the assembly of :math:`\bm{\mathcal{A}}` or
 New mechanisms
 --------------
 
-A new gas goes in its own directory under ``mechanisms/``
-(``mechanisms/<gas>/<gas>_<scheme>.py`` + ``mechanisms/<gas>/config.py`` +
-data files), following :ref:`Chap:NewMechanisms`.
+A new mechanism goes in its own directory, under its gas:
+``mechanisms/<gas>/<scheme>/<gas>_<scheme>.py`` + ``config.py`` + the JSON
+configurations written for it.  Data and code shared by the mechanisms of
+one gas sit in ``mechanisms/<gas>/`` and are loaded by path
+(:func:`incept1d.mechanism.load_helper`).  Follow :ref:`Chap:NewMechanisms`.
 Please include the swarm-data source, the literature reference for every
 rate, and a configuration file that reduces the scheme to the textbook
 limit for testing.

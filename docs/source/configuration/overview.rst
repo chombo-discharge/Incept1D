@@ -16,25 +16,39 @@ assumes a reaction; it reads what a mechanism gives it and solves the system
 that results.  This chapter
 describes those files and the interfaces they must satisfy.
 
-The unit is a **mechanism directory**.  One directory holds one gas, and the
-variants of that gas are configurations within it:
+The unit is a **mechanism directory**.  One directory holds one mechanism,
+its configuration class, and the configuration files written for it; the
+variants of that mechanism are configurations within it.  Mechanisms for the
+same gas sit side by side under a common gas directory, which also holds
+what they share:
 
 .. code-block:: text
 
    mechanisms/air/
-   ├── air_pancheshnyi.py    the mechanism module      (required)
-   ├── config.py             the configuration class   (optional)
-   ├── baseline.json         configuration files       (optional)
-   ├── nodetachment.json
-   ├── paschen.json
-   ├── lisbon.txt            data the module reads     (optional)
-   └── o2m_mobility.txt
+   ├── pancheshnyi/
+   │   ├── air_pancheshnyi.py    the mechanism module      (required)
+   │   ├── config.py             the configuration class   (optional)
+   │   ├── baseline.json         configuration files       (optional)
+   │   ├── nodetachment.json
+   │   └── paschen.json
+   ├── morrowlowke/
+   │   ├── air_morrowlowke.py
+   │   └── config.py
+   ├── lxcat/                    data the modules read     (optional)
+   │   ├── lisbon.txt
+   │   └── o2m_mobility.txt
+   ├── air_config.py             code the modules share    (optional)
+   └── zheleznyak.py
+
+A configuration file belongs to the mechanism in its directory: reaction
+multipliers are keyed by that mechanism's reaction strings, and its
+``config.py`` decides which keys mean anything.
 
 A run names the module, and optionally one or more configuration files:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/databases.json
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/databases.json
 
 Which files are needed
 ----------------------
@@ -65,7 +79,9 @@ Which files are needed
      - No
      - Whatever the module chooses to read: BOLSIG+ swarm output, LXCat
        mobility tables, fitted absorption curves.  The package never opens
-       them; the module does, relative to its own location.
+       them; the module does, relative to its own location.  Data and code
+       shared by several mechanisms can live one level up, and shared code is
+       loaded with :func:`incept1d.mechanism.load_helper`.
 
 A mechanism with no ``config.py`` and no JSON is perfectly valid — it is then
 a fixed gas with no adjustable parameters.  Passing a configuration file to
@@ -89,7 +105,9 @@ Given a module path and a raw dictionary, it takes five steps:
    module — fitting a photoionization model, for instance.
 5. Wrap the result in a :class:`~incept1d.mechanism.Mechanism` with
    ``config.mechanism_params()``, which bakes rate multipliers, scale factors
-   and per-polarity overrides into the accessors.
+   and per-polarity overrides into the accessors.  If the module declares
+   ``REACTIONS``, a multiplier naming a reaction it does not define is an
+   error: the configuration was written for a different mechanism.
 
 .. code-block:: text
 

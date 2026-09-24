@@ -56,7 +56,7 @@ for pytest, pre-commit, black and flake8.
 
 ```bash
 # Inception curve for dry air at 1 bar, uniform gap
-incept1d pdiv mechanisms/air/air_pancheshnyi.py --p 1 --pd-min 1e-2 --pd-max 1e3
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py --p 1 --pd-min 1e-2 --pd-max 1e3
 ```
 
 ```
@@ -86,7 +86,7 @@ A gap geometry is chosen with `--field`, and JSON configuration files may follow
 the mechanism to overlay sensitivity variants in one figure:
 
 ```bash
-incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/databases.json \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/databases.json \
     --field sphere-plane 50 --d 20
 ```
 
@@ -98,7 +98,7 @@ profile enters the solve, so the field units of the file never reach the
 answer, and the arc length fixes the gap:
 
 ```bash
-incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
     --field fieldline line.csv mm --fieldline-voltage 100
 ```
 
@@ -116,7 +116,7 @@ for a guided walk-through.
 
 ```
 src/incept1d/        the Python package (solver, inception curves, CLI)
-mechanisms/air/      dry-air mechanism family, swarm data, configurations
+mechanisms/air/      dry-air mechanisms, one directory each, with shared swarm data
 examples/            scripts reproducing the worked examples
 tests/               the test suite
 docs/                Sphinx documentation sources
@@ -167,7 +167,7 @@ and the pull request template.
 holder and licence, either through an inline SPDX header or an entry in
 [`REUSE.toml`](REUSE.toml). Run `reuse lint` to check.
 
-The electron swarm data under `mechanisms/air/*.txt` is **not** covered by the
+The electron swarm data under `mechanisms/air/lxcat/` is **not** covered by the
 project licence. It is retrieved from the [LXCat](https://www.lxcat.net)
 open-access database and redistributed verbatim, with its original headers
 intact, under [`LicenseRef-LXCat`](LICENSES/LicenseRef-LXCat.txt); copyright
