@@ -104,9 +104,18 @@ one, and the only one of the three that changes the answer.
 Running the calculation
 -----------------------
 
-.. literalinclude:: ../../../examples/fieldline/run.sh
-   :language: bash
-   :start-at: MECH=
+``examples/fieldline/make_line.py`` writes the two files, and the solve
+along the engineering-unit copy is
+
+.. code-block:: bash
+
+   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+       --field fieldline examples/fieldline/line_engineering.csv mm \
+       --fieldline-voltage 100 \
+       --pd-min 1 --pd-max 100 --pd-num 40 \
+       --write-to-file examples/fieldline/sim_engineering.dat
+
+Running the same command on ``line_si.csv m`` gives the SI companion.
 
 This is a **pressure sweep**, and for a tabulated field line it is the only
 sweep that makes sense — which is also why the results come back against

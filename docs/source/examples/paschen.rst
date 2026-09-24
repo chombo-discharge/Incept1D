@@ -102,11 +102,14 @@ Running the calculation
 The three gases are three configurations of one mechanism, so a single
 invocation produces all three curves:
 
-.. literalinclude:: ../../../examples/paschen/run.sh
-   :language: bash
-   :start-at: set -euo pipefail
+.. code-block:: bash
 
-``closed_form.py`` then tabulates :eq:`eq_paschen_curve` from the very same
+   incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json \
+       --p 1.0 \
+       --pd-min 3e-3 --pd-max 1e2 --pd-num 120 \
+       --write-to-file examples/paschen/sim.dat
+
+``examples/paschen/closed_form.py`` then tabulates :eq:`eq_paschen_curve` from the very same
 coefficients, so the comparison is self-contained — no external table is
 needed, and the reference cannot drift out of step with the mechanism.
 

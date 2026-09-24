@@ -269,6 +269,63 @@ class TestPdiv:
         assert "--p cannot be used with --field fieldline" in err
         assert "--pd-num 1" in err, "the error must say how to ask for one pressure"
 
+    def _run_coaxial(self, *extra):
+        return _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "coaxial",
+            "1",
+            "10",
+            *extra,
+            "--pd-min",
+            "5",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+        )
+
+    def test_coaxial_sweeps_pressure_at_fixed_geometry(self, tmp_path, capsys):
+        """C7g: the radii fix the gap at b − a, so pd varies through p."""
+        out = tmp_path / "sim.dat"
+        rc = self._run_coaxial("--write-to-file", str(out))
+        stdout = capsys.readouterr().out
+        assert rc == 0
+        assert "using d = L = 9 mm" in stdout
+        assert "inner=positive" in stdout and "inner=negative" in stdout
+
+        header = out.read_text()
+        assert "# Radii:       a = 1 mm, b = 10 mm" in header
+        names = [
+            ln.split(":", 1)[1].strip()
+            for ln in header.splitlines()
+            if ln.startswith("# Column ")
+        ]
+        data = np.genfromtxt(out)
+        col = {n: data[:, i] for i, n in enumerate(names)}
+        d_cols = [c for n, c in col.items() if n.startswith("d_mm[")]
+        p_cols = [c for n, c in col.items() if n.startswith("p_bar[")]
+        assert len(d_cols) == len(p_cols) == 2, "one curve per polarity"
+
+        # Every curve, both polarities: the gap is b - a at every point, the
+        # pressure is the swept coordinate, and p * (b - a) reproduces the
+        # requested pd grid -- so all of the pd variation is pressure.
+        sweep = col["p_bar"]
+        pd_requested = np.logspace(np.log10(5.0), np.log10(50.0), 3)
+        for d_col, p_col in zip(d_cols, p_cols):
+            assert np.all(d_col == 9.0), "the gap must be b - a"
+            assert np.array_equal(p_col, sweep), "p must be the sweep"
+            assert np.allclose(p_col * d_col, pd_requested, rtol=1e-6)  # %.7g
+        assert sweep.max() / sweep.min() == pytest.approx(10.0), "p spans pd"
+
+    def test_fixed_pressure_is_refused_for_coaxial(self, capsys):
+        """C7h: as for a field line, --p would resize the arrangement."""
+        rc = self._run_coaxial("--p", "1.0")
+        assert rc != 0
+        assert "--p cannot be used with --field coaxial" in capsys.readouterr().err
+
     def test_declared_excitation_is_refused_for_a_uniform_gap(self, tmp_path, capsys):
         """C7d: there the voltage is a result, so accepting it would mislead."""
         rc = _run("pdiv", TOY, "--fieldline-voltage", "100", "--no-plot")

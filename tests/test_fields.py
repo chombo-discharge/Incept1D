@@ -45,6 +45,8 @@ class TestNormalisation:
             FieldDistribution("sphere-plane", 5e-3),
             FieldDistribution("sphere-sphere", 50e-3),
             FieldDistribution("sphere-sphere", 5e-3),
+            FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3),
+            FieldDistribution("coaxial", coax_a=0.5e-3, coax_b=25e-3),
         ],
     )
     @pytest.mark.parametrize("d", [1e-3, 20e-3, 100e-3])
@@ -78,6 +80,7 @@ class TestShape:
             (FieldDistribution("uniform"), True, True),
             (FieldDistribution("sphere-plane", 50e-3), False, True),
             (FieldDistribution("sphere-sphere", 50e-3), True, False),
+            (FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3), False, True),
         ],
     )
     def test_geometry_flags(self, fd, symmetric, monotone):
@@ -90,6 +93,53 @@ class TestShape:
         f = FieldDistribution("sphere-plane", 1.0).build(1e-4)
         v = np.array([f(x) for x in np.linspace(0.0, 1.0, 50)])
         assert np.allclose(v, 1.0, atol=1e-3)
+
+
+class TestCoaxial:
+    A, B = 1e-3, 10e-3
+
+    def _f(self, a=A, b=B):
+        return FieldDistribution("coaxial", coax_a=a, coax_b=b).build(b - a)
+
+    def test_field_falls_as_one_over_r(self):
+        """F12: Gauss's law, E·r is constant across the gap."""
+        f = self._f()
+        r = lambda x: self.A + x * (self.B - self.A)  # noqa: E731
+        er = [f(x) * r(x) for x in np.linspace(0.0, 1.0, 41)]
+        assert np.allclose(er, er[0], rtol=1e-12)
+
+    def test_surface_field_matches_the_exact_solution(self):
+        """F13: E(a) = U / (a ln(b/a)), i.e. f(0) = (b − a) / (a ln(b/a))."""
+        a, b = self.A, self.B
+        assert self._f()(0.0) == pytest.approx((b - a) / (a * np.log(b / a)))
+        assert self._f()(1.0) == pytest.approx((b - a) / (b * np.log(b / a)))
+
+    def test_profile_depends_on_the_radius_ratio_only(self):
+        """F14: scaling both radii leaves f unchanged, and so does d."""
+        fd = FieldDistribution("coaxial", coax_a=self.A, coax_b=self.B)
+        g = FieldDistribution("coaxial", coax_a=7 * self.A, coax_b=7 * self.B)
+        for x in np.linspace(0.0, 1.0, 11):
+            assert fd.build(1e-3)(x) == pytest.approx(g.build(5e-2)(x), rel=1e-14)
+
+    def test_thin_annulus_tends_to_uniform(self):
+        """F15: b/a -> 1 recovers the plane-parallel gap."""
+        f = self._f(a=1.0, b=1.0 + 1e-4)
+        assert np.allclose([f(x) for x in np.linspace(0, 1, 11)], 1.0, atol=1e-4)
+        assert self._f(a=1.0, b=1.0 + 1e-14)(0.3) == 1.0
+
+    def test_gap_is_fixed_by_the_radii(self):
+        fd = FieldDistribution("coaxial", coax_a=self.A, coax_b=self.B)
+        assert fd.fixed_gap_length == pytest.approx(self.B - self.A)
+        assert FieldDistribution("sphere-plane", 50e-3).fixed_gap_length is None
+
+    def test_tabulated_copy_gives_the_same_profile(self, tmp_path):
+        """F16: the analytic profile and a sampled field line of it agree."""
+        f = self._f()
+        s = np.linspace(0.0, self.B - self.A, 4001)
+        path = _write_line(tmp_path / "coax.dat", [(si, f(si / s[-1])) for si in s])
+        g = FieldDistribution.from_fieldline(path).build(s[-1])
+        for x in np.linspace(0.0, 1.0, 21):
+            assert g(x) == pytest.approx(f(x), rel=1e-4)
 
 
 class TestFieldLineLayouts:
@@ -312,6 +362,12 @@ class TestParseFieldSpec:
         assert fd.field_type == kind
         assert fd.sphere_R == pytest.approx(50e-3)
 
+    def test_coaxial_radii_are_millimetres(self):
+        fd = parse_field_spec(["coaxial", "1", "10"])
+        assert fd.field_type == "coaxial"
+        assert fd.coax_a == pytest.approx(1e-3)
+        assert fd.coax_b == pytest.approx(10e-3)
+
     def test_fieldline(self, tmp_path):
         p = _write_line(tmp_path / "f.dat", [(0.0, 2.0), (1.0, 1.0)])
         fd = parse_field_spec(["fieldline", p, "mm"])
@@ -324,6 +380,10 @@ class TestParseFieldSpec:
             (["banana"], "Unknown field type"),
             (["sphere-plane"], "requires a sphere radius"),
             (["fieldline"], "requires a data file"),
+            (["coaxial", "1"], "inner and an outer radius"),
+            (["coaxial", "10", "1"], "inner radius < outer radius"),
+            (["coaxial", "0", "1"], "inner radius < outer radius"),
+            (["coaxial", "a", "1"], "must be numbers"),
         ],
     )
     def test_errors(self, spec, match):
@@ -333,6 +393,8 @@ class TestParseFieldSpec:
     def test_label_mentions_the_geometry(self, tmp_path):
         assert "uniform" in FieldDistribution("uniform").label
         assert "50" in FieldDistribution("sphere-plane", 50e-3).label
+        lbl = FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3).label
+        assert "coaxial" in lbl and "10 mm" in lbl
 
 
 class TestFieldLineScaling:

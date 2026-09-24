@@ -58,7 +58,7 @@ into three layers:
        solver ``chombo-discharge``.  Not part of the inception solve.  See
        :ref:`Chap:ThirdParty`.
    * - :mod:`incept1d.fields`
-     - Gap geometry: uniform / sphere-plane / sphere-sphere / tabulated field
+     - Gap geometry: uniform / sphere-plane / sphere-sphere / coaxial / tabulated field
        line profiles :math:`f(\xi)` and the shared ``--field`` CLI parsing.
        See :ref:`Chap:FieldDistributions`.
    * - :mod:`incept1d.reactions`
@@ -118,7 +118,7 @@ The four solver commands share the same first arguments and most options:
 
 ``--field SPEC``
    Gap geometry: ``uniform`` (default), ``sphere-plane R_mm``,
-   ``sphere-sphere R_mm``, or ``fieldline FILE [UNIT]``.  See
+   ``sphere-sphere R_mm``, ``coaxial A_mm B_mm``, or ``fieldline FILE [UNIT]``.  See
    :ref:`Chap:FieldDistributions` and :ref:`Chap:FieldLines`.
 
 ``--dx [N_min [N_max [tol]]]``, ``--method {midpoint,magnus2}``
