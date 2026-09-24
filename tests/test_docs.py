@@ -79,6 +79,21 @@ def test_image_is_a_figure_the_makefile_builds(rst, target):
     )
 
 
+@pytest.mark.parametrize("rst,target", list(_image_directives()), ids=str)
+def test_image_leaves_the_format_to_the_builder(rst, target):
+    """D2b: a figure is referenced as ``figures/<name>.*``, never by extension.
+
+    The builder picks PDF or PNG.  An explicit extension also makes the
+    ``dummy`` build require the file, and figures are build products that a
+    clean checkout does not have -- so it passes wherever the figure happens
+    to have been built and fails in CI.
+    """
+    assert target.endswith(".*"), (
+        f"{rst.relative_to(SOURCE)} references {target}; use "
+        f"{target.rsplit('.', 1)[0]}.* instead"
+    )
+
+
 EXAMPLES = ROOT / "examples"
 
 #: One directory per worked example, each with a README and a docs page.

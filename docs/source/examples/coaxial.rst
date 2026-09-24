@@ -77,7 +77,7 @@ header:
 Result
 ------
 
-.. figure:: ../figures/coaxial.png
+.. figure:: ../figures/coaxial.*
    :width: 90%
    :align: center
 
