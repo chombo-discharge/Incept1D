@@ -1,0 +1,67 @@
+{
+    "_comment": [
+        "Photoionization sensitivity with the other feedback loops suppressed.",
+        "Both secondary-emission yields are fixed at 1E-9: gamma0 is the ion-induced",
+        "yield (gamma1 defaults to 0, so gamma+ = gamma0 exactly), and the",
+        "photon-induced yield is 0.1 * xi_emit in this mechanism, hence xi_emit = 1E-8.",
+        "Detachment (O2- + O2, O- + N2) is switched off.  xi_photo scales the",
+        "photoionization coupling from 1E-2 to 1E2 times the default."
+    ],
+    "configurations": [
+    {
+        "label": "xi_photo=1E-2",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1E-2,
+        "gamma0": 1E-9,
+        "xi_emit": 1E-8,
+        "reaction_multipliers": {
+            "O2- + O2 -> e + O2 + O2":     0.0,
+            "O- + N2 -> e + N2O":          0.0
+        }
+    },
+    {
+        "label": "xi_photo=1E-1",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1E-1,
+        "gamma0": 1E-9,
+        "xi_emit": 1E-8,
+        "reaction_multipliers": {
+            "O2- + O2 -> e + O2 + O2":     0.0,
+            "O- + N2 -> e + N2O":          0.0
+        }
+    },
+    {
+        "label": "xi_photo=1",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1.0,
+        "gamma0": 1E-9,
+        "xi_emit": 1E-8,
+        "reaction_multipliers": {
+            "O2- + O2 -> e + O2 + O2":     0.0,
+            "O- + N2 -> e + N2O":          0.0
+        }
+    },
+    {
+        "label": "xi_photo=1E1",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1E1,
+        "gamma0": 1E-9,
+        "xi_emit": 1E-8,
+        "reaction_multipliers": {
+            "O2- + O2 -> e + O2 + O2":     0.0,
+            "O- + N2 -> e + N2O":          0.0
+        }
+    },
+    {
+        "label": "xi_photo=1E2",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1E2,
+        "gamma0": 1E-9,
+        "xi_emit": 1E-8,
+        "reaction_multipliers": {
+            "O2- + O2 -> e + O2 + O2":     0.0,
+            "O- + N2 -> e + N2O":          0.0
+        }
+    }
+  ]
+}
