@@ -21,7 +21,9 @@ from incept1d.solver import inception_det  # noqa: E402
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(TESTS_DIR)
 TOY_PATH = os.path.join(TESTS_DIR, "toy", "toy_mechanism.py")
-AIR_PATH = os.path.join(REPO_ROOT, "mechanisms", "air", "air_pancheshnyi.py")
+AIR_PATH = os.path.join(
+    REPO_ROOT, "mechanisms", "air", "pancheshnyi", "air_pancheshnyi.py"
+)
 
 # tests/closed_form.py is imported by name from the test modules.
 if TESTS_DIR not in sys.path:

@@ -5,7 +5,7 @@
 """
 Configuration class for the toy mechanism.
 
-Implements the same three-step protocol as ``mechanisms/air/config.py``, so the
+Implements the same three-step protocol as ``mechanisms/air/air_config.py``, so the
 test suite exercises the real ``incept1d.mechanism.load_mechanism`` path:
 
     config.pre_exec_vars()      -> dict injected before the module body runs

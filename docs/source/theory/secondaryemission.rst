@@ -160,7 +160,7 @@ logarithmically sensitive to it — :math:`\ln(1 + \gamma^{-1})` in the
 classical limit — which is what makes the approach usable at all, but a
 sensitivity sweep is still the honest way to report a result.  See
 :ref:`Chap:AirScheme` for the form and values the dry-air mechanism uses, and
-``mechanisms/air/see.json`` for a ready-made sweep.
+``mechanisms/air/pancheshnyi/see.json`` for a ready-made sweep.
 
 .. admonition:: Code
 

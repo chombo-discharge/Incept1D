@@ -16,7 +16,7 @@ streamer criterion `∫α dx = 18` are computed together.
 From the repository root:
 
 ```bash
-incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
     --pd-min 5E-3 --pd-max 500 --pd-num 100 \
     --field sphere-sphere 1000 \
     --streamer-criterion 18 \

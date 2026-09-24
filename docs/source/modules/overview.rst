@@ -103,7 +103,7 @@ The four solver commands share the same first arguments and most options:
    incept1d COMMAND MECHANISM.py [CONFIG.json ...] [options]
 
 ``MECHANISM.py``
-   Path to a mechanism file, e.g. ``mechanisms/air/air_pancheshnyi.py``
+   Path to a mechanism file, e.g. ``mechanisms/air/pancheshnyi/air_pancheshnyi.py``
    (:ref:`Chap:NewMechanisms`).
 
 ``CONFIG.json ...``

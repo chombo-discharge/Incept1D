@@ -59,7 +59,7 @@ criterion :math:`\int\max(\alpha-\eta,0)\,dx = 18`:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
        --pd-min 1 --pd-max 55 --pd-num 100 \
        --field sphere-sphere 50 --streamer-criterion 18
 
@@ -84,7 +84,7 @@ To keep the numbers instead of the figure:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
        --pd-min 1 --pd-max 55 --pd-num 100 \
        --field sphere-sphere 50 --streamer-criterion 18 \
        --no-plot --write-to-file air_sphere50.dat
@@ -103,7 +103,7 @@ after the mechanism, and each becomes its own curve in the same figure:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
        --p 1.0 --pd-min 1 --pd-max 1e3
 
 ``nodetachment.json`` holds the baseline and a variant with both

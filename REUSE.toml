@@ -80,34 +80,34 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 # database so the required citation is unambiguous.
 
 [[annotations]]
-path = ["mechanisms/air/lisbon.txt", "mechanisms/air/lisbon_x.txt"]
+path = ["mechanisms/air/lxcat/lisbon.txt", "mechanisms/air/lxcat/lisbon_x.txt"]
 SPDX-FileCopyrightText = "IST-Lisbon database, www.lxcat.net/IST-Lisbon"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 
 [[annotations]]
-path = ["mechanisms/air/phelps.txt", "mechanisms/air/phelps_x.txt"]
+path = ["mechanisms/air/lxcat/phelps.txt", "mechanisms/air/lxcat/phelps_x.txt"]
 SPDX-FileCopyrightText = "Phelps database, www.lxcat.net/Phelps"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 
 [[annotations]]
-path = ["mechanisms/air/biagi.txt", "mechanisms/air/biagi_x.txt"]
+path = ["mechanisms/air/lxcat/biagi.txt", "mechanisms/air/lxcat/biagi_x.txt"]
 SPDX-FileCopyrightText = "Biagi database, www.lxcat.net/Biagi"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 
 [[annotations]]
-path = ["mechanisms/air/morgan.txt", "mechanisms/air/morgan_x.txt"]
+path = ["mechanisms/air/lxcat/morgan.txt", "mechanisms/air/lxcat/morgan_x.txt"]
 SPDX-FileCopyrightText = "Morgan database, www.lxcat.net/Morgan"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 
 [[annotations]]
-path = ["mechanisms/air/trinity.txt", "mechanisms/air/trinity_x.txt"]
+path = ["mechanisms/air/lxcat/trinity.txt", "mechanisms/air/lxcat/trinity_x.txt"]
 SPDX-FileCopyrightText = "TRINITI database, www.lxcat.net/TRINITI"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 
 # Negative-ion mobilities.
 
 [[annotations]]
-path = ["mechanisms/air/o2m_mobility.txt", "mechanisms/air/o3m_mobility.txt"]
+path = ["mechanisms/air/lxcat/o2m_mobility.txt", "mechanisms/air/lxcat/o3m_mobility.txt"]
 SPDX-FileCopyrightText = "Viehland database, www.lxcat.net/Viehland"
 SPDX-License-Identifier = "LicenseRef-LXCat"
 

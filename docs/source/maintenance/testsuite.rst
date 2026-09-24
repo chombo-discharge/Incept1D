@@ -39,7 +39,7 @@ The solver must reproduce it, and its documented limits, to about
   :math:`\lambda_+`.
 
 The shipped dry-air mechanism is held to the same standard:
-``mechanisms/air/paschen.json`` reduces it to the textbook limit, and it
+``mechanisms/air/pancheshnyi/paschen.json`` reduces it to the textbook limit, and it
 must then satisfy :eq:`eq_standard_paschen` using its own tabulated
 :math:`\alpha`, :math:`\eta` and :math:`\gamma`.
 

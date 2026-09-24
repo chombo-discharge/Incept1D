@@ -7,7 +7,7 @@ Example: A minimal scheme for dry air
    :local:
    :depth: 1
 
-The mechanism shipped as ``mechanisms/air/air_pancheshnyi.py`` is the
+The mechanism shipped as ``mechanisms/air/pancheshnyi/air_pancheshnyi.py`` is the
 reference dry-air scheme used in the examples, and the worked example of
 everything in this chapter: a species list, a declarative reaction table, a
 ``config.py`` exposing the parameters worth varying, and a set of JSON
@@ -150,8 +150,8 @@ Positive ions use a constant reduced mobility
 [Bohringer1987]_;
 :math:`\mathrm{O}^-` uses :math:`1.2\times10^{22}`; the
 :math:`\mathrm{O}_2^-` and :math:`\mathrm{O}_3^-` mobilities are tabulated
-against :math:`E/N` from LXCat (``mechanisms/air/o2m_mobility.txt``,
-``mechanisms/air/o3m_mobility.txt``).
+against :math:`E/N` from LXCat (``mechanisms/air/lxcat/o2m_mobility.txt``,
+``mechanisms/air/lxcat/o3m_mobility.txt``).
 
 Three-body attachment and the Bloch-Bradbury mechanism
 ------------------------------------------------------
@@ -192,7 +192,7 @@ to :math:`\mathrm{O}_3^-` formation (reaction 8).
 
 .. admonition:: Code
 
-   ``mechanisms/air/air_2body.py`` is an alternative mechanism that keeps
+   ``mechanisms/air/2body/air_2body.py`` is an alternative mechanism that keeps
    :math:`\mathrm{O}_2^{-*}` and :math:`\mathrm{O}_3^{-*}` as explicit
    tracked species (eight species in total) and represents the
    Bloch-Bradbury sequence with two-body reactions.  It shares the same
@@ -210,7 +210,7 @@ dissociation :math:`\mathrm{O}_3^- \to \mathrm{O}^- + \mathrm{O}_2` about
 0.1–0.2 eV at 100 Td.  :math:`\mathrm{O}_3^-` may therefore be stable only
 in a moderate sense and begin to contribute to the attachment-detachment
 cycle at very long gaps; no experimental rates are available.  The
-configuration set ``mechanisms/air/ionsensitivity.json`` switches reactions 7 and 8
+configuration set ``mechanisms/air/pancheshnyi/ionsensitivity.json`` switches reactions 7 and 8
 off individually to quantify their role.
 
 Pressure scaling
@@ -322,7 +322,7 @@ parameters are listed in :numref:`tab_photo_groups`.
    The fit is performed at import time of the mechanism by
    ``mechanisms/air/zheleznyak.py`` (``fit_twostream(ngroups)``), called from
    ``init_photoionization(ngroups, cone_angle_deg)`` in
-   ``mechanisms/air/air_pancheshnyi.py``.  The number of groups is the ``ngroups``
+   ``mechanisms/air/pancheshnyi/air_pancheshnyi.py``.  The number of groups is the ``ngroups``
    entry of the JSON configuration (default 3; six groups reproduce the
    Zheleznyak curve to better than 1 %).  Absorption coefficients scale with the O\ :sub:`2` partial
    pressure, :math:`\kappa_j = (\kappa_j/p_{\mathrm{O}_2})\,x_{\mathrm{O}_2}\,p`.
@@ -349,7 +349,7 @@ JSON configuration, and can be set independently for the two polarities of a
 non-symmetric gap (:ref:`Chap:Configuration`).
 
 Photoemission uses a constant yield :math:`\gamma_\Psi = 0.1` per group.
-Both are uncertain by orders of magnitude; ``mechanisms/air/see.json`` sweeps
+Both are uncertain by orders of magnitude; ``mechanisms/air/pancheshnyi/see.json`` sweeps
 :math:`\gamma_0` over :math:`10^{-4}`–:math:`10^{-2}` so the sensitivity can
 be read off directly.
 
@@ -374,25 +374,27 @@ Each is paired with a callable that folds in the neutral densities, so the
 rate coefficients themselves stay in small named functions ``k1`` … ``k8``
 that can be edited one at a time:
 
-.. literalinclude:: ../../../../mechanisms/air/air_pancheshnyi.py
+.. literalinclude:: ../../../../mechanisms/air/pancheshnyi/air_pancheshnyi.py
    :language: python
    :pyobject: k5
 
 Three checks catch most mistakes:
 
-* ``python3 mechanisms/air/air_pancheshnyi.py`` — Plots the entries of
+* ``python3 mechanisms/air/pancheshnyi/air_pancheshnyi.py`` — Plots the entries of
   :math:`\bm{R}` against :math:`E/N`.
-* ``incept1d eigenvalues mechanisms/air/air_pancheshnyi.py`` — Shows whether
+* ``incept1d eigenvalues mechanisms/air/pancheshnyi/air_pancheshnyi.py`` — Shows whether
   the leading eigenvalue still crosses zero where expected.
-* ``incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/paschen.json``
+* ``incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/paschen.json``
   — Must still reproduce the classical Paschen curve, unchanged if only the
   detachment or conversion chemistry was touched.
 
 Configuration keys
 ------------------
 
-``mechanisms/air/config.py`` accepts the following keys
-(:ref:`Chap:Configuration` describes the file format):
+``mechanisms/air/pancheshnyi/config.py`` accepts the following keys, and
+rejects any other (:ref:`Chap:Configuration` describes the file format).
+The class itself is ``mechanisms/air/air_config.py``, shared with the other
+air mechanisms:
 
 .. list-table::
    :header-rows: 1
@@ -407,10 +409,11 @@ Configuration keys
    * - ``cross_sections``
      - ``lisbon.txt``
      - BOLSIG+ output file for the electron transport data and the rates
-       :math:`k_1, k_2, k_3`.  Shipped: ``lisbon.txt``, ``phelps.txt``,
-       ``biagi.txt``, ``trinity.txt``, ``morgan.txt``.  A relative path is
-       resolved first against the directory of the JSON file, then against
-       the mechanism directory.
+       :math:`k_1, k_2, k_3`.  Shipped in ``mechanisms/air/lxcat/``:
+       ``lisbon.txt``, ``phelps.txt``, ``biagi.txt``, ``trinity.txt``,
+       ``morgan.txt``.  A relative path is resolved first against the
+       directory of the JSON file, then against the mechanism directory, so
+       the shipped files are named ``"../lxcat/lisbon.txt"``.
    * - ``reaction_multipliers``
      - ``{}``
      - Dictionary ``{reaction string: factor}``, keyed by the strings
@@ -440,7 +443,8 @@ Configuration keys
 Ready-made configuration sets
 -----------------------------
 
-Each of these files is a complete study, and several may be given at once:
+Each of these files in ``mechanisms/air/pancheshnyi/`` is a complete study,
+and several may be given at once:
 
 .. list-table::
    :header-rows: 1
@@ -468,5 +472,7 @@ Each of these files is a complete study, and several may be given at once:
      - The textbook limit: no detachment, no ion conversion, no photon
        feedback.  Reproduces :eq:`eq_standard_paschen`, and so serves as a
        regression check on any change to the ion chemistry.
-   * - ``example_config.json``
-     - Annotated example for the two-body mechanism ``air_2body.py``.
+
+The two-body alternative has its own annotated set,
+``mechanisms/air/2body/example_config.json``; it names that mechanism's
+reactions and is rejected by this one.

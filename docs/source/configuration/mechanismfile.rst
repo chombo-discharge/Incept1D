@@ -128,8 +128,8 @@ Parameters that act at run time — reaction multipliers, ``xi_photo``,
 file does not need to know about them beyond honouring the ``multipliers``
 argument of ``get_R``.
 
-A new mechanism *family* (a new directory) needs its own ``config.py``
-implementing ``pre_exec_vars`` / ``post_exec_init`` / ``mechanism_params`` /
+Every mechanism directory that accepts configuration files needs its own
+``config.py`` implementing ``pre_exec_vars`` / ``post_exec_init`` / ``mechanism_params`` /
 ``label``; :ref:`Chap:ConfigPy` specifies that protocol and gives a minimal
 implementation.  The solvers never import it directly.
 

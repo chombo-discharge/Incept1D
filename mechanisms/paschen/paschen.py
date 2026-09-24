@@ -56,20 +56,13 @@ metal cathode.
 Species and coordinates
 -----------------------
 Two species, ``["e", "M+"]``, with the convention of
-``mechanisms/air/air_pancheshnyi.py``: cathode at x = 0, anode at x = d,
+``mechanisms/air/pancheshnyi/air_pancheshnyi.py``: cathode at x = 0, anode at x = d,
 electrons drift toward +x and positive ions toward -x.
 """
-
-import os
-import sys
 
 import numpy as np
 
 from incept1d.constants import kB
-
-_HERE = os.path.dirname(os.path.abspath(__file__))
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
 
 SPECIES = ["e", "M+"]
 ELECTRON_INDEX = 0

@@ -68,7 +68,7 @@ excitation itself, which is what ``--fieldline-voltage`` declares:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
        --field fieldline examples/fieldline/line_engineering.csv mm \
        --fieldline-voltage 100 \
        --pd-min 1 --pd-max 100 --pd-num 40
@@ -109,7 +109,7 @@ along the engineering-unit copy is
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/air_pancheshnyi.py \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
        --field fieldline examples/fieldline/line_engineering.csv mm \
        --fieldline-voltage 100 \
        --pd-min 1 --pd-max 100 --pd-num 40 \

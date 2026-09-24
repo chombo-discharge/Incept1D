@@ -6,17 +6,57 @@
 Mechanism loading: the ``Mechanism`` wrapper, JSON configuration files and
 ``load_mechanism``.
 
-A mechanism is a plain Python file (see ``mechanisms/air/air_pancheshnyi.py``)
-that is executed by :func:`load_mechanism` and must expose the interface
-listed in :data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same
-directory (optional) implements the ``pre_exec_vars()`` /
-``post_exec_init()`` / ``mechanism_params()`` protocol used to inject
-configuration parameters from JSON files.
+A mechanism is a plain Python file (see
+``mechanisms/air/pancheshnyi/air_pancheshnyi.py``) that is executed by
+:func:`load_mechanism` and must expose the interface listed in
+:data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same directory
+(optional) implements the ``pre_exec_vars()`` / ``post_exec_init()`` /
+``mechanism_params()`` protocol used to inject configuration parameters from
+JSON files.  Code that several mechanisms share is loaded by path with
+:func:`load_helper`.
 """
 
 import importlib.util
 import json
 import os
+
+from incept1d.reactions import unknown_multiplier_keys
+
+_HELPERS = {}
+
+
+def load_helper(path):
+    """
+    Import a Python file shared by mechanism or configuration files, by path.
+
+    Mechanism files are data, not a package, so code they share — a
+    photoionization fit, a common configuration class — cannot be imported by
+    name.  Resolve the path against ``__file__`` in the caller::
+
+        _HERE = os.path.dirname(os.path.abspath(__file__))
+        zheleznyak = load_helper(os.path.join(_HERE, "..", "zheleznyak.py"))
+
+    Parameters
+    ----------
+    path : str
+        Path to the ``.py`` file.
+
+    Returns
+    -------
+    module
+        The executed module.  Each file is executed once per process and the
+        same module object is returned on every later call.
+    """
+    abs_path = os.path.realpath(path)
+    if abs_path not in _HELPERS:
+        if not os.path.isfile(abs_path):
+            raise FileNotFoundError(f"Helper file not found: {abs_path}")
+        name = "_incept1d_helper_" + os.path.splitext(os.path.basename(abs_path))[0]
+        spec = importlib.util.spec_from_file_location(name, abs_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _HELPERS[abs_path] = mod
+    return _HELPERS[abs_path]
 
 
 class Mechanism:
@@ -220,4 +260,20 @@ def load_mechanism(path, config_dict=None):
         config.post_exec_init(mod)
     label = config.label if config is not None else ""
     params = config.mechanism_params() if config is not None else {}
+    # A configuration belongs to one mechanism.  Reaction multipliers are keyed
+    # by reaction string, so a configuration written for another mechanism
+    # names reactions this one does not have; refuse it rather than solve a
+    # different problem than the configuration describes.
+    # Only a mechanism that declares REACTIONS can be checked.
+    unknown = (
+        unknown_multiplier_keys(mod.REACTIONS, params.get("reaction_multipliers") or {})
+        if hasattr(mod, "REACTIONS")
+        else []
+    )
+    if unknown:
+        raise ValueError(
+            f"Configuration '{label}' sets multipliers for reactions that "
+            f"'{os.path.basename(path)}' does not define: {unknown}.  A "
+            f"configuration belongs to the mechanism in its own directory."
+        )
     return Mechanism(mod, label, **params)

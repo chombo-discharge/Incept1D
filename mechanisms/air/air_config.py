@@ -3,25 +3,55 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-config.py — configuration class for Air mechanism files.
+air_config.py — configuration class shared by the air mechanisms.
 
-Defines Config for use with the air mechanism files in this directory.
-Implements the config protocol expected by incept1d.mechanism.load_mechanism:
+Each mechanism directory under mechanisms/air/ has its own config.py, which
+subclasses :class:`AirConfig` and states which JSON keys that mechanism
+understands (``KEYS``).  The class implements the config protocol expected by
+incept1d.mechanism.load_mechanism:
 
     config.pre_exec_vars()      → dict of {attr: value} to inject before exec
     config.post_exec_init(mod)  → called after exec (e.g. init_photoionization)
     config.mechanism_params()   → dict of kwargs forwarded to Mechanism()
     config.label                → str display label
+
+A JSON key outside ``KEYS`` is an error, not a silently ignored setting: a
+configuration belongs to one mechanism.  Keys starting with ``_`` are notes
+(``_comment``) or added by the loader (``_cfg_dir``) and are always allowed.
 """
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import ClassVar, Optional
+
+#: Keys every air mechanism understands.
+COMMON_KEYS = frozenset(
+    {
+        "label",
+        "ngroups",
+        "cone_angle",
+        "xi_photo",
+        "xi_emit",
+        "reaction_multipliers",
+        "gamma0",
+        "gamma1",
+        "eref",
+        "beta",
+        "positive",
+        "negative",
+    }
+)
+
+#: Keys of a mechanism whose electron transport comes from a BOLSIG+ table.
+SWARM_KEYS = COMMON_KEYS | {"cross_sections"}
 
 
 @dataclass
-class Config:
-    """All parameters that define one Air-model configuration."""
+class AirConfig:
+    """All parameters that define one air-model configuration."""
+
+    #: JSON keys the mechanism understands; set by each directory's config.py.
+    KEYS: ClassVar[frozenset] = COMMON_KEYS
 
     label: str = "Baseline"
     cross_sections: Optional[str] = None
@@ -72,12 +102,24 @@ class Config:
     # ── construction from raw dict ────────────────────────────────────────────
 
     @classmethod
-    def from_dict(cls, d: dict, mech_dir: str) -> "Config":
-        """Construct Config from a raw JSON dict.
+    def from_dict(cls, d: dict, mech_dir: str) -> "AirConfig":
+        """Construct the configuration from a raw JSON dict.
 
         Relative cross_sections paths are resolved first against
-        d['_cfg_dir'] (injected by _read_json_configs), then mech_dir.
+        d['_cfg_dir'] (injected by read_json_configs), then mech_dir.
+
+        Raises
+        ------
+        ValueError
+            If *d* has a key outside ``KEYS`` (other than ``_``-prefixed ones).
         """
+        unknown = sorted(k for k in d if not k.startswith("_") and k not in cls.KEYS)
+        if unknown:
+            raise ValueError(
+                f"Configuration '{d.get('label', 'Baseline')}' has keys the "
+                f"mechanism in {os.path.basename(mech_dir)}/ does not use: "
+                f"{unknown}.  It accepts: {sorted(cls.KEYS)}."
+            )
         cs = d.get("cross_sections")
         if cs is not None and not os.path.isabs(cs):
             cfg_dir = d.get("_cfg_dir", mech_dir)

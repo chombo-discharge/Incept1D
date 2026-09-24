@@ -178,7 +178,7 @@ criterion handles and the closed form does not.
    validating changes to the propagator or determinant code: a mechanism
    with only ionization, attachment, and detachment must reproduce
    :eq:`eq_generalized_paschen`, and with detachment switched off it must
-   reproduce :eq:`eq_standard_paschen`.  ``mechanisms/air/paschen.json`` configures
+   reproduce :eq:`eq_standard_paschen`.  ``mechanisms/air/pancheshnyi/paschen.json`` configures
    the dry-air mechanism into this limit (no detachment, no ion conversion,
    no photon feedback).
 
