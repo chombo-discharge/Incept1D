@@ -21,7 +21,7 @@ import scipy.optimize
 
 from incept1d.constants import kB as _kB
 from incept1d.eigenvalues import max_real_eigenvalue as _max_real_eigenvalue
-from incept1d.solver import inception_det
+from incept1d.solver import inception_det, riccati_criterion
 
 # ── Core solver ───────────────────────────────────────────────────────────────
 
@@ -120,9 +120,10 @@ def find_lambda_for_voltage(
         True when the ξ = 0 electrode is the anode, as for
         :func:`incept1d.solver.inception_det`.
     criterion : callable or None
-        :func:`incept1d.solver.inception_det` (the default, None) or
-        :func:`incept1d.solver.riccati_criterion`; both are positive below
-        the dominant root and negative above it here.
+        :func:`incept1d.solver.riccati_criterion` (the default, None) or
+        :func:`incept1d.solver.inception_det`.  Riccati's g is positive below
+        the dominant root and negative above it for every mechanism; det Q
+        has that sign only for mechanisms whose row parity gives it.
 
     Returns
     -------
@@ -134,7 +135,7 @@ def find_lambda_for_voltage(
     """
 
     if criterion is None:
-        criterion = inception_det
+        criterion = riccati_criterion
     extra = {"resolve": True} if criterion is inception_det else {}
 
     def _det(lam_val):

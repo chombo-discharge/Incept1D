@@ -28,6 +28,31 @@ pytestmark = pytest.mark.slow
 UNIFORM = FieldDistribution("uniform")
 
 
+class _NoPhotons:
+    """A mechanism with its photon groups removed (zero-width B, C, κ)."""
+
+    def __init__(self, mod):
+        self._mod = mod
+
+    def __getattr__(self, name):
+        return getattr(self._mod, name)
+
+    def resolve(self, positive):
+        return self
+
+    def get_B(self, EN, p, T):
+        return np.zeros((len(self.SPECIES), 0))
+
+    def get_C(self, EN, p, T):
+        return np.zeros((0, len(self.SPECIES)))
+
+    def get_kappa(self, p, T):
+        return np.zeros(0)
+
+    def get_gamma_Psi(self, EN, p, T):
+        return np.zeros(0)
+
+
 @pytest.fixture(scope="module")
 def det():
     return functools.partial(riccati_criterion, field_dist=UNIFORM)
@@ -154,7 +179,7 @@ class TestInceptionCurve:
             p,
             T,
             first_only=True,
-            det_fn=functools.partial(inception_det, positive_polarity=True, **kw),
+            det_fn=functools.partial(riccati_criterion, positive_polarity=True, **kw),
         )[0]
         neg = find_all_breakdown_EN(
             pd,
@@ -162,7 +187,7 @@ class TestInceptionCurve:
             p,
             T,
             first_only=True,
-            det_fn=functools.partial(inception_det, positive_polarity=False, **kw),
+            det_fn=functools.partial(riccati_criterion, positive_polarity=False, **kw),
         )[0]
         assert pos != neg
         assert abs(pos - neg) / pos < 0.2
@@ -178,11 +203,11 @@ class TestGrowthRate:
         EN = find_all_breakdown_EN(pd, air, p, T, first_only=True, det_fn=det)[0]
         return air, pd, p, T, EN
 
-    def test_determinant_sign_convention(self, star):
+    def test_criterion_sign_convention(self, star):
         """The assumption find_lambda_for_voltage relies on, for real air."""
         air, pd, p, T, EN = star
-        below = inception_det(EN * 0.9, pd, air, p, T, UNIFORM)
-        assert np.isfinite(below) and below > 0.0
+        assert riccati_criterion(EN * 0.9, pd, air, p, T, UNIFORM) > 0.0
+        assert riccati_criterion(EN * 1.1, pd, air, p, T, UNIFORM) < 0.0
 
     def test_small_overvoltage_gives_a_small_growth_rate(self, star):
         """Just above threshold the solve still behaves."""
@@ -233,6 +258,9 @@ class TestGrowthRate:
         # det Q cancels across much of the dynamic range of S M, so the
         # reference carries more digits than that range spans.
         mp.mp.dps = 400
+        # Photons play no part in the electron transient this test is about,
+        # and their e^{±κd} modes would overflow the float64 reference.
+        air = _NoPhotons(air)
         p, T, pd = 10.0, 293.0, 400e-3
         d = pd / p
         n = len(air.SPECIES)
@@ -272,6 +300,9 @@ class TestGrowthRate:
         def resolved(lam, N):
             return inception_det(EN, pd, air, p, T, fd, N, N, lam=lam, resolve=True)
 
+        def riccati(lam, N):
+            return riccati_criterion(EN, pd, air, p, T, fd, N, N, lam=lam)
+
         # Fine grid, float64, below the root.
         for lam in (1e5, 1e6, 3e6):
             M = np.eye(n)
@@ -280,6 +311,7 @@ class TestGrowthRate:
             exact = np.linalg.det(np.vstack([Q0, S @ M]))
             assert np.isfinite(exact) and exact < 0.0
             assert resolved(lam, 800) < 0.0, f"lam={lam:g}"
+            assert riccati(lam, 800) < 0.0, f"lam={lam:g}"
 
         # Coarse grid, mpmath, across the root.
         signs = []
@@ -295,6 +327,9 @@ class TestGrowthRate:
             exact = int(mp.sign(leibniz(Q)))
             assert exact != 0
             assert np.sign(resolved(lam, 50)) == exact, f"lam={lam:g}"
+            # Riccati's g is negative below the root and positive above it,
+            # like det Q for air, so the signs must agree here too.
+            assert np.sign(riccati(lam, 50)) == exact, f"lam={lam:g}"
             signs.append(exact)
         assert -1 in signs and 1 in signs, "the root must be crossed"
 
@@ -310,7 +345,7 @@ class TestGrowthRate:
         lams = {}
         for positive in (True, False):
             det_fn = functools.partial(
-                inception_det, field_dist=fd, positive_polarity=positive
+                riccati_criterion, field_dist=fd, positive_polarity=positive
             )
             EN = find_all_breakdown_EN(pd, air, p, T, first_only=True, det_fn=det_fn)[0]
             lam, status = find_lambda_for_voltage(
@@ -353,7 +388,7 @@ class TestGrowthRate:
 
     def test_no_root_above_the_growth_rate(self, star):
         """
-        lambda* is the largest real root: det Q keeps one sign above it.
+        lambda* is the largest real root: the criterion keeps one sign above it.
 
         This is what makes it the dominant mode (every loop gain falls with
         lambda, so no mode grows faster), and what the downward scan in
@@ -366,20 +401,27 @@ class TestGrowthRate:
             )
             assert status == "ok"
             above = [
-                inception_det(EN * over, pd, air, p, T, UNIFORM, lam=x, resolve=True)
+                riccati_criterion(EN * over, pd, air, p, T, UNIFORM, lam=x)
                 for x in lam * np.geomspace(1.001, 1e4, 25)
             ]
             assert all(v > 0.0 for v in above), f"{over}x V*"
 
-    def test_direct_determinant_fails_above_that_range(self, star):
+    def test_direct_determinant_fails_with_thick_photons(self, star):
         """
-        Why the compound route is needed: the direct det Q is NaN at 1.5 V*
-        already at lambda = 0, but resolved it keeps the above-threshold sign.
+        Why det Q needs the compound route, and Riccati does not.
+
+        With every photon group explicit, the e^{κd} mode of the thickest
+        group (κd ≈ 106 here) makes the anode rows parallel on both sides of
+        inception, so the direct det Q is NaN below it as well as above.  The
+        resolved det Q keeps the right sign, and agrees with Riccati's g.
         """
         air, pd, p, T, EN = star
-        assert np.isfinite(inception_det(EN * 1.15, pd, air, p, T, UNIFORM))
-        assert np.isnan(inception_det(EN * 1.5, pd, air, p, T, UNIFORM))
-        assert inception_det(EN * 1.5, pd, air, p, T, UNIFORM, resolve=True) < 0.0
+        for over, sign in ((0.9, 1.0), (1.5, -1.0)):
+            assert np.isnan(
+                inception_det(EN * over, pd, air, p, T, UNIFORM, resolve=False)
+            )
+            assert np.sign(inception_det(EN * over, pd, air, p, T, UNIFORM)) == sign
+            assert np.sign(riccati_criterion(EN * over, pd, air, p, T, UNIFORM)) == sign
 
 
 class TestNonUniformRootSelection:
@@ -398,7 +440,7 @@ class TestNonUniformRootSelection:
         """The full determinant and the proxy the CLI pairs it with."""
         fd = FieldDistribution("sphere-sphere", sphere_R=cls.SPHERE_R_M)
         full = functools.partial(
-            inception_det,
+            riccati_criterion,
             field_dist=fd,
             N_min=5,
             N_max=200,
@@ -407,7 +449,7 @@ class TestNonUniformRootSelection:
             propagator=midpoint_propagator,
         )
         proxy = functools.partial(
-            inception_det,
+            riccati_criterion,
             field_dist=UNIFORM,
             N_min=1,
             N_max=1,
