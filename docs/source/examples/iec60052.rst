@@ -59,7 +59,7 @@ matched to its table; ``examples/iec60052/README.md`` lists the radius and
 
 The sphere-sphere geometry is symmetric: both polarities are written to
 the output file but contain identical values.  The default adaptive grid
-(``--dx 5 200 0.03``) is used; each diameter takes a few minutes.
+is used.
 
 Reading the output
 ------------------

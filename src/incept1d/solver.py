@@ -26,6 +26,8 @@ import math
 import numpy as np
 import scipy.integrate
 import scipy.linalg
+import scipy.sparse
+import scipy.sparse.linalg
 
 from incept1d.constants import kB as _kB, c_light as _C_LIGHT  # noqa: F401
 from incept1d.fields import FieldDistribution  # noqa: F401
@@ -34,9 +36,14 @@ from incept1d.fields import FieldDistribution  # noqa: F401
 def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     """Build the augmented ODE matrix for reduced field EN and gap length d.
 
-    Photon groups that are re-absorbed within a fraction of a step are
-    folded into A rather than propagated explicitly, so the augmented
-    system can be smaller than N_s + 2 N_γ.
+    Every photon group is propagated explicitly, however optically thick.
+    Folding a thick group into A as the local source 2 b_j c_jᵀ / κ_j keeps
+    the photoionization it produces but puts each photoelectron at the
+    point of emission, and so removes the upstream seeding that makes
+    photoionization a feedback loop: in an inhomogeneous gap the ionization
+    zone can be as thin as 1/κ even when κ d ≫ 1.  The stiffness of the
+    e^{±κx} photon modes is handled by the determinant instead (see
+    :func:`_det_Q`).
 
     Parameters
     ----------
@@ -51,9 +58,9 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     -------
     tuple
         ``(A_aug, N_gamma_eff, aug_mask, n_aug)``.  ``aug_mask`` selects the
-        explicitly propagated photon groups, and is None when N_γ = 0.
+        explicitly propagated photon groups — all of them — and is None when
+        N_γ = 0.
     """
-    _KD_LOCAL_THRESHOLD = 12.0
     n = len(mod.SPECIES)
 
     R = mod.get_R(EN, p, T)
@@ -73,22 +80,9 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
         kappa = kappa + lam / _C_LIGHT  # κ + λ/c
     N_gamma = B.shape[1]
 
-    if N_gamma > 0:
-        kd = kappa * d
-        local_mask = kd > _KD_LOCAL_THRESHOLD
-        aug_mask = ~local_mask
-        for j in np.where(local_mask)[0]:
-            A += 2.0 * np.outer(B[:, j], C[j, :]) / kappa[j]
-        B_aug = B[:, aug_mask]
-        C_aug_ph = C[aug_mask, :]
-        kappa_aug = kappa[aug_mask]
-        N_gamma_eff = int(aug_mask.sum())
-    else:
-        N_gamma_eff = 0
-        aug_mask = None
-        B_aug = B
-        C_aug_ph = C
-        kappa_aug = kappa
+    N_gamma_eff = N_gamma
+    aug_mask = np.ones(N_gamma, dtype=bool) if N_gamma > 0 else None
+    B_aug, C_aug_ph, kappa_aug = B, C, kappa
 
     if N_gamma_eff == 0:
         A_aug = A
@@ -128,8 +122,11 @@ def _expm_shifted(M):
 
 
 DX_N_MIN_DEFAULT = 5
-DX_N_MAX_DEFAULT = 200
-DX_TOL_DEFAULT = 0.03
+# Measured on sphere-plane gaps (R = 0.32 and 5 mm, both polarities): the
+# old 200 / 0.03 put the inception field 0.3–2.3 % off the converged value;
+# 1000 / 1e-3 keeps it within 0.1 % at 3–4× the cost.
+DX_N_MAX_DEFAULT = 1000
+DX_TOL_DEFAULT = 1e-3
 
 
 def parse_dx_spec(tokens, parser=None):
@@ -142,7 +139,7 @@ def parse_dx_spec(tokens, parser=None):
     Parameters
     ----------
     tokens : list of str or None
-        Raw argparse token list, e.g. ['5', '200', '0.03'].
+        Raw argparse token list, e.g. ['5', '1000', '1e-3'].
     parser : argparse.ArgumentParser or None
         If given, validation errors are routed through parser.error().
     """
@@ -368,17 +365,33 @@ def _compound_index(n, k):
     )
 
 
-def _additive_compound(Omega, k):
+def _additive_compound(Omega, k, sparse=False):
     """
     The k-th additive compound Ω^[k], the generator of ∧^k exp(Ω).
 
     exp(Ω^[k]) acts on the Plücker coordinates (the k×k minors) of an
-    n×k matrix exactly as exp(Ω) acts on the matrix itself.
+    n×k matrix exactly as exp(Ω) acts on the matrix itself.  Each row has at
+    most 1 + k(n − k) nonzeros; with *sparse* it is returned in CSR form.
     """
     _, _, rows, cols, a, b, sign = _compound_index(Omega.shape[0], k)
-    K = np.zeros((math.comb(Omega.shape[0], k),) * 2)
+    size = math.comb(Omega.shape[0], k)
+    if sparse:
+        # Duplicate (row, col) pairs — the diagonal — are summed on conversion.
+        return scipy.sparse.coo_matrix(
+            (sign * Omega[a, b], (rows, cols)), shape=(size, size)
+        ).tocsr()
+    K = np.zeros((size, size))
     np.add.at(K, (rows, cols), sign * Omega[a, b])
     return K
+
+
+# Above this many Plücker coordinates the compound propagator is applied to
+# the coordinate vector (scipy.sparse.linalg.expm_multiply) instead of being
+# formed: C(12, 5) = 792 for three explicit photon groups, where a dense
+# 792×792 exponential per step dominated the run time.  Like the dense
+# exponential, the action only follows coupling paths of Ω^[k], so the
+# structural zeros that keep small coordinates accurate are preserved.
+_DENSE_COMPOUND_MAX = 120
 
 
 def _propagate_compound(exponents, Y):
@@ -433,12 +446,19 @@ def _propagate_compound(exponents, Y):
         # Shift by the largest eigenvalue of Ω^[k], the sum of the k largest
         # of Ω, so that the compound propagator cannot overflow.
         shift = float(mu[:k].sum()) / m
-        Pk = scipy.linalg.expm(
-            _additive_compound(Omega / m, k) - shift * np.eye(len(subsets))
-        )
+        if len(subsets) <= _DENSE_COMPOUND_MAX:
+            Pk = scipy.linalg.expm(
+                _additive_compound(Omega / m, k) - shift * np.eye(len(subsets))
+            )
+            step = Pk.__matmul__
+        else:
+            Kk = _additive_compound(Omega / m, k, sparse=True) - shift * (
+                scipy.sparse.identity(len(subsets), format="csr")
+            )
+            step = functools.partial(scipy.sparse.linalg.expm_multiply, Kk)
         done = 0
         while done < m:
-            q = Pk @ p
+            q = step(p)
             scale = np.abs(q).max()
             log_scale += shift + math.log(scale)
             q = q / scale
@@ -691,7 +711,7 @@ def inception_det(
     positive_polarity=True,
     propagator=midpoint_propagator,
     diag_list=None,
-    resolve=False,
+    resolve=True,
 ):
     """
     Evaluate det Q(λ) for the inception boundary-value problem.
@@ -728,7 +748,9 @@ def inception_det(
     resolve : bool
         Evaluate det Q even where Q is numerically singular, by the
         compound-matrix method (see :func:`_det_Q`), instead of returning
-        NaN.  Needed for λ > 0; much slower.
+        NaN.  Needed above threshold, at λ > 0, and wherever an optically
+        thick photon group makes the propagator stiff; slower, but only
+        used where the direct evaluation fails.  False restores NaN there.
     positive_polarity : bool
         True when the ξ = 0 electrode is the anode.  Ignored for the
         symmetric geometries.
@@ -742,6 +764,61 @@ def inception_det(
     -------
     float
         det Q(λ).  Inception threshold: det Q = 0.
+    """
+    with np.errstate(over="ignore", invalid="ignore"):
+        exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug = _discretise(
+            EN_ref,
+            pd,
+            mod,
+            p,
+            T,
+            field_dist,
+            N_min,
+            N_max,
+            tol,
+            lam,
+            positive_polarity,
+            propagator,
+            diag_list,
+        )
+        return _det_Q(
+            exponents,
+            EN_cathode,
+            eff,
+            p,
+            T,
+            N_gamma_eff,
+            aug_mask,
+            n_aug,
+            resolve,
+        )
+
+
+def _discretise(
+    EN_ref,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min,
+    N_max,
+    tol,
+    lam,
+    positive_polarity,
+    propagator,
+    diag_list,
+):
+    """
+    Step exponents across the gap and the boundary data both criteria need.
+
+    Returns ``(exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug)``:
+    the step exponents Ω_i from cathode to anode (one exact exponent for a
+    uniform field; the midpoint or Magnus grid otherwise), the reduced field
+    at the cathode, the polarity-resolved mechanism, and the photon
+    structure of the augmented system.  :func:`inception_det` and
+    :func:`riccati_criterion` share it, so they solve the same discrete
+    problem on the same grid.
     """
     eff = mod.resolve(positive_polarity)
     d = pd / p
@@ -781,17 +858,7 @@ def inception_det(
                         ],
                     }
                 )
-            return _det_Q(
-                [A_aug * d],
-                EN_ref,
-                eff,
-                p,
-                T,
-                N_gamma_eff,
-                aug_mask,
-                n_aug,
-                resolve,
-            )
+            return [A_aug * d], EN_ref, eff, N_gamma_eff, aug_mask, n_aug
 
     f = field_dist.build(d)
     d_step = d / N_min
@@ -851,14 +918,159 @@ def inception_det(
 
         xi_cathode = 1.0 if positive_polarity else 0.0
         EN_cathode = EN_ref * f(xi_cathode)
-        return _det_Q(
-            exponents,
-            EN_cathode,
-            eff,
+        return exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug
+
+
+def _riccati_g(exponents, Q0, S):
+    """
+    The inception criterion by the Riccati (reflection) method.
+
+    Split θ into the components that travel toward the anode (electrons,
+    negative ions, forward photons: f) and toward the cathode (positive ions,
+    backward photons: b, the ones S selects).  The anode condition b(d) = 0
+    is carried back to the cathode as b = P f, where the reflection operator
+    P obeys
+
+        P′ = A_bf + A_bb P − P A_ff − P A_fb P,   P(d) = 0.
+
+    Integrated from the anode, every component travels in its own direction,
+    so the modes that make the propagator M useless — e^{+κx} for backward
+    photons, e^{+λx/|v₊|} for ions — decay instead of growing.  On a step
+    with constant A the equation is solved exactly by the linear fractional
+    map
+
+        P ← (E_bf + E_bb P)(E_ff + E_fb P)⁻¹,   E = exp(−Ω),
+
+    so the result is the same discrete problem det Q solves on the same
+    grid.  At the cathode the conditions Q0 θ = 0 with θ_b = P θ_f give
+
+        g = det(Q0_f + Q0_b P(0)),
+
+    which is zero exactly where det Q is.  With one electron row it is
+    1 − (loop gain): positive below inception, negative above, and of order
+    one; P(0) e_e are the ion and backward-photon fluxes returning to the
+    cathode per emitted electron.
+
+    P stays finite below inception: it can only blow up where a sub-slab
+    [x, d] is self-sustaining without the cathode, which makes the whole gap
+    supercritical.  The map passes through such a pole within one step
+    without failing, so a pole is detected instead as a sign change of
+    det(E_ff + E_fb P), whose product over the steps is the determinant of
+    the forward block of the propagated basis.  Returns −1 there.
+    """
+    n = Q0.shape[1]
+    b = [int(np.argmax(row)) for row in S]
+    fw = [i for i in range(n) if i not in b]
+    if Q0.shape[0] != len(fw):
+        raise ValueError(
+            f"Q0 has {Q0.shape[0]} rows for {len(fw)} forward components: every "
+            "species must be selected by exactly one of Pi_e, Pi_plus, Pi_minus"
+        )
+    P = np.zeros((len(b), len(fw)))
+    for Omega in reversed(exponents):
+        # Substeps with a well-conditioned propagator, as in the compound
+        # route; splitting is exact, exp(−Ω) = exp(−Ω/m)^m.
+        mu = np.real(np.linalg.eigvals(Omega))
+        m = max(1, math.ceil((mu.max() - mu.min()) / math.log(_MAX_STEP_COND)))
+        E = _expm_shifted(-Omega / m)  # the dropped shift cancels in the map
+        while np.linalg.cond(E) > _MAX_STEP_COND and m < 2**20:
+            m *= 2
+            E = _expm_shifted(-Omega / m)
+        E_bf, E_bb = E[np.ix_(b, fw)], E[np.ix_(b, b)]
+        E_ff, E_fb = E[np.ix_(fw, fw)], E[np.ix_(fw, b)]
+        for step in range(m):
+            X = E_ff + E_fb @ P
+            if np.linalg.slogdet(X)[0] <= 0:
+                return -1.0
+            P_new = np.linalg.solve(X.T, (E_bf + E_bb @ P).T).T
+            if not np.all(np.isfinite(P_new)):
+                return -1.0
+            # A fixed point of the constant map: the remaining substeps are
+            # exact no-ops.  Relative test, entry by entry, for the reason
+            # given in _propagate_compound.
+            nz = P != 0.0
+            converged = (
+                step < m - 1
+                and not np.any(P_new[~nz])
+                and np.max(np.abs(P_new[nz] / P[nz] - 1.0), initial=0.0) < 1e-13
+            )
+            P = P_new
+            if converged:
+                break
+    return float(np.linalg.det(Q0[:, fw] + Q0[:, b] @ P))
+
+
+def riccati_criterion(
+    EN_ref,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min=DX_N_MIN_DEFAULT,
+    N_max=DX_N_MAX_DEFAULT,
+    tol=DX_TOL_DEFAULT,
+    lam=0.0,
+    positive_polarity=True,
+    propagator=midpoint_propagator,
+    diag_list=None,
+):
+    """
+    Evaluate the inception criterion by the Riccati method.
+
+    A drop-in alternative to :func:`inception_det`, with the same arguments
+    and the same step grid, returning g = det(Q0_f + Q0_b P(0)) instead of
+    det Q (see :func:`_riccati_g`).  g vanishes exactly where det Q does;
+    unlike det Q it is of order one, positive below inception and negative
+    above for every mechanism, and cheap to evaluate however optically thick
+    the photon groups or however large λ.
+
+    Returns
+    -------
+    float
+        g; −1 where the reflection operator has a pole inside the gap
+        (above inception).
+    """
+    with np.errstate(over="ignore", invalid="ignore"):
+        exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug = _discretise(
+            EN_ref,
+            pd,
+            mod,
             p,
             T,
-            N_gamma_eff,
-            aug_mask,
-            n_aug,
-            resolve,
+            field_dist,
+            N_min,
+            N_max,
+            tol,
+            lam,
+            positive_polarity,
+            propagator,
+            diag_list,
         )
+        Q0, S = _boundary_rows(EN_cathode, eff, p, T, N_gamma_eff, aug_mask, n_aug)
+        return _riccati_g(exponents, Q0, S)
+
+
+#: Inception criteria selectable with ``--criterion``; each has the signature
+#: of :func:`inception_det` (without ``resolve``) and vanishes at inception.
+CRITERIA = {"riccati": riccati_criterion, "detq": inception_det}
+
+#: The criterion used unless ``--criterion`` says otherwise.
+CRITERION_DEFAULT = "riccati"
+
+
+def add_criterion_argument(parser):
+    """Register the shared ``--criterion`` option on an argparse *parser*."""
+    parser.add_argument(
+        "--criterion",
+        choices=sorted(CRITERIA),
+        default=CRITERION_DEFAULT,
+        help=(
+            "How the inception condition is evaluated.  'riccati' (default): "
+            "the reflection operator carried from the anode, of order one "
+            "and cheap however optically thick the photon groups.  'detq': "
+            "the boundary determinant det Q, the formulation of the Theory "
+            "chapter; slow where the propagator is stiff.  Both solve the "
+            "same discrete problem on the same grid."
+        ),
+    )

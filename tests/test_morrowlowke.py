@@ -26,7 +26,7 @@ from incept1d.constants import kB
 from incept1d.fields import FieldDistribution
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import REQUIRED_ATTRS, load_mechanism
-from incept1d.solver import inception_det
+from incept1d.solver import riccati_criterion
 
 ML_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -202,7 +202,9 @@ class TestClosedFormLimit:
 
     @pytest.mark.parametrize("pd_mm", [1.0, 10.0, 100.0])
     def test_reproduces_standard_paschen(self, townsend, pd_mm):
-        det = functools.partial(inception_det, field_dist=FieldDistribution("uniform"))
+        det = functools.partial(
+            riccati_criterion, field_dist=FieldDistribution("uniform")
+        )
         pd = pd_mm * 1e-3
         roots = find_all_breakdown_EN(pd, townsend, P, T, first_only=True, det_fn=det)
         assert roots, f"no inception found at pd = {pd_mm} bar·mm"

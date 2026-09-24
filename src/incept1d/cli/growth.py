@@ -23,7 +23,11 @@ from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.output import write_metadata_header
 from incept1d.solver import (
-    inception_det,
+    DX_N_MAX_DEFAULT,
+    DX_N_MIN_DEFAULT,
+    DX_TOL_DEFAULT,
+    CRITERIA,
+    add_criterion_argument,
     midpoint_propagator,
     magnus2_propagator,
     parse_dx_spec,
@@ -139,6 +143,7 @@ def add_arguments(parser):
         help="Upper voltage as multiple of V* (default: 2.0).",
     )
     add_field_argument(parser)
+    add_criterion_argument(parser)
     parser.add_argument(
         "--dx",
         nargs="*",
@@ -146,7 +151,8 @@ def add_arguments(parser):
         metavar="SPEC",
         help=(
             "Adaptive integration stepping: N_min [N_max [tol]].  "
-            "Defaults: N_min=5, N_max=200, tol=0.03."
+            f"Defaults: N_min={DX_N_MIN_DEFAULT}, N_max={DX_N_MAX_DEFAULT}, "
+            f"tol={DX_TOL_DEFAULT:g}."
         ),
     )
     parser.add_argument(
@@ -211,7 +217,7 @@ def run(args, parser):
 
             # Build det_fn for the inception solve (λ=0).
             det_fn = functools.partial(
-                inception_det,
+                CRITERIA[args.criterion],
                 field_dist=_field_dist,
                 N_min=_N_min,
                 N_max=_N_max,
@@ -251,6 +257,7 @@ def run(args, parser):
                 args.n_voltages,
                 args.v_max_factor,
                 positive_polarity=positive,
+                criterion=CRITERIA[args.criterion],
             )
             curve_records.append((pol_label, label, polarity, rows))
             if positive:

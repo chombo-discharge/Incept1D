@@ -8,8 +8,10 @@ across a p·d sweep, giving the (partial) discharge inception voltage
 PDIV = V*(p·d).
 
 The root finding, warm starts and branch tracking are described in
-``docs/source/numerics/rootfinding.rst``; the determinant itself is
-:func:`incept1d.solver.inception_det`.
+``docs/source/numerics/rootfinding.rst``.  The criterion whose root is
+sought is :func:`incept1d.solver.riccati_criterion` unless a ``det_fn`` is
+given; :func:`incept1d.solver.inception_det` evaluates the same condition
+as det Q.
 """
 
 import math
@@ -18,7 +20,7 @@ import numpy as np
 import scipy.optimize
 
 from incept1d.constants import kB as _kB
-from incept1d.solver import inception_det
+from incept1d.solver import riccati_criterion
 
 _ROOT_CHECK_TOL = 0.01  # |det Q(root)| / bracket-scale above this triggers a warning
 _NAN_SENTINEL = 1e-290  # |value| below this → came from NaN → -1e-300 mapping
@@ -147,7 +149,7 @@ def find_all_breakdown_EN(
         Empty list if no sign change is found in [EN_lo, EN_hi].
     """
     if det_fn is None:
-        det_fn = inception_det
+        det_fn = riccati_criterion
     scan_fn = fast_det_fn if fast_det_fn is not None else det_fn
 
     def f_brentq(EN):
@@ -388,7 +390,7 @@ def compute_inception_curve(
         Returns an empty list if no solutions are found anywhere.
     """
     if det_fn is None:
-        det_fn = inception_det
+        det_fn = riccati_criterion
     p_arr = np.full_like(pd_arr, p) if np.ndim(p) == 0 else np.asarray(p, dtype=float)
     branches = []
     branch_last_logEN = []  # last log10(EN) for each branch, for continuity tracking

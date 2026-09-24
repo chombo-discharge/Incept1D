@@ -57,7 +57,7 @@ following controls trade accuracy for time:
      - Fewer initial segments, a smaller refinement budget or a looser
        tolerance reduce the number of ``expm`` calls per evaluation.
        ``--dx 5 25 0.05`` (used for the ELECTRA example) is 5–10× cheaper
-       than the default ``5 200 0.03`` at small :math:`pd`.
+       than the default ``5 1000 1e-3`` at small :math:`pd`, and less accurate.
    * - ``--method magnus2 --dx N N``
      - Fourth-order propagator on a fixed grid; no adaptive refinement.
        Cheap and accurate for smooth profiles when :math:`N` is chosen

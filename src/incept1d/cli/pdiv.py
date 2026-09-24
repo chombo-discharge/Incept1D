@@ -33,9 +33,13 @@ from incept1d.fields import (
 )
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.solver import (
-    inception_det,
+    DX_N_MAX_DEFAULT,
+    DX_N_MIN_DEFAULT,
+    DX_TOL_DEFAULT,
     midpoint_propagator,
     magnus2_propagator,
+    CRITERIA,
+    add_criterion_argument,
     parse_dx_spec,
     polarities_equivalent,
 )
@@ -134,6 +138,7 @@ def add_arguments(parser):
         ),
     )
     add_field_argument(parser)
+    add_criterion_argument(parser)
     parser.add_argument(
         "--dx",
         nargs="*",
@@ -141,11 +146,12 @@ def add_arguments(parser):
         metavar="SPEC",
         help=(
             "Adaptive integration stepping: N_min [N_max [tol]].  "
-            "N_min (default 5): minimum number of integration segments.  "
-            "N_max (default 200): maximum total fine steps; N_max = N_min gives "
-            "a constant uniform grid with no adaptive refinement.  "
-            "tol (default 0.03): relative Frobenius error threshold for the "
-            "midpoint step-halving check (fraction, not percent).  "
+            f"N_min (default {DX_N_MIN_DEFAULT}): minimum number of integration "
+            f"segments.  N_max (default {DX_N_MAX_DEFAULT}): maximum total fine "
+            "steps; N_max = N_min gives a constant uniform grid with no adaptive "
+            f"refinement.  tol (default {DX_TOL_DEFAULT:g}): relative Frobenius "
+            "error threshold for the midpoint step-halving check (fraction, not "
+            "percent).  "
             "Example: --dx 10 400 0.01  sets N_min=10, N_max=400, tol=1%%."
         ),
     )
@@ -240,6 +246,7 @@ def run(args, parser):
     parser : argparse.ArgumentParser
         The (sub)parser that produced *args*; used for ``parser.error``.
     """
+    _criterion = CRITERIA[args.criterion]
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
@@ -526,7 +533,7 @@ def run(args, parser):
         if _field_dist.field_type == "uniform":
             det_pos, det_neg = (
                 functools.partial(
-                    inception_det,
+                    _criterion,
                     field_dist=_field_dist,
                     N_min=_N_min,
                     N_max=_N_max,
@@ -546,7 +553,7 @@ def run(args, parser):
                 5, _N_min
             )  # cheap constant scan; N_med = N_med disables adaptation
             det_pos = functools.partial(
-                inception_det,
+                _criterion,
                 field_dist=_field_dist,
                 N_min=_N_min,
                 N_max=_N_max,
@@ -559,7 +566,7 @@ def run(args, parser):
                 det_pos
                 if same_polarity
                 else functools.partial(
-                    inception_det,
+                    _criterion,
                     field_dist=_field_dist,
                     N_min=_N_min,
                     N_max=_N_max,
@@ -573,7 +580,7 @@ def run(args, parser):
             # surface parameters still follow the polarity.
             fast_det_pos, fast_det_neg = (
                 functools.partial(
-                    inception_det,
+                    _criterion,
                     field_dist=_fast_fd,
                     N_min=1,
                     N_max=1,
@@ -585,7 +592,7 @@ def run(args, parser):
                 for positive in (True, False)
             )
             med_det_pos = functools.partial(
-                inception_det,
+                _criterion,
                 field_dist=_med_fd,
                 N_min=_N_med,
                 N_max=_N_med,
@@ -598,7 +605,7 @@ def run(args, parser):
                 med_det_pos
                 if same_polarity
                 else functools.partial(
-                    inception_det,
+                    _criterion,
                     field_dist=_med_fd,
                     N_min=_N_med,
                     N_max=_N_med,

@@ -91,58 +91,22 @@ class TestBuildAAug:
         assert Z_tr == pytest.approx(np.zeros((2, 2)))
         assert Z_bl == pytest.approx(np.zeros((2, 2)))
 
-    def test_optically_thick_group_is_folded_into_A(self):
+    @pytest.mark.parametrize("kd", [0.01, 11.99, 12.01, 100.0, 1e4])
+    def test_every_group_is_propagated(self, kd):
         """
-        S3: a group with kappa*d > 12 is treated as local.
+        S3: no photon group is folded into A, however optically thick.
 
-        It leaves the augmented block and contributes 2 B C / kappa to A.
+        Folding a thick group as the local source 2 B C / kappa removes the
+        upstream seeding by photons, which is the photoionization feedback.
         """
-        kappa = 1.0
-        mod = PhotonStub(n=2, kappa=(kappa,))
-        EN, p, T = 100.0, 1.0, 293.0
-        d_thick = 20.0 / kappa  # kappa*d = 20 > 12
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(EN, d_thick, mod, p, T)
-        assert n_gamma == 0 and n_aug == 2
-        assert list(mask) == [False]
-
-        A_local = mod.get_R(EN, p, T) @ np.linalg.inv(mod.get_V(EN, p, T))
-        B = mod.get_B(EN, p, T)
-        C = mod.get_C(EN, p, T) * (1.0 / np.diag(mod.get_V(EN, p, T)))[np.newaxis, :]
-        expected = A_local + 2.0 * np.outer(B[:, 0], C[0, :]) / kappa
-        assert A_aug == pytest.approx(expected)
-
-    def test_collapse_happens_exactly_at_the_threshold(self):
-        """
-        S3b: the switch is at kappa*d = 12, and only the thick group moves.
-
-        Below the threshold the group stays in the augmented block; above it,
-        it leaves the block and its contribution appears in the species block.
-        """
-        kappa = 1.0
-        mod = PhotonStub(n=2, kappa=(kappa,))
-        EN, p, T = 100.0, 1.0, 293.0
-
-        below, n_below, mask_below, _ = _build_A_aug(EN, 11.99 / kappa, mod, p, T)
-        above, n_above, mask_above, _ = _build_A_aug(EN, 12.01 / kappa, mod, p, T)
-
-        assert n_below == 1 and list(mask_below) == [True]
-        assert n_above == 0 and list(mask_above) == [False]
-        assert below.shape == (4, 4) and above.shape == (2, 2)
-
-        # The species block gains exactly the folded term 2 B C / kappa.
-        B = mod.get_B(EN, p, T)
-        C = mod.get_C(EN, p, T) * (1.0 / np.diag(mod.get_V(EN, p, T)))[np.newaxis, :]
-        assert above - below[:2, :2] == pytest.approx(
-            2.0 * np.outer(B[:, 0], C[0, :]) / kappa
-        )
-
-    def test_mixed_thin_and_thick_groups(self):
-        """S3c: only the thick groups collapse; the thin ones stay augmented."""
         mod = PhotonStub(n=2, kappa=(1.0, 1e4))
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(100.0, 1e-2, mod, 1.0, 293.0)
-        # kappa*d = 0.01 (thin, stays) and 100 (thick, collapses)
-        assert list(mask) == [True, False]
-        assert n_gamma == 1 and n_aug == 2 + 2 * 1
+        A_aug, n_gamma, mask, n_aug = _build_A_aug(100.0, kd, mod, 1.0, 293.0)
+        assert n_gamma == 2 and n_aug == 2 + 2 * 2
+        assert list(mask) == [True, True]
+        v_inv = 1.0 / np.diag(mod.get_V(100.0, 1.0, 293.0))
+        assert A_aug[:2, :2] == pytest.approx(
+            mod.get_R(100.0, 1.0, 293.0) * v_inv[np.newaxis, :]
+        )
 
     def test_lambda_shifts_A_and_kappa(self):
         """S4: A -> (R - lam I) V^-1 and kappa -> kappa + lam / c."""
@@ -269,12 +233,12 @@ class TestAdaptiveGrid:
 
 class TestParseDxSpec:
     def test_defaults(self):
-        assert parse_dx_spec(None) == (5, 200, 0.03)
-        assert parse_dx_spec([]) == (5, 200, 0.03)
+        assert parse_dx_spec(None) == (5, 1000, 1e-3)
+        assert parse_dx_spec([]) == (5, 1000, 1e-3)
 
     def test_partial_specs(self):
-        assert parse_dx_spec(["10"]) == (10, 200, 0.03)
-        assert parse_dx_spec(["10", "400"]) == (10, 400, 0.03)
+        assert parse_dx_spec(["10"]) == (10, 1000, 1e-3)
+        assert parse_dx_spec(["10", "400"]) == (10, 400, 1e-3)
         assert parse_dx_spec(["10", "400", "0.01"]) == (10, 400, 0.01)
 
     @pytest.mark.parametrize(

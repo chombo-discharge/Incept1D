@@ -76,7 +76,7 @@ Inputs
      - Geometry: ``uniform`` | ``sphere-plane R_mm`` | ``sphere-sphere R_mm``
        | ``fieldline FILE [UNIT]``.  See :ref:`Chap:FieldDistributions`.
    * - ``--dx N_min [N_max [tol]]``
-     - Adaptive integration grid (defaults 5, 200, 0.03).  See
+     - Adaptive integration grid (defaults 5, 1000, 10\ :sup:`-3`).  See
        :ref:`Chap:Numerics:Propagator`.
    * - ``--method``
      - Propagator: ``midpoint`` (default, adaptive) or ``magnus2``.

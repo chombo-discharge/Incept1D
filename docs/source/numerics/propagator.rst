@@ -88,12 +88,12 @@ the two-step estimate :math:`\bm{P}_\mathrm{fine} = \bm{P}_\mathrm{r}
    \frac{\|\bm{P}_\mathrm{fine} - \bm{P}_\mathrm{coarse}\|_F}
         {\|\bm{P}_\mathrm{fine}\|_F} \le \mathrm{tol}
 
-(``--dx`` third argument, default 0.03).  Otherwise each half is refined
+(``--dx`` third argument, default :math:`10^{-3}`).  Otherwise each half is refined
 recursively, re-using the already computed half-step propagators as the
 children's coarse estimates so that each level costs only the new
 half-steps.  The recursion depth is limited by
 :math:`\lfloor\log_2(N_{\max}/N_{\min})\rfloor` (``--dx`` second argument,
-default 200), so the total number of fine steps never exceeds
+default 1000), so the total number of fine steps never exceeds
 :math:`N_{\max}`.  Setting :math:`N_{\max} = N_{\min}` disables adaptation and
 gives a fixed uniform grid.
 

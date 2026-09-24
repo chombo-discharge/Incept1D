@@ -21,7 +21,7 @@ from incept1d.fields import FieldDistribution
 from incept1d.growth import find_lambda_for_voltage
 from incept1d.inception import compute_inception_curve, find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism
-from incept1d.solver import inception_det, midpoint_propagator
+from incept1d.solver import inception_det, riccati_criterion, midpoint_propagator
 
 pytestmark = pytest.mark.slow
 
@@ -30,7 +30,7 @@ UNIFORM = FieldDistribution("uniform")
 
 @pytest.fixture(scope="module")
 def det():
-    return functools.partial(inception_det, field_dist=UNIFORM)
+    return functools.partial(riccati_criterion, field_dist=UNIFORM)
 
 
 @pytest.fixture(scope="module")

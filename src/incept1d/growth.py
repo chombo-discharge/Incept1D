@@ -81,6 +81,7 @@ def find_lambda_for_voltage(
     propagator,
     lam_scale=None,
     positive_polarity=True,
+    criterion=None,
 ):
     """
     Find the growth rate λ* > 0 of the dominant mode at E/N = EN_ref.
@@ -118,6 +119,10 @@ def find_lambda_for_voltage(
     positive_polarity : bool
         True when the ξ = 0 electrode is the anode, as for
         :func:`incept1d.solver.inception_det`.
+    criterion : callable or None
+        :func:`incept1d.solver.inception_det` (the default, None) or
+        :func:`incept1d.solver.riccati_criterion`; both are positive below
+        the dominant root and negative above it here.
 
     Returns
     -------
@@ -128,8 +133,12 @@ def find_lambda_for_voltage(
         across λ* (a jump rather than a zero); or the reason for failure.
     """
 
+    if criterion is None:
+        criterion = inception_det
+    extra = {"resolve": True} if criterion is inception_det else {}
+
     def _det(lam_val):
-        return inception_det(
+        return criterion(
             EN_ref,
             pd,
             mod,
@@ -142,7 +151,7 @@ def find_lambda_for_voltage(
             lam=lam_val,
             positive_polarity=positive_polarity,
             propagator=propagator,
-            resolve=True,
+            **extra,
         )
 
     # det Q(0) > 0 means V ≤ V*: already sub-threshold at λ = 0.
@@ -218,6 +227,7 @@ def compute_lambda_curve(
     n_voltages,
     v_max_factor,
     positive_polarity=True,
+    criterion=None,
 ):
     """
     Sweep voltages from V* to v_max_factor·V* and find λ at each point.
@@ -245,6 +255,8 @@ def compute_lambda_curve(
     positive_polarity : bool
         True when the ξ = 0 electrode is the anode.  *EN_star* must be the
         inception field for the same polarity.
+    criterion : callable
+        Passed on to :func:`find_lambda_for_voltage`.
 
     Returns
     -------
@@ -283,6 +295,7 @@ def compute_lambda_curve(
                 propagator,
                 lam_scale=nu_ion,
                 positive_polarity=positive_polarity,
+                criterion=criterion,
             )
 
         tau_ns = (
