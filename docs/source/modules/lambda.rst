@@ -87,7 +87,7 @@ Example
 
 .. code-block:: bash
 
-   incept1d growth mechanisms/air/air_pancheshnyi.py --pd 10 --p 1 --n-voltages 30 --v-max-factor 1.5
+   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.py --pd 10 --p 1 --n-voltages 30 --v-max-factor 1.5
 
 Outputs
 -------

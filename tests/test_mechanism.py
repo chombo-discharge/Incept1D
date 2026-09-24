@@ -10,7 +10,12 @@ import os
 import numpy as np
 import pytest
 
-from incept1d.mechanism import REQUIRED_ATTRS, load_mechanism, read_json_configs
+from incept1d.mechanism import (
+    REQUIRED_ATTRS,
+    load_helper,
+    load_mechanism,
+    read_json_configs,
+)
 
 
 class TestLoadMechanism:
@@ -170,3 +175,25 @@ class TestReadJsonConfigs:
         p = self._write(tmp_path, "d.json", {"label": "A"})
         out = read_json_configs([p])
         assert out[0]["_cfg_dir"] == os.path.dirname(os.path.abspath(p))
+
+
+class TestLoadHelper:
+    def test_runs_the_file_once(self, tmp_path):
+        """M10: shared code is executed once, however often it is asked for."""
+        helper = tmp_path / "shared.py"
+        helper.write_text("import itertools\nCOUNT = next(itertools.count())\n")
+        first = load_helper(str(helper))
+        assert load_helper(str(helper)) is first
+
+    def test_relative_spellings_are_one_file(self, tmp_path):
+        """M11: '<dir>/../shared.py' is the same helper as 'shared.py'."""
+        (tmp_path / "sub").mkdir()
+        helper = tmp_path / "shared.py"
+        helper.write_text("VALUE = 42\n")
+        via_parent = load_helper(os.path.join(tmp_path, "sub", "..", "shared.py"))
+        assert via_parent is load_helper(str(helper))
+        assert via_parent.VALUE == 42
+
+    def test_missing_file(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            load_helper(str(tmp_path / "nope.py"))

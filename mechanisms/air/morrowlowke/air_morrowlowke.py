@@ -45,13 +45,13 @@ Species index
 """
 
 import os
-import sys
 import argparse
 import math
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+from incept1d.mechanism import load_helper
 from incept1d.constants import kB
 from incept1d.reactions import (
     compile_reactions as _compile_reactions,
@@ -60,6 +60,8 @@ from incept1d.reactions import (
 
 # Directory of this file: the Zheleznyak helper module is resolved relative to it.
 _HERE = os.path.dirname(os.path.abspath(__file__))
+# Shared by the air mechanisms: the photoionization fit.
+_AIR = os.path.dirname(_HERE)
 
 # ---------------------------------------------------------------------------
 # Photoionization constants — identical to air_pancheshnyi.py
@@ -100,9 +102,7 @@ def init_photoionization(ngroups=3, cone_angle_deg=45.0):
         Half-opening angle of the emission cone in degrees (default 45.0).
     """
     global _N_GAMMA, _kappa_SI, _g_groups, _CONE_FACTOR
-    if _HERE not in sys.path:
-        sys.path.insert(0, _HERE)
-    from zheleznyak import fit_twostream
+    fit_twostream = load_helper(os.path.join(_AIR, "zheleznyak.py")).fit_twostream
 
     kappa, g, _ = fit_twostream(ngroups)
     _N_GAMMA = ngroups

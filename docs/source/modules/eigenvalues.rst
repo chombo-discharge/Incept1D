@@ -46,10 +46,10 @@ Examples
 .. code-block:: bash
 
    # All eigenvalue tracks for the baseline and the no-detachment variant
-   incept1d eigenvalues mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json --EN-lo 20 --EN-hi 300
+   incept1d eigenvalues mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json --EN-lo 20 --EN-hi 300
 
    # Leading eigenvalue vs E/N for five pressures between 1 mbar and 10 bar
-   incept1d eigenvalues mechanisms/air/air_pancheshnyi.py --pressure-scan --p-min 1e-3 --p-max 10 --p-num 5
+   incept1d eigenvalues mechanisms/air/pancheshnyi/air_pancheshnyi.py --pressure-scan --p-min 1e-3 --p-max 10 --p-num 5
 
 .. note::
 

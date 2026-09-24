@@ -28,22 +28,24 @@ ionisation exceeds attachment).
 
 Species index
 -------------
-0  e      electron
-1  N2+    molecular nitrogen cation
-2  O2+    molecular oxygen cation
-3  O-     atomic oxygen anion
-4  O2-    molecular oxygen anion
-5  O3-    ozone anion
+0  e          electron
+1  N2+        molecular nitrogen cation
+2  O2+        molecular oxygen cation
+3  O-         atomic oxygen anion
+4  O2-(exc)   vibrationally excited molecular oxygen anion
+5  O2-        molecular oxygen anion
+6  O3-*       excited ozone anion
+7  O3-        ozone anion
 """
 
 import os
-import sys
 import argparse
 
 import numpy as np
 import math
 import matplotlib.pyplot as plt
 
+from incept1d.mechanism import load_helper
 from incept1d.constants import kB, Q
 from incept1d.reactions import (
     compile_reactions as _compile_reactions,
@@ -53,6 +55,9 @@ from incept1d.reactions import (
 # Directory of this file: data tables (BOLSIG+ output, mobilities) and the
 # Zheleznyak helper module are resolved relative to it.
 _HERE = os.path.dirname(os.path.abspath(__file__))
+# Shared by the air mechanisms: the photoionization fit, and the LXCat data.
+_AIR = os.path.dirname(_HERE)
+_LXCAT = os.path.join(_AIR, "lxcat")
 
 # ---------------------------------------------------------------------------
 # Photoionization constants — two-stream model (Zheleznyak absorption curve)
@@ -64,7 +69,7 @@ _XI_EMIT = globals().get("_XI_EMIT", 0.1)  # Photoemission efficiency ξ
 _PQ_BAR = globals().get("_PQ_BAR", 30.0 / 750.064)  # Quenching pressure: 30 Torr → bar
 
 # Ion secondary-emission coefficients — configurable via globals().get() injection
-_GAMMA0 = globals().get("_GAMMA0", 1e-3)  # base SEE yield (N2+, O2+)
+_GAMMA0 = globals().get("_GAMMA0", 1e-6)  # base SEE yield (N2+, O2+)
 _GAMMA1 = globals().get("_GAMMA1", 0.0)  # exponential prefactor
 _EREF = globals().get("_EREF", 170e7)  # reference field [V/m]
 _BETA = globals().get("_BETA", 1.0)  # field scaling exponent
@@ -94,9 +99,7 @@ def init_photoionization(ngroups=3, cone_angle_deg=45.0):
         Translated to ΔΩ/(4π) = (1 − cos θ) / 2.
     """
     global _N_GAMMA, _kappa_SI, _g_groups, _CONE_FACTOR
-    if _HERE not in sys.path:
-        sys.path.insert(0, _HERE)
-    from zheleznyak import fit_twostream
+    fit_twostream = load_helper(os.path.join(_AIR, "zheleznyak.py")).fit_twostream
 
     kappa, g, _ = fit_twostream(ngroups)
     _N_GAMMA = ngroups
@@ -112,22 +115,23 @@ init_photoionization()
 # Gas composition
 # ---------------------------------------------------------------------------
 
-xO2 = 0.2  # Mole fraction of O2
-xN2 = 0.8  # Mole fraction of N2
+xO2 = 0.21  # Mole fraction of O2
+xN2 = 0.79  # Mole fraction of N2
 
 # ---------------------------------------------------------------------------
 # Ion transport
 # ---------------------------------------------------------------------------
 
 _N_1bar = 1e5 / (kB * 300.0)  # Neutral density at 1 bar, 300 K [m^-3]
-ion_muN = 5e21  # N2+, O2+ reduced mobility mu*N [m^-1 V^-1 s^-1]
+ion_muN = 2e-4 * _N_1bar  # N2+, O2+ reduced mobility mu*N [m^-1 V^-1 s^-1]
 _muN_Om = 1.2e22  # O-           reduced mobility mu*N [m^-1 V^-1 s^-1]
+m_O3 = 48 * 1.66053906660e-27  # Ozone (O3) mass [kg]
 
 # ---------------------------------------------------------------------------
 # Species list and electron index
 # ---------------------------------------------------------------------------
 
-SPECIES = ["e", "N2+", "O2+", "O-", "O2-", "O3-"]
+SPECIES = ["e", "N2+", "O2+", "O-", "O2-(exc)", "O2-", "O3-*", "O3-"]
 ELECTRON_INDEX = 0
 _N_SPECIES = len(SPECIES)
 
@@ -272,7 +276,7 @@ def _load_lxcat_mobility(path):
 # Cross-section and transport data tables (loaded once at import time)
 # ---------------------------------------------------------------------------
 
-BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_HERE, "lisbon.txt"))
+BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_LXCAT, "phelps.txt"))
 
 (
     energy_table,
@@ -283,8 +287,8 @@ BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_HERE, "lisbon.txt"))
     o2dissociate_table,
 ) = _load_bolsig(BOLSIG_FILE)
 
-_o2m_mobility_table = _load_lxcat_mobility(os.path.join(_HERE, "o2m_mobility.txt"))
-_o3m_mobility_table = _load_lxcat_mobility(os.path.join(_HERE, "o3m_mobility.txt"))
+_o2m_mobility_table = _load_lxcat_mobility(os.path.join(_LXCAT, "o2m_mobility.txt"))
+_o3m_mobility_table = _load_lxcat_mobility(os.path.join(_LXCAT, "o3m_mobility.txt"))
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +384,7 @@ def ElectronMobility(EN):
 
 def O2mMobility(EN):
     """
-    Return the reduced O2- mobility mu * N.
+    Return the reduced O2- (and O2-(exc)) mobility mu * N.
 
     Interpolated from o2m_mobility.txt (Viehland/LXCat).  Queries outside
     the table range [5, 250] Td are clamped to the nearest boundary value.
@@ -400,7 +404,7 @@ def O2mMobility(EN):
 
 def O3mMobility(EN):
     """
-    Return the reduced O3- mobility mu * N.
+    Return the reduced O3- (and O3-*) mobility mu * N.
 
     Interpolated from o3m_mobility.txt (Viehland/LXCat).  Queries outside
     the table range [5, 200] Td are clamped to the nearest boundary value.
@@ -438,7 +442,7 @@ def ElectronDiffusion(EN):
 
 
 # ---------------------------------------------------------------------------
-# Rate coefficient functions k1 – k8
+# Rate coefficient functions k1 – k12
 # ---------------------------------------------------------------------------
 
 
@@ -508,7 +512,7 @@ def k3(EN):
     return np.interp(EN, o2dissociate_table[:, 0], o2dissociate_table[:, 1])
 
 
-def k4(EN, T=293.0):
+def k45(EN, T=293.0):
     """
     Three-body rate coefficient for O2- formation.
 
@@ -540,30 +544,81 @@ def k4(EN, T=293.0):
     )
 
 
-def k5(EN):
+def k4(EN, T=293.0):
     """
-    Rate coefficient for collisional detachment from O2-.
+    Rate coefficient for electron attachment forming vibrationally excited O2-.
 
-    Reaction: O2- + O2 -> O2 + O2 + e
+    Reaction: e + O2 -> O2-(exc)
+
+    Reverse-engineered from the Kossyi three-body rate k45 using the
+    quasi-steady-state balance between O2-(exc) autodetachment (k5) and
+    collisional de-excitation (k6):  k4 = k45 * k5 / k6.  Multiply by
+    [O2] = xO2 * N.
 
     Parameters
     ----------
     EN : float
         Reduced electric field in Townsend.
+    T : float
+        Gas temperature in Kelvin.  Default 293.0 K.
 
     Returns
     -------
     float
         Rate coefficient in m^3 s^-1.
     """
-    return 1.24e-17 * math.exp(-pow(259 / (14.6 + EN), 2))
+    return k45(EN, T) * k5(EN) / k6(EN)
+
+
+def k5(EN):
+    """
+    Autodetachment rate from O2-(exc).
+
+    Reaction: O2-(exc) -> e + O2
+
+    This is a unimolecular rate (not a rate coefficient).  It is constant
+    and independent of E/N.  The EN parameter is accepted for interface
+    consistency only.
+
+    Parameters
+    ----------
+    EN : float
+        Reduced electric field in Townsend (unused).
+
+    Returns
+    -------
+    float
+        Autodetachment rate in s^-1.
+    """
+    return 1e10
 
 
 def k6(EN):
     """
-    Rate coefficient for associative detachment from O- by N2.
+    Rate coefficient for collisional de-excitation of O2-(exc) by O2.
 
-    Reaction: O- + N2 -> e + N2O
+    Reaction: O2-(exc) + O2 -> O2- + O2
+
+    Constant and independent of E/N.  Multiply by [O2] = xO2 * N.
+
+    Parameters
+    ----------
+    EN : float
+        Reduced electric field in Townsend (unused).
+
+    Returns
+    -------
+    float
+        Rate coefficient in m^3 s^-1.
+    """
+    return 1e-15
+
+
+def k7(EN):
+    """
+    Rate coefficient for collisional detachment from O2-.
+
+    Reaction: O2- + M -> O2 + O2 + e
 
     Parameters
     ----------
@@ -575,13 +630,10 @@ def k6(EN):
     float
         Rate coefficient in m^3 s^-1.
     """
-    d = -1.36
-    k0 = 3.98e-17
-    EA = 176
-    return k0 * pow((EN / 43), 2 * d) * math.exp(-pow(EA / EN, 2))
+    return 1.24e-17 * math.exp(-pow(179.0 / (8.8 + EN), 2))
 
 
-def k7(EN):
+def k8(EN):
     """
     Rate coefficient for ion conversion from O- to O2-.
 
@@ -602,11 +654,16 @@ def k7(EN):
     return 6.96e-17 * math.exp(-pow(198.0 / (5.6 + EN), 2))
 
 
-def k8(EN):
+def k9(EN):
     """
-    Three-body rate coefficient for ozone-ion formation from O-.
+    Rate coefficient for excited ozone-ion formation from O-.
 
-    Reaction: O- + O2 + M -> O3- + O2
+    Reaction: O- + O2 -> O3-*
+
+    The three-body association constant 1.1e-42 m^6 s^-1 is pre-multiplied
+    by k10/k11 to account for the branching between autodetachment and
+    collisional stabilisation, folding the three-body dependence into an
+    effective two-body rate.  Multiply by [O2] = xO2 * N.
 
     Parameters
     ----------
@@ -616,9 +673,81 @@ def k8(EN):
     Returns
     -------
     float
-        Three-body rate coefficient in m^6 s^-1.
+        Effective two-body rate coefficient in m^3 s^-1.
     """
-    return 1.1e-42 * math.exp(-pow(EN / 65.0, 2))
+    return 1.1e-42 * math.exp(-pow(EN / 65.0, 2)) * k10(EN) / k11(EN)
+
+
+def k10(EN):
+    """
+    Autodetachment rate from O3-*.
+
+    Reaction: O3-* -> O- + O2
+
+    Unimolecular rate, constant and independent of E/N.
+
+    Parameters
+    ----------
+    EN : float
+        Reduced electric field in Townsend (unused).
+
+    Returns
+    -------
+    float
+        Autodetachment rate in s^-1.
+    """
+    return 1e10
+
+
+def k11(EN):
+    """
+    Rate coefficient for collisional stabilisation of O3-*.
+
+    Reaction: O3-* + M -> O3- + M*
+
+    Constant and independent of E/N.  Multiply by the total neutral density N.
+
+    Parameters
+    ----------
+    EN : float
+        Reduced electric field in Townsend (unused).
+
+    Returns
+    -------
+    float
+        Rate coefficient in m^3 s^-1.
+    """
+    return 1e-15
+
+
+def k12(EN, T=293.0):
+    """
+    Rate coefficient for ozone-ion detachment by O2.
+
+    Reaction: O3- + O2 -> O- + O2
+
+    The rate depends on temperature through the mean ion kinetic energy,
+    which includes both thermal (3/2 kB T) and directed drift contributions
+    (pi/4 * m_O3 * u_drift^2).  Multiply by [O2] = xO2 * N.
+
+    Parameters
+    ----------
+    EN : float
+        Reduced electric field in Townsend.
+    T : float
+        Gas temperature in Kelvin.  Default 293.0 K.
+
+    Returns
+    -------
+    float
+        Rate coefficient in m^3 s^-1.
+    """
+    u = O3mMobility(EN) * EN * 1e-21  # O3- drift speed [m/s]
+    # Mean ion energy [eV].  Kept for the disabled rate expression below.
+    eps = (1.5 * kB * T + 0.25 * math.pi * m_O3 * u**2) / Q  # noqa: F841
+
+    #    return 1E-18 * math.exp(-1.5 / eps)
+    return 0.0
 
 
 def alpha(EN, p=1.0, T=293.0):
@@ -652,8 +781,10 @@ def eta(EN, p=1.0, T=293.0):
     """
     Return the effective Townsend attachment coefficient eta.
 
-    Includes dissociative attachment (K3) and the direct three-body attachment
-    channel (K4).
+    Treats O2-(exc) as a permanent electron sink (autodetachment ignored),
+    so the full K4 rate contributes to electron loss alongside K3.  This
+    gives the net electron loss rate per electron divided by the drift
+    velocity, consistent with disabling the O2-(exc) autodetachment channel (k5).
 
     Parameters
     ----------
@@ -671,7 +802,7 @@ def eta(EN, p=1.0, T=293.0):
     """
     N = _make_N(p, T)
     K3 = k3(EN) * xO2 * N
-    K4 = k4(EN, T) * (xO2 * N) ** 2
+    K4 = k4(EN, T) * xO2 * N
     return (K3 + K4) / (ElectronMobility(EN) * EN * 1e-21)
 
 
@@ -683,11 +814,15 @@ REACTIONS = [
     ("e + N2 -> 2e + N2+", lambda EN, p, T: k1(EN) * xN2 * _make_N(p, T)),
     ("e + O2 -> 2e + O2+", lambda EN, p, T: k2(EN) * xO2 * _make_N(p, T)),
     ("e + O2 -> O- + O", lambda EN, p, T: k3(EN) * xO2 * _make_N(p, T)),
-    ("e + 2O2 -> O2- + O2", lambda EN, p, T: k4(EN, T) * (xO2 * _make_N(p, T)) ** 2),
-    ("O2- + O2 -> e + O2 + O2", lambda EN, p, T: k5(EN) * xO2 * _make_N(p, T)),
-    ("O- + N2 -> e + N2O", lambda EN, p, T: k6(EN) * xN2 * _make_N(p, T)),
-    ("O- + O2 -> O + O2-", lambda EN, p, T: k7(EN) * xO2 * _make_N(p, T)),
-    ("O- + O2 + M -> O3- + M", lambda EN, p, T: k8(EN) * xO2 * _make_N(p, T) ** 2),
+    ("e + O2 -> O2-(exc)", lambda EN, p, T: k4(EN, T) * xO2 * _make_N(p, T)),
+    ("O2-(exc) -> e + O2", lambda EN, p, T: k5(EN)),
+    ("O2-(exc) + O2 -> O2- + O2", lambda EN, p, T: k6(EN) * xO2 * _make_N(p, T)),
+    ("O2- + O2 -> e + 2O2", lambda EN, p, T: k7(EN) * _make_N(p, T)),
+    ("O- + O2 -> O + O2-", lambda EN, p, T: k8(EN) * xO2 * _make_N(p, T)),
+    ("O- + O2 -> O3-*", lambda EN, p, T: k9(EN) * xO2 * _make_N(p, T)),
+    ("O3-* -> O- + O2", lambda EN, p, T: k10(EN)),
+    ("O3-* + M -> O3- + M", lambda EN, p, T: k11(EN) * _make_N(p, T)),
+    ("O3- + O2 -> O- + 2O2", lambda EN, p, T: k12(EN, T) * xO2 * _make_N(p, T)),
 ]
 
 _COMPILED_REACTIONS = _compile_reactions(REACTIONS, SPECIES)
@@ -696,7 +831,7 @@ _N_SPECIES_INT = len(SPECIES)
 
 def get_R(EN, p=1.0, T=293.0, multipliers=None):
     """
-    Build and return the 6x6 reaction matrix R.
+    Build and return the 8x8 reaction matrix R.
 
     R[i, j] is the rate [s^-1] at which one carrier of species j produces
     (positive) or destroys (negative, diagonal) one particle of species i.
@@ -718,7 +853,7 @@ def get_R(EN, p=1.0, T=293.0, multipliers=None):
 
     Returns
     -------
-    numpy.ndarray, shape (6, 6)
+    numpy.ndarray, shape (8, 8)
         Reaction matrix R with entries in s^-1.
     """
     return _build_R_fast(_COMPILED_REACTIONS, _N_SPECIES_INT, EN, p, T, multipliers)
@@ -741,10 +876,10 @@ def get_V(EN, p=1.0, T=293.0):
 
     The electron reduced mobility is field-dependent (BOLSIG+ table).  Ion
     reduced mobilities are species-specific:
-        N2+, O2+  → ion_muN (constant)
-        O-        → _muN_Om (constant)
-        O2-       → O2mMobility(EN) (interpolated from Viehland/LXCat)
-        O3-       → O3mMobility(EN) (interpolated from Viehland/LXCat)
+        N2+, O2+      → ion_muN (constant)
+        O-            → _muN_Om (constant)
+        O2-(exc), O2- → O2mMobility(EN) (interpolated from Viehland/LXCat)
+        O3-*, O3-     → O3mMobility(EN) (interpolated from Viehland/LXCat)
     p and T are accepted for interface consistency but do not affect V
     in this implementation (mu*N is pressure-independent).
 
@@ -759,18 +894,20 @@ def get_V(EN, p=1.0, T=293.0):
 
     Returns
     -------
-    numpy.ndarray, shape (6, 6)
+    numpy.ndarray, shape (8, 8)
         Diagonal drift-velocity matrix V in m/s.
     """
-    Z_diag = np.array([-1.0, +1.0, +1.0, -1.0, -1.0, -1.0])
+    Z_diag = np.array([-1.0, +1.0, +1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
     muN = np.array(
         [
             ElectronMobility(EN),  # 0: e
             ion_muN,  # 1: N2+
             ion_muN,  # 2: O2+
             _muN_Om,  # 3: O-
-            O2mMobility(EN),  # 4: O2-
-            O3mMobility(EN),  # 5: O3-
+            O2mMobility(EN),  # 4: O2-(exc)
+            O2mMobility(EN),  # 5: O2-
+            O3mMobility(EN),  # 6: O3-*
+            O3mMobility(EN),  # 7: O3-
         ]
     )
     return np.diag(-Z_diag * muN * EN * 1e-21)
@@ -790,7 +927,7 @@ def get_Pi_e():
 
     Returns
     -------
-    numpy.ndarray, shape (1, 6)
+    numpy.ndarray, shape (1, 8)
         One-hot row matrix selecting the electron species.
     """
     M = np.zeros((1, _N_SPECIES))
@@ -807,7 +944,7 @@ def get_Pi_plus():
 
     Returns
     -------
-    numpy.ndarray, shape (2, 6)
+    numpy.ndarray, shape (2, 8)
         Two one-hot rows, one per positive-ion species.
     """
     M = np.zeros((2, _N_SPECIES))
@@ -820,16 +957,16 @@ def get_Pi_minus():
     """
     Return the negative-ion row-selection matrix Π_-.
 
-    Selects O- (3), O2- (4), O3- (5).
+    Selects O- (3), O2-(exc) (4), O2- (5), O3-* (6), O3- (7).
     Used to impose the zero negative-ion flux condition at the cathode.
 
     Returns
     -------
-    numpy.ndarray, shape (3, 6)
-        Three one-hot rows, one per negative-ion species.
+    numpy.ndarray, shape (5, 8)
+        Five one-hot rows, one per negative-ion species.
     """
-    M = np.zeros((3, _N_SPECIES))
-    for k, idx in enumerate([3, 4, 5]):
+    M = np.zeros((5, _N_SPECIES))
+    for k, idx in enumerate([3, 4, 5, 6, 7]):
         M[k, idx] = 1.0
     return M
 
@@ -873,9 +1010,7 @@ def get_gamma_plus(EN, p, T):
 
 def get_gamma_plus_with(EN, p, T, gamma0=None, gamma1=None, eref=None, beta=None):
     """Like get_gamma_plus but with optional per-call overrides of the four
-    gamma parameters.  None → use the module-level defaults (_GAMMA0 etc.).
-    Used by the inception solver to apply polarity-specific SEE overrides
-    without reloading the module."""
+    gamma parameters.  None → use the module-level defaults (_GAMMA0 etc.)."""
     g0 = gamma0 if gamma0 is not None else _GAMMA0
     g1 = gamma1 if gamma1 is not None else _GAMMA1
     er = eref if eref is not None else _EREF
@@ -1086,11 +1221,15 @@ if __name__ == "__main__":
         (1, 0): r"$K_1$: e + N$_2$ $\to$ 2e + N$_2^+$",
         (2, 0): r"$K_2$: e + O$_2$ $\to$ 2e + O$_2^+$",
         (3, 0): r"$K_3$: e + O$_2$ $\to$ O$^-$ + O",
-        (4, 0): r"$K_4$: e + 2O$_2$ $\to$ O$_2^-$ + O$_2$",
-        (0, 4): r"$K_5$: O$_2^-$ + O$_2$ $\to$ e + 2O$_2$",
-        (0, 3): r"$K_6$: O$^-$ + N$_2$ $\to$ e + N$_2$O",
-        (4, 3): r"$K_7$: O$^-$ + O$_2$ $\to$ O + O$_2^-$",
-        (5, 3): r"$K_8$: O$^-$ + 2O$_2$ $\to$ O$_3^-$ + O$_2$",
+        (4, 0): r"$K_4$: e + O$_2$ $\to$ O$_2^-$(exc)",
+        (0, 4): r"$K_5$: O$_2^-$(exc) $\to$ e + O$_2$",
+        (5, 4): r"$K_6$: O$_2^-$(exc) + O$_2$ $\to$ O$_2^-$ + O$_2$",
+        (0, 5): r"$K_7$: O$_2^-$ + O$_2$ $\to$ e + 2O$_2$",
+        (5, 3): r"$K_8$: O$^-$ + O$_2$ $\to$ O + O$_2^-$",
+        (6, 3): r"$K_9$: O$^-$ + O$_2$ $\to$ O$_3^{-*}$",
+        (3, 6): r"$K_{10}$: O$_3^{-*}$ $\to$ O$^-$ + O$_2$",
+        (7, 6): r"$K_{11}$: O$_3^{-*}$ + M $\to$ O$_3^-$ + M",
+        (3, 7): r"$K_{12}$: O$_3^-$ + O$_2$ $\to$ O$^-$ + O$_2$",
     }
 
     numPts = 500
@@ -1113,17 +1252,16 @@ if __name__ == "__main__":
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10))
 
-    for (i, j), vals in sorted(offdiag_data.items()):
-        nonzero = vals > 0
-        if np.any(nonzero):
-            label = _RATE_LABELS.get((i, j), f"R[{i},{j}]")
-            ax1.loglog(EN_arr[nonzero], vals[nonzero], label=label)
+    for (i, j), label in _RATE_LABELS.items():
+        vals = offdiag_data.get((i, j))
+        if vals is not None:
+            nonzero = vals > 0
+            if np.any(nonzero):
+                ax1.loglog(EN_arr[nonzero], vals[nonzero], label=label)
 
     ax1.set_xlabel("E/N (Td)")
     ax1.set_ylabel("Rate (s$^{-1}$)")
-    ax1.set_title(
-        f"Reaction rates — air_pancheshnyi.py,  p = {p_val} bar,  T = {T_val} K"
-    )
+    ax1.set_title(f"Reaction rates — air_2body.py,  p = {p_val} bar,  T = {T_val} K")
     ax1.legend(loc="best", fontsize=8, ncol=2)
     ax1.grid(True, which="both", ls="--", alpha=0.4)
     ax1.set_ylim(bottom=1e-6)
@@ -1160,29 +1298,36 @@ if __name__ == "__main__":
         # Evaluate rates on a denser grid (10-100 Td) for the data file
         numPts_file = 1500
         EN_file = np.logspace(1, 2, numPts_file)
-        O2N_f = xO2 * N_val
 
         K1_f = np.array([k1(en) * xN2 * N_val for en in EN_file])
-        K2_f = np.array([k2(en) * O2N_f for en in EN_file])
-        K3_f = np.array([k3(en) * O2N_f for en in EN_file])
-        K4_f = np.array([k4(en, T_val) * O2N_f**2 for en in EN_file])
-        K5_f = np.array([k5(en) * O2N_f for en in EN_file])
-        K6_f = np.array([k6(en) * xN2 * N_val for en in EN_file])
-        K7_f = np.array([k7(en) * O2N_f for en in EN_file])
-        K8_f = np.array([k8(en) * O2N_f**2 for en in EN_file])
+        K2_f = np.array([k2(en) * xO2 * N_val for en in EN_file])
+        K3_f = np.array([k3(en) * xO2 * N_val for en in EN_file])
+        K4_f = np.array([k4(en, T_val) * xO2 * N_val for en in EN_file])
+        K5_f = np.array([k5(en) for en in EN_file])
+        K6_f = np.array([k6(en) * xO2 * N_val for en in EN_file])
+        K7_f = np.array([k7(en) * xO2 * N_val for en in EN_file])
+        K8_f = np.array([k8(en) * xO2 * N_val for en in EN_file])
+        K9_f = np.array([k9(en) * xO2 * N_val for en in EN_file])
+        K10_f = np.array([k10(en) for en in EN_file])
+        K11_f = np.array([k11(en) * N_val for en in EN_file])
+        K12_f = np.array([k12(en, T_val) * xO2 * N_val for en in EN_file])
         header = (
             f"Transport data for N2/O2 air (80% N2, 20% O2) "
             f"at {p_val} bar, {T_val} K\n"
             "-------------------------------------------------------------------\n"
-            "Column 1:  E/N  (Td)\n"
-            "Column 2:  K1  = k1*[N2]      (s^-1)  e + N2 -> 2e + N2+\n"
-            "Column 3:  K2  = k2*[O2]      (s^-1)  e + O2 -> 2e + O2+\n"
-            "Column 4:  K3  = k3*[O2]      (s^-1)  e + O2 -> O- + O\n"
-            "Column 5:  K4  = k4*[O2]^2    (s^-1)  e + O2 + O2 -> O2- + O2\n"
-            "Column 6:  K5  = k5*[O2]      (s^-1)  O2- + O2 -> e + 2 O2\n"
-            "Column 7:  K6  = k6*[N2]      (s^-1)  O- + N2 -> e + N2O\n"
-            "Column 8:  K7  = k7*[O2]      (s^-1)  O- + O2 -> O + O2-\n"
-            "Column 9:  K8  = k8*[O2]^2    (s^-1)  O- + O2 + O2 -> O3- + O2\n"
+            "Column  1: E/N (Td)\n"
+            "Column  2: K1  = k1*[N2]   (s^-1)  e + N2 -> 2e + N2+\n"
+            "Column  3: K2  = k2*[O2]   (s^-1)  e + O2 -> 2e + O2+\n"
+            "Column  4: K3  = k3*[O2]   (s^-1)  e + O2 -> O- + O\n"
+            "Column  5: K4  = k4*[O2]   (s^-1)  e + O2 -> O2-(exc)\n"
+            "Column  6: K5  = k5        (s^-1)  O2-(exc) -> e + O2\n"
+            "Column  7: K6  = k6*[O2]   (s^-1)  O2-(exc) + O2 -> O2- + O2\n"
+            "Column  8: K7  = k7*[O2]   (s^-1)  O2- + O2 -> e + 2 O2\n"
+            "Column  9: K8  = k8*[O2]   (s^-1)  O- + O2 -> O + O2-\n"
+            "Column 10: K9  = k9*[O2]   (s^-1)  O- + O2 -> O3-*\n"
+            "Column 11: K10 = k10       (s^-1)  O3-* -> O- + O2\n"
+            "Column 12: K11 = k11*N     (s^-1)  O3-* + M -> O3- + M*\n"
+            "Column 13: K12 = k12*[O2]  (s^-1)  O3- + O2 -> O- + O2\n"
             "-------------------------------------------------------------------\n"
         )
         np.savetxt(
@@ -1194,10 +1339,14 @@ if __name__ == "__main__":
                     K2_f / p_val,
                     K3_f / p_val,
                     K4_f / p_val,
-                    K5_f / p_val,
+                    K5_f,
                     K6_f / p_val,
                     K7_f / p_val,
                     K8_f / p_val,
+                    K9_f / p_val,
+                    K10_f,
+                    K11_f / p_val,
+                    K12_f / p_val,
                 )
             ),
             header=header,

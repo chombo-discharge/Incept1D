@@ -11,7 +11,7 @@ This example computes the inception curves of dry air for the standard
 diameters with `--field sphere-sphere R` (radius in mm). The pressure is
 held at 1 bar and the gap spacing is swept, so `pd` in bar·mm equals the
 spacing in mm. The full air scheme and a no-detachment variant are both
-computed (`mechanisms/air/nodetachment.json` holds the two configurations),
+computed (`mechanisms/air/pancheshnyi/nodetachment.json` holds the two configurations),
 and the streamer criterion `∫α dx = 18` is solved alongside for comparison.
 
 ## Run it
@@ -19,7 +19,7 @@ and the streamer criterion `∫α dx = 18` is solved alongside for comparison.
 From the repository root, for the largest sphere, `D = 200` cm:
 
 ```bash
-incept1d pdiv mechanisms/air/air_pancheshnyi.py mechanisms/air/nodetachment.json \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
     --pd-min 1 --pd-max 1000 --pd-num 100 \
     --field sphere-sphere 1000 \
     --streamer-criterion 18 \

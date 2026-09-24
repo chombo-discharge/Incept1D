@@ -33,7 +33,7 @@ form for alpha, constant eta and delta) rather than table lookups, so the
 mechanism loads instantly and the closed form stays exact.
 
 Species order: ``["e", "M+", "M-"]``; the coordinate convention is the one
-documented in ``mechanisms/air/air_pancheshnyi.py`` (cathode at x = 0, anode at
+documented in ``mechanisms/air/pancheshnyi/air_pancheshnyi.py`` (cathode at x = 0, anode at
 x = d, electrons and negative ions drift toward +x, positive ions toward -x).
 """
 

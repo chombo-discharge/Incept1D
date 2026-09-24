@@ -84,7 +84,7 @@ so :math:`\theta_\mathrm{cone} = 45^\circ` (the default) gives
 :math:`\Delta\Omega/(4\pi) \approx 0.146`, :math:`90^\circ` gives
 :math:`1/2` (a full hemisphere), and :math:`0^\circ` switches photon
 feedback off entirely.  It is exposed as ``cone_angle`` in the JSON
-configuration (:ref:`Chap:Configuration`); ``mechanisms/air/see.json`` contains a
+configuration (:ref:`Chap:Configuration`); ``mechanisms/air/pancheshnyi/see.json`` contains a
 ready-made sensitivity sweep over it.
 
 After the eigenvalue substitution :math:`\vec{\Psi}(x,t) \to

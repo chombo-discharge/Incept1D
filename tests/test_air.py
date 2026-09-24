@@ -35,7 +35,7 @@ def det():
 
 @pytest.fixture(scope="module")
 def paschen_air(air_path):
-    """Air reduced to the textbook limit by mechanisms/air/paschen.json."""
+    """Air reduced to the textbook limit by mechanisms/air/pancheshnyi/paschen.json."""
     import json
     import os
 

@@ -2,7 +2,7 @@
   "configurations": [
     {
       "label": "Baseline",
-      "cross_sections": "phelps.txt",
+      "cross_sections": "../lxcat/phelps.txt",
       "ngroups": 3,
       "cone_angle": 45.0,
       "xi_photo": 1.0,

@@ -24,7 +24,7 @@ If this PR changes the physics or the numerics (rate coefficients, boundary
 conditions, the augmented matrix, propagators, root finding):
 
 - [ ] I have cited the corresponding equation label or table in `docs/source/theory/` in the commit message or docstring, and updated the theory page if the model itself changed.
-- [ ] I have checked the closed-form limit with `mechanisms/air/paschen.json` and it still reproduces the standard Paschen law.
+- [ ] I have checked the closed-form limit with `mechanisms/air/pancheshnyi/paschen.json` and it still reproduces the standard Paschen law.
 - [ ] I have included before/after inception curves (or equivalent evidence) for a case the change is expected to affect.
 - [ ] I have confirmed that cases the change is *not* expected to affect are unchanged.
 

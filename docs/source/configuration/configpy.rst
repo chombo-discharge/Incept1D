@@ -48,8 +48,10 @@ Where the file lives
 :func:`incept1d.mechanism.load_mechanism` looks for a file called exactly
 ``config.py`` in the same directory as the mechanism module, and expects it to
 define a class called ``Config``.  It is executed, not imported, so it must
-not rely on being part of a package.  One ``config.py`` serves every mechanism
-in its directory.
+not rely on being part of a package.  Code that the configuration classes of
+several mechanisms share belongs in a separate file, loaded with
+:func:`incept1d.mechanism.load_helper`; the ``config.py`` next to each
+mechanism then only states what differs, such as which keys it accepts.
 
 The interface
 -------------

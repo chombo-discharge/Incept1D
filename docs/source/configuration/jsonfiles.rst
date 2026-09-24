@@ -51,8 +51,12 @@ What the keys mean
 
 A configuration file is not validated against a fixed schema.  It is handed
 to the mechanism directory's ``config.py``, which decides what each key
-means (:ref:`Chap:ConfigPy`), and unknown keys are ignored so that one file
-can be shared between mechanisms understanding different subsets of it.
+means (:ref:`Chap:ConfigPy`) and whether a key it does not know is an error.
+A configuration file belongs to one mechanism, and a ``config.py`` that
+rejects unknown keys makes a file written for another mechanism fail loudly
+instead of solving a different problem than it describes.  Reaction
+multipliers are checked by the loader itself: a key that names no reaction
+of the mechanism is an error.
 
 One key is universal:
 

@@ -2,7 +2,7 @@
     "configurations": [
     {
         "label": "Phelps",
-        "cross_sections": "phelps.txt",
+        "cross_sections": "../lxcat/phelps.txt",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
@@ -16,7 +16,7 @@
     },
     {
         "label": "Trinity",
-        "cross_sections": "trinity.txt",
+        "cross_sections": "../lxcat/trinity.txt",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
@@ -30,7 +30,7 @@
     },
     {
         "label": "Biagi",
-        "cross_sections": "biagi.txt",
+        "cross_sections": "../lxcat/biagi.txt",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
@@ -44,7 +44,7 @@
     },
     {
         "label": "Lisbon",
-        "cross_sections": "lisbon.txt",
+        "cross_sections": "../lxcat/lisbon.txt",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
@@ -58,7 +58,7 @@
     },
     {
         "label": "No detachment",
-        "cross_sections": "lisbon.txt",
+        "cross_sections": "../lxcat/lisbon.txt",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
