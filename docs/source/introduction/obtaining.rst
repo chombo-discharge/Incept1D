@@ -23,8 +23,9 @@ documentation sources.
 Versioning
 ----------
 
-There are no tagged releases yet; the ``main`` branch is the reference
-version and is the one exercised by continuous integration
+Releases are tagged on GitHub, and each is archived on Zenodo with a DOI of
+its own (:ref:`Chap:Citing`).  Between releases the ``main`` branch is the
+reference version, and it is the one exercised by continuous integration
 (:ref:`Chap:Infrastructure`).  Every data file written by the commands records
 the git commit it was produced with in its header, so results can always be
-traced back to a specific version of the code.
+traced back to a specific version of the code, released or not.
