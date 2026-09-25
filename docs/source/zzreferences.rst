@@ -18,6 +18,10 @@ Works cited in this documentation:
    (2007).
    `doi:10.1088/0963-0252/16/3/026 <https://doi.org/10.1088/0963-0252/16/3/026>`_
 
+.. [Coelho1971] R. Coelho and J. Debeau, *Properties of the tip-plane
+   configuration*, J. Phys. D: Appl. Phys. **4**, 1266 (1971).
+   `doi:10.1088/0022-3727/4/9/305 <https://doi.org/10.1088/0022-3727/4/9/305>`_
+
 .. [Dakin1974] T. W. Dakin, G. Luxa, G. Oppermann, J. Vigreux, G. Wind and
    H. Winkelnkemper, *Breakdown of gases in uniform fields: Paschen curves
    for nitrogen, air and sulfur hexafluoride*, ELECTRA **32**, 61–82 (1974).

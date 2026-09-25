@@ -96,6 +96,8 @@ def run(args, parser):
     geom_str = f"{fd.label},  d = {d_mm} mm"
     if fd.sphere_R is not None:
         geom_str += f"  (d/R = {d/fd.sphere_R:.3f})"
+    if fd.tip_R is not None:
+        geom_str += f"  (d/r = {d/fd.tip_R:.3f})"
 
     print(f"Geometry:  {geom_str}")
     if fd.field_type == "fieldline":

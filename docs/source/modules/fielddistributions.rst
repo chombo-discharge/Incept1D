@@ -19,8 +19,8 @@ solvers.  Everything downstream only ever needs a normalised field profile
 so that the "reference" reduced field :math:`E_\mathrm{ref}/N` used on the
 axes of every plot and output file is always the *mean* field
 :math:`U/d`, whatever the geometry.  :math:`\xi = 0` is the high-field
-electrode (sphere surface, inner conductor, or either plate for a uniform
-field) and :math:`\xi = 1` the low-field side.
+electrode (sphere surface, hyperboloid tip, inner conductor, or either plate
+for a uniform field) and :math:`\xi = 1` the low-field side.
 
 Geometries
 ----------
@@ -42,6 +42,12 @@ Geometries
    * - ``sphere-sphere R``
      - Two equal spheres of radius :math:`R` (mm) at :math:`\pm U/2`.
        Exact bispherical series.  Symmetric.
+   * - ``hyperboloid-plane R``
+     - Hyperboloid of revolution with tip radius of curvature :math:`r`
+       (mm) above a grounded plane, the usual model of a point electrode.
+       Exact on-axis field, see `Hyperboloid-plane`_.  Not symmetric:
+       ``incept1d pdiv`` and ``incept1d growth`` compute both polarities
+       (``tip=positive`` / ``tip=negative``).
    * - ``coaxial A B``
      - Coaxial cylinders with inner radius :math:`a` and outer radius
        :math:`b` (mm).  Exact radial field, see `Coaxial cylinders`_.  Not
@@ -59,6 +65,50 @@ together), while a sweep at fixed :math:`d` varies only the pressure.  For a
 tabulated field line the arc length fixes :math:`d = L`, and for coaxial
 cylinders the radii fix :math:`d = b - a`, so only fixed-:math:`d` sweeps are
 meaningful there.
+
+Hyperboloid-plane
+-----------------
+
+A point electrode is usually modelled as a hyperboloid of revolution above a
+plane, because both surfaces are coordinate surfaces of prolate spheroidal
+coordinates and the potential is then known in closed form [Coelho1971]_.
+With the tip at distance :math:`d` from the plane and tip radius of
+curvature :math:`r`, the common foci lie on the axis at
+
+.. math::
+
+   z = \pm a, \qquad a = \sqrt{d\,(d + r)},
+
+and the potential depends on the coordinate
+:math:`\eta = (r_- - r_+)/2a` alone, :math:`r_\pm` being the distances to
+the two foci: :math:`\phi = U \operatorname{artanh}\eta \,/\,
+\operatorname{artanh}\eta_0`, with :math:`\eta = 0` the plane and
+:math:`\eta_0 = d/a` the tip.  On the axis :math:`\eta = z/a`, so the field
+at height :math:`z` above the plane is
+
+.. math::
+
+   E(z) = \frac{U}{\operatorname{artanh} k}\,\frac{a}{a^2 - z^2},
+   \qquad k = \frac{d}{a} = \sqrt{\frac{d}{d + r}} .
+
+With :math:`z = d(1 - \xi)` the normalised profile is
+
+.. math::
+
+   f(\xi) = \frac{k}{\big(1 - k^2 (1 - \xi)^2\big)\operatorname{artanh} k},
+
+which integrates to one exactly and depends on :math:`d/r` alone.  The field
+at the tip,
+
+.. math::
+
+   E(d) = \frac{2 U a}{r\,d\,\ln\dfrac{1 + k}{1 - k}}
+   \;\longrightarrow\; \frac{2U}{r \ln(4d/r)} \quad (r \ll d),
+
+is the classic point-plane estimate, and :math:`f \to 1` as
+:math:`r/d \to \infty`.  As for the sphere-plane gap, :math:`r` is held
+fixed while a :math:`pd` sweep at fixed pressure varies :math:`d`, so
+:math:`d/r` changes along the sweep.
 
 Coaxial cylinders
 -----------------
@@ -271,6 +321,7 @@ field-line file before using it in a solve.
 .. code-block:: bash
 
    incept1d field --field sphere-plane 50 --d 20
+   incept1d field --field hyperboloid-plane 0.1 --d 20
    incept1d field --field coaxial 1 10
    incept1d field --field fieldline line.csv mm
 
@@ -280,4 +331,5 @@ API reference
 .. automodule:: incept1d.fields
    :members:
    :undoc-members:
-   :private-members: _sphere_sphere_axial_field, _coaxial_field
+   :private-members: _sphere_sphere_axial_field, _hyperboloid_plane_field,
+      _coaxial_field

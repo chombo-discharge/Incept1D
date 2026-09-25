@@ -1090,6 +1090,12 @@ def run(args, parser):
                     "# Polarity:    sphere=positive → sphere is anode (+),  "
                     "sphere=negative → sphere is cathode (−)\n"
                 )
+            if _field_dist.field_type == "hyperboloid-plane":
+                fh.write(f"# Tip R:       {_field_dist.tip_R*1e3:.4g} mm\n")
+                fh.write(
+                    "# Polarity:    tip=positive → tip is anode (+),  "
+                    "tip=negative → tip is cathode (−)\n"
+                )
             if _field_dist.field_type == "coaxial":
                 fh.write(
                     f"# Radii:       a = {_field_dist.coax_a*1e3:.6g} mm, "
