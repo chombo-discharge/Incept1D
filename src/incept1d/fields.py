@@ -7,7 +7,8 @@ Gap geometry: the normalised field profile f(ξ) on ξ ∈ [0, 1].
 
 Everything downstream of this module sees a gap only through f, normalised
 so that ∫f dξ = 1, so the geometry — uniform, sphere-plane, sphere-sphere,
-coaxial cylinders, or a tabulated field line — is invisible to the solvers.
+hyperboloid-plane, coaxial cylinders, or a tabulated field line — is
+invisible to the solvers.
 :class:`FieldDistribution` is the geometry itself, independent of gap
 length; :meth:`FieldDistribution.build` turns it into f for a specific
 gap.  :func:`add_field_argument` and :func:`parse_field_spec` implement
@@ -70,7 +71,33 @@ def _coaxial_field(xi, ratio):
     return t / ((1.0 + xi * t) * math.log1p(t))
 
 
-# ── Step-count helpers (kept for backward compatibility / plot_sphere_plane.py) ──
+# ── Hyperboloid-plane ────────────────────────────────────────────────────────
+
+
+def _hyperboloid_plane_field(xi, k):
+    """
+    Exact normalised on-axis field between a hyperboloid tip and a plane.
+
+    In prolate spheroidal coordinates with foci at ±a on the axis, the plane
+    and the hyperboloid of revolution are both coordinate surfaces, and the
+    potential depends on one coordinate alone.  With the tip at distance d
+    from the plane and tip radius of curvature r,
+
+        a = √(d(d + r)),   k = d/a = √(d/(d + r)),
+
+    the on-axis field at height z above the plane is
+    E(z) = U a / ((a² − z²) artanh k), and with z = d(1 − ξ)
+
+        f(ξ) = k / ((1 − k²(1 − ξ)²) artanh k),
+
+    so that ∫₀¹ f dξ = 1 exactly.  ξ = 0 is the tip, where
+    E = 2U a / (r d ln((1 + k)/(1 − k))) ≈ 2U / (r ln(4d/r)) for r ≪ d
+    [Coelho1971]_.  f depends on d/r alone, and tends to 1 as k → 0.
+    """
+    if k < 1e-7:
+        return 1.0
+    u = k * (1.0 - xi)
+    return k / ((1.0 - u * u) * math.atanh(k))
 
 
 # ── Tabulated field line ──────────────────────────────────────────────────────
@@ -212,10 +239,12 @@ class FieldDistribution:
     Attributes
     ----------
     field_type : str
-        One of 'uniform', 'sphere-plane', 'sphere-sphere', 'coaxial',
-        'fieldline'.
+        One of 'uniform', 'sphere-plane', 'sphere-sphere',
+        'hyperboloid-plane', 'coaxial', 'fieldline'.
     sphere_R : float or None
         Sphere radius in metres.  None unless field_type is a sphere geometry.
+    tip_R : float or None
+        For 'hyperboloid-plane': radius of curvature of the tip in metres.
     coax_a, coax_b : float or None
         For 'coaxial': inner and outer conductor radii in metres, a < b.
     fieldline_xi, fieldline_f : ndarray or None
@@ -242,6 +271,7 @@ class FieldDistribution:
 
     field_type: str
     sphere_R: Optional[float] = None
+    tip_R: Optional[float] = None
     coax_a: Optional[float] = None
     coax_b: Optional[float] = None
     fieldline_xi: Optional[np.ndarray] = None
@@ -297,7 +327,8 @@ class FieldDistribution:
         Name *polarity* (``"positive"`` or ``"negative"``) for this geometry.
 
         Says which electrode is the anode in positive polarity: the sphere,
-        the inner conductor, or the first tabulated point.
+        the hyperboloid tip, the inner conductor, or the first tabulated
+        point.
         """
         if self.field_type == "uniform":
             return polarity
@@ -305,6 +336,8 @@ class FieldDistribution:
             return f"start={polarity}"
         if self.field_type == "coaxial":
             return f"inner={polarity}"
+        if self.field_type == "hyperboloid-plane":
+            return f"tip={polarity}"
         return f"sphere={polarity}"
 
     @property
@@ -312,12 +345,18 @@ class FieldDistribution:
         """
         True when f(ξ) is known to decrease monotonically from ξ = 0 to ξ = 1.
 
-        Sphere-plane (and trivially uniform) profiles have this property;
+        Sphere-plane, hyperboloid-plane, coaxial (and trivially uniform)
+        profiles have this property;
         sphere-sphere has maxima at both ends, and a tabulated field line may
         have any shape.  Used by quadrature helpers that would otherwise
         assume a single active region starting at ξ = 0.
         """
-        return self.field_type in ("uniform", "sphere-plane", "coaxial")
+        return self.field_type in (
+            "uniform",
+            "sphere-plane",
+            "hyperboloid-plane",
+            "coaxial",
+        )
 
     @property
     def fixed_gap_length(self) -> Optional[float]:
@@ -349,6 +388,8 @@ class FieldDistribution:
                 f"coaxial, a = {self.coax_a * 1e3:.4g} mm, "
                 f"b = {self.coax_b * 1e3:.4g} mm"
             )
+        if self.field_type == "hyperboloid-plane":
+            return f"hyperboloid-plane, r = {self.tip_R * 1e3:.4g} mm"
         R_mm = self.sphere_R * 1e3
         return f"{self.field_type}, R = {R_mm:.4g} mm"
 
@@ -389,6 +430,14 @@ class FieldDistribution:
 
             return f_cx
 
+        if self.field_type == "hyperboloid-plane":
+            k = math.sqrt(d / (d + self.tip_R))
+
+            def f_hp(xi, _k=k):
+                return _hyperboloid_plane_field(xi, _k)
+
+            return f_hp
+
         if self.field_type == "sphere-plane":
             alpha = float(np.arccosh(1.0 + d / self.sphere_R))
             a = self.sphere_R * np.sinh(alpha)
@@ -422,6 +471,8 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
             "Field distribution.  'uniform' (default): spatially uniform field.  "
             "'sphere-plane R_mm': sphere-plane gap with sphere radius R_mm in mm.  "
             "'sphere-sphere R_mm': symmetric sphere-sphere gap.  "
+            "'hyperboloid-plane R_mm': hyperboloid of revolution above a plane, "
+            "tip radius of curvature R_mm in mm (exact on-axis field).  "
             "'coaxial A_mm B_mm': coaxial cylinders with inner radius A_mm and "
             "outer radius B_mm in mm (gap b - a, inner conductor at xi = 0).  "
             "'fieldline FILE [UNIT]': tabulated |E| along a (curved) field line "
@@ -490,6 +541,19 @@ def parse_field_spec(
         sphere_R = float(spec[1]) * 1e-3  # mm → m
         return FieldDistribution(field_type=field_type, sphere_R=sphere_R)
 
+    if field_type == "hyperboloid-plane":
+        if len(spec) != 2:
+            _err("--field hyperboloid-plane requires a tip radius in mm")
+        try:
+            tip_R = float(spec[1]) * 1e-3  # mm → m
+        except ValueError:
+            _err(
+                f"--field hyperboloid-plane: tip radius must be a number, got {spec[1]!r}"
+            )
+        if not tip_R > 0.0:
+            _err("--field hyperboloid-plane: tip radius must be positive")
+        return FieldDistribution(field_type="hyperboloid-plane", tip_R=tip_R)
+
     if field_type == "coaxial":
         if len(spec) != 3:
             _err("--field coaxial requires an inner and an outer radius in mm")
@@ -517,8 +581,8 @@ def parse_field_spec(
 
     _err(
         f"Unknown field type: {field_type!r}. "
-        "Use 'uniform', 'sphere-plane', 'sphere-sphere', 'coaxial', or "
-        "'fieldline'."
+        "Use 'uniform', 'sphere-plane', 'sphere-sphere', 'hyperboloid-plane', "
+        "'coaxial', or 'fieldline'."
     )
 
 

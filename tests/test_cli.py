@@ -495,6 +495,40 @@ class TestStreamerCriterion:
             assert got == pytest.approx(C, rel=1e-4)
 
 
+class TestHyperboloidPlane:
+    def test_both_tip_polarities_are_written(self, tmp_path, capsys):
+        """The tip is named as the electrode, and its radius reaches the header."""
+        out = tmp_path / "hp.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "hyperboloid-plane",
+            "0.5",
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        assert "# Tip R:       0.5 mm" in out.read_text()
+        col = _columns(out)
+        for pol in ("positive", "negative"):
+            EN = [
+                c for n, c in col.items() if n.startswith("EN_Td") and f"tip={pol}" in n
+            ]
+            assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
+
+
 class TestJobs:
     def test_parallel_sweep_writes_the_same_file(self, tmp_path, capsys):
         outs = []

@@ -47,6 +47,8 @@ class TestNormalisation:
             FieldDistribution("sphere-sphere", 5e-3),
             FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3),
             FieldDistribution("coaxial", coax_a=0.5e-3, coax_b=25e-3),
+            FieldDistribution("hyperboloid-plane", tip_R=20e-3),
+            FieldDistribution("hyperboloid-plane", tip_R=5e-3),
         ],
     )
     @pytest.mark.parametrize("d", [1e-3, 20e-3, 100e-3])
@@ -81,6 +83,7 @@ class TestShape:
             (FieldDistribution("sphere-plane", 50e-3), False, True),
             (FieldDistribution("sphere-sphere", 50e-3), True, False),
             (FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3), False, True),
+            (FieldDistribution("hyperboloid-plane", tip_R=1e-3), False, True),
         ],
     )
     def test_geometry_flags(self, fd, symmetric, monotone):
@@ -93,6 +96,87 @@ class TestShape:
         f = FieldDistribution("sphere-plane", 1.0).build(1e-4)
         v = np.array([f(x) for x in np.linspace(0.0, 1.0, 50)])
         assert np.allclose(v, 1.0, atol=1e-3)
+
+
+class TestHyperboloidPlane:
+    """The profile is the axis of a Laplace solution with the right electrodes.
+
+    Independently of the closed form in :mod:`incept1d.fields`, build the
+    potential from the distances to the two foci: with foci at z = ±a,
+    η = (r₋ − r₊)/(2a) is a prolate spheroidal coordinate, its level sets are
+    confocal hyperboloids (η = 0 the plane z = 0), and artanh η is harmonic.
+    """
+
+    D, R = 10e-3, 0.5e-3
+
+    @classmethod
+    def _potential(cls, rho, z):
+        a = np.sqrt(cls.D * (cls.D + cls.R))
+        eta = (np.hypot(rho, z + a) - np.hypot(rho, z - a)) / (2.0 * a)
+        return np.arctanh(eta) / np.arctanh(cls.D / a)  # U = 1 on the tip
+
+    def test_potential_is_harmonic(self):
+        """F30: ∇²φ = 0 in cylindrical coordinates, off axis in the gap."""
+        h = 1e-6
+        for rho, z in [(0.3e-3, 5e-3), (2e-3, 8e-3), (4e-3, 1e-3)]:
+            phi = self._potential
+            d2r = (phi(rho + h, z) - 2 * phi(rho, z) + phi(rho - h, z)) / h**2
+            d1r = (phi(rho + h, z) - phi(rho - h, z)) / (2 * h)
+            d2z = (phi(rho, z + h) - 2 * phi(rho, z) + phi(rho, z - h)) / h**2
+            scale = abs(d2z) + abs(d2r)
+            assert abs(d2r + d1r / rho + d2z) < 1e-4 * scale
+
+    def test_electrodes_are_the_plane_and_a_tip_of_radius_r(self):
+        """F31: φ = 0 on z = 0, φ = 1 at z = d, vertex curvature radius r."""
+        assert np.allclose(self._potential(np.linspace(0, 0.05, 11), 0.0), 0.0)
+        assert self._potential(0.0, self.D) == pytest.approx(1.0)
+        # The tip surface φ = 1 near the axis: z(ρ) ≈ d − ρ²/(2r).
+        rho = 1e-6
+        a = np.sqrt(self.D * (self.D + self.R))
+        eta0 = self.D / a
+        # On the hyperboloid z²/eta0² − ρ²/(1 − eta0²) = a², solved for z.
+        z = eta0 * np.sqrt(a**2 + rho**2 / (1.0 - eta0**2))
+        assert self._potential(rho, z) == pytest.approx(1.0, abs=1e-12)
+        assert rho**2 / (2.0 * (z - self.D)) == pytest.approx(self.R, rel=1e-4)
+
+    def test_profile_is_the_axial_field(self):
+        """F32: f(ξ) = −∂φ/∂z · d/U at z = d(1 − ξ)."""
+        f = FieldDistribution("hyperboloid-plane", tip_R=self.R).build(self.D)
+        h = 1e-8
+        for xi in np.linspace(0.0, 1.0, 11):
+            z = self.D * (1.0 - xi)
+            dphi = (self._potential(0.0, z + h) - self._potential(0.0, z - h)) / (2 * h)
+            assert f(xi) == pytest.approx(dphi * self.D, rel=1e-6)
+
+    @pytest.mark.parametrize("r", [1e-3, 1e-4, 1e-5])
+    def test_sharp_tip_integrates_to_one(self, r):
+        """F33: normalisation where the trapezoid rule of F1 cannot resolve the tip."""
+        from scipy.integrate import quad
+
+        d = 0.1
+        f = FieldDistribution("hyperboloid-plane", tip_R=r).build(d)
+        val = quad(f, 0.0, 1.0, points=[r / d], limit=200, epsabs=0, epsrel=1e-12)
+        assert val[0] == pytest.approx(1.0, rel=1e-10)
+
+    def test_sharp_tip_recovers_the_classic_field(self):
+        """F34: E_tip → 2U / (r ln(4d/r)) as r/d → 0."""
+        d, r = 10e-3, 1e-6
+        f = FieldDistribution("hyperboloid-plane", tip_R=r).build(d)
+        assert f(0.0) / d == pytest.approx(2.0 / (r * np.log(4 * d / r)), rel=1e-3)
+
+    def test_blunt_tip_tends_to_uniform(self):
+        """F35: r/d → ∞ recovers the plane-parallel gap."""
+        f = FieldDistribution("hyperboloid-plane", tip_R=1e3).build(1e-3)
+        assert np.allclose([f(x) for x in np.linspace(0, 1, 11)], 1.0, atol=1e-5)
+        f = FieldDistribution("hyperboloid-plane", tip_R=1e12).build(1e-3)
+        assert f(0.3) == 1.0
+
+    def test_profile_depends_on_d_over_r_only(self):
+        """F36: scaling tip radius and gap together leaves f unchanged."""
+        f = FieldDistribution("hyperboloid-plane", tip_R=self.R).build(self.D)
+        g = FieldDistribution("hyperboloid-plane", tip_R=7 * self.R).build(7 * self.D)
+        for x in np.linspace(0.0, 1.0, 11):
+            assert f(x) == pytest.approx(g(x), rel=1e-12)
 
 
 class TestCoaxial:
@@ -362,6 +446,12 @@ class TestParseFieldSpec:
         assert fd.field_type == kind
         assert fd.sphere_R == pytest.approx(50e-3)
 
+    def test_tip_radius_is_millimetres(self):
+        fd = parse_field_spec(["hyperboloid-plane", "0.1"])
+        assert fd.field_type == "hyperboloid-plane"
+        assert fd.tip_R == pytest.approx(1e-4)
+        assert fd.sphere_R is None
+
     def test_coaxial_radii_are_millimetres(self):
         fd = parse_field_spec(["coaxial", "1", "10"])
         assert fd.field_type == "coaxial"
@@ -384,6 +474,9 @@ class TestParseFieldSpec:
             (["coaxial", "10", "1"], "inner radius < outer radius"),
             (["coaxial", "0", "1"], "inner radius < outer radius"),
             (["coaxial", "a", "1"], "must be numbers"),
+            (["hyperboloid-plane"], "requires a tip radius"),
+            (["hyperboloid-plane", "0"], "must be positive"),
+            (["hyperboloid-plane", "x"], "must be a number"),
         ],
     )
     def test_errors(self, spec, match):
@@ -395,6 +488,8 @@ class TestParseFieldSpec:
         assert "50" in FieldDistribution("sphere-plane", 50e-3).label
         lbl = FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3).label
         assert "coaxial" in lbl and "10 mm" in lbl
+        lbl = FieldDistribution("hyperboloid-plane", tip_R=0.2e-3).label
+        assert "hyperboloid" in lbl and "0.2 mm" in lbl
 
 
 class TestFieldLineScaling:
@@ -474,6 +569,7 @@ class TestPolarityLabel:
             (FieldDistribution("sphere-plane", 5e-3), "sphere=positive"),
             (FieldDistribution("sphere-sphere", 5e-3), "sphere=positive"),
             (FieldDistribution("coaxial", coax_a=1e-3, coax_b=10e-3), "inner=positive"),
+            (FieldDistribution("hyperboloid-plane", tip_R=1e-4), "tip=positive"),
         ],
     )
     def test_labels(self, field, expected):
