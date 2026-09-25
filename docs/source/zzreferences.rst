@@ -75,10 +75,6 @@ Works cited in this documentation:
    **388**, 624–654 (2019).
    `doi:10.1016/j.jcp.2019.03.036 <https://doi.org/10.1016/j.jcp.2019.03.036>`_
 
-.. [Morrow1997] R. Morrow and J. J. Lowke, *Streamer propagation in air*,
-   J. Phys. D: Appl. Phys. **30**, 614 (1997).
-   `doi:10.1088/0022-3727/30/4/017 <https://doi.org/10.1088/0022-3727/30/4/017>`_
-
 .. [Pancheshnyi2013] S. Pancheshnyi, *Effective ionization rate in
    nitrogen-oxygen mixtures*, J. Phys. D: Appl. Phys. **46**, 155201
    (2013).

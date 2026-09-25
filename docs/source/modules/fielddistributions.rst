@@ -280,4 +280,4 @@ API reference
 .. automodule:: incept1d.fields
    :members:
    :undoc-members:
-   :private-members: _sphere_sphere_axial_field, _coaxial_field, _compute_n_steps
+   :private-members: _sphere_sphere_axial_field, _coaxial_field

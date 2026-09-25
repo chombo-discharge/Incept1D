@@ -58,7 +58,29 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
     -------
     bool
         True if the root is accepted.
+
+    Notes
+    -----
+    A criterion with a physical sign (Riccati, :func:`_has_physical_sign`)
+    is 1 − (loop gain): positive below inception, negative above, so a root
+    can only be a crossing from + to − in increasing E/N.  Any such crossing
+    is accepted as it is: inception shows either as a zero or, when the
+    photon loop alone sustains the discharge, as the pole where g jumps
+    from about +1 to −1, and the residual test below would call the pole
+    suspect.  A crossing from − to + cannot be inception and is rejected; it
+    is the signature of a mis-evaluated point (an isolated spurious "below"
+    far above inception once gave a false root).
     """
+    if _has_physical_sign(det_fn):
+        if fa > 0.0 > fb:
+            return True
+        print(
+            f"  [root check] EN = {root:.4f} Td  pd = {pd*1e3:.4g} bar·mm: the "
+            f"criterion goes from {fa:+.2e} to {fb:+.2e}, not from + to -, "
+            f"so this is not inception — discarded"
+        )
+        return False
+
     det_root = det_fn(root, pd, mod, p, T)
 
     if not np.isfinite(det_root):

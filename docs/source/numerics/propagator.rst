@@ -97,10 +97,11 @@ default 1000), so the total number of fine steps never exceeds
 :math:`N_{\max}`.  Setting :math:`N_{\max} = N_{\min}` disables adaptation and
 gives a fixed uniform grid.
 
-The initial :math:`N_{\min}` is additionally raised by
-:func:`incept1d.fields._compute_n_steps` for sphere geometries so that
-the field does not change by more than a set fraction over the first step
-near the sphere, where :math:`f(\xi)` is steepest.
+The steep part of a strongly non-uniform field, near a small electrode,
+needs no special treatment: the step halving refines exactly where the
+propagator changes fastest.  The defaults were chosen on sphere-plane gaps
+with :math:`R/d` down to 0.1, where they keep the inception field within
+about 0.1 % of its converged value.
 
 Eigenvalue shifting
 -------------------

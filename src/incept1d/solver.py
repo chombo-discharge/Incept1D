@@ -425,7 +425,7 @@ def _propagate_compound(exponents, Y):
     Returns
     -------
     p : ndarray
-        Plücker coordinates of ∏ exp(Ω_i) Y, scaled to max |p| = 1, ordered
+        Plücker coordinates of ∏ exp(Ω_i) Y, scaled so the largest ``abs(p)`` is 1, ordered
         as :func:`_compound_index`.
     log_scale : float
         log of the factor removed: the true coordinates are p · e^log_scale.
@@ -1031,6 +1031,8 @@ def _slab_scattering(Omega, b, fw):
     T_f = E_ff_inv * math.exp(-shift)
     T_b = (E_bb - R_l @ E_fb) * math.exp(shift)
     unit = (R_l, R_r, T_f, T_b)
+    if not all(np.all(np.isfinite(x)) for x in unit):
+        return None  # overflowed: see _spectral_radius
 
     result = None
     while m:
@@ -1061,6 +1063,12 @@ def _spectral_radius(M):
     """
     if M.size == 0:
         return 0.0
+    if not np.all(np.isfinite(M)):
+        # Overflowed: the gain is astronomically large, i.e. above threshold.
+        # (Only a system with no feedback at all, whose loop gain is exactly
+        # zero, could overflow its transmissions without that being so, and
+        # such a system has no inception to find.)
+        return np.inf
     return float(np.max(np.abs(np.linalg.eigvals(M))))
 
 
@@ -1079,12 +1087,15 @@ def _star(A, B):
     K = np.eye(Tf_a.shape[0]) - loop
     K_Tf = np.linalg.solve(K, Tf_a)
     K_Rr = np.linalg.solve(K, Rr_a)
-    return (
+    out = (
         Rl_a + Tb_a @ Rl_b @ K_Tf,
         Rr_b + Tf_b @ K_Rr @ Tb_b,
         Tf_b @ K_Tf,
         Tb_a @ (Tb_b + Rl_b @ K_Rr @ Tb_b),
     )
+    if not all(np.all(np.isfinite(x)) for x in out):
+        return None  # overflowed: see _spectral_radius
+    return out
 
 
 def riccati_criterion(

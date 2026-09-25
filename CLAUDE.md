@@ -42,8 +42,7 @@ transported, then the photons, then the electrodes, then the assembly:
 
 The reaction schemes are inputs, not part of the derivation: they live in
 `docs/source/configuration/examples/` (`air.rst`, table `tab_reactions`, is
-the scheme implemented by `mechanisms/air/pancheshnyi/air_pancheshnyi.py`;
-`morrowlowke.rst` documents `mechanisms/air/morrowlowke/air_morrowlowke.py`).
+the scheme implemented by `mechanisms/air/pancheshnyi/air_pancheshnyi.py`).
 
 Code docstrings still cite "manuscript, eq. NNN" in places; those numbers
 refer to an external LaTeX source and have drifted. When code and docs
@@ -82,7 +81,7 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`, `mechanisms/air/morrowlowke/air_morrowlowke.py`)
+### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`)
 
 Mechanism files live one per directory under `mechanisms/<gas>/<scheme>/`
 and are **data, not part of the package**: they are `exec`'d by
