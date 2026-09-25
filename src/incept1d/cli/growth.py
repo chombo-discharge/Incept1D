@@ -14,6 +14,7 @@ import functools
 import math
 import time
 import os
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -310,6 +311,11 @@ def add_arguments(parser):
 
 def run(args, parser):
     """Run the command with parsed *args*; *parser* is used for ``parser.error``."""
+    if args.verify and args.silent:
+        print(
+            "note: --silent turns off the det Q check of --verify",
+            file=sys.stderr,
+        )
     if args.v_max_factor <= 1.0:
         parser.error("--v-max-factor must be > 1.0")
     if args.n_voltages < 2:

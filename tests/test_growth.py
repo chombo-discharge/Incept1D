@@ -16,6 +16,7 @@ so the solver's behaviour is checked here on the toy, cheaply, and the air
 physics in ``test_air.py``.
 """
 
+import numpy as np
 import pytest
 
 from incept1d.fields import FieldDistribution
@@ -85,6 +86,32 @@ class TestLambdaOnTheToy:
             EN_star * 0.9, pd, mod, p, T, UNIFORM, *DX, midpoint_propagator
         )
         assert status == "below_inception" and lam == 0.0
+
+    def test_nan_inside_the_bracket_is_reported(self, setup):
+        """
+        A criterion that is finite at the bracket ends but NaN between them
+        (det Q can be) gives "det_Q_unresolved", not a Brent failure.
+        """
+        mod, pd, p, T, EN_star = setup
+
+        def criterion(*args, lam=0.0, **kwargs):
+            if 4e5 < lam < 1e6:
+                return float("nan")
+            return 1.0 if lam > 5e5 else -1.0
+
+        lam, status = find_lambda_for_voltage(
+            EN_star * 1.1,
+            pd,
+            mod,
+            p,
+            T,
+            UNIFORM,
+            *DX,
+            midpoint_propagator,
+            lam_scale=1e6,
+            criterion=criterion,
+        )
+        assert status == "det_Q_unresolved" and np.isnan(lam)
 
     def test_det_q_gives_the_same_growth_rate(self, setup):
         """

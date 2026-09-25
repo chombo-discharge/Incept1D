@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from incept1d.fields import FieldDistribution
-from incept1d.ionization import aed_integral, eig_integral
+from incept1d.ionization import aed_integral, eig_integral, streamer_EN
 
 _trapz = getattr(np, "trapezoid", None) or np.trapz
 
@@ -112,3 +112,22 @@ class TestRobustness:
         """X5: the CLI sweeps blindly, so overflow must not raise."""
         val = fn(1e30, 1.0, 1e6, toy, 293.0, FieldDistribution("uniform"), 50)
         assert np.isnan(val) or np.isfinite(val)
+
+
+class TestStreamerEN:
+    """The streamer field is where the integral reaches C, with or without a hint."""
+
+    @pytest.mark.parametrize("hint", [None, 10.0, 1e4])
+    def test_integral_equals_C_at_the_root(self, toy, hint):
+        p, T, d, C = 1.0, 293.0, 5e-3, 5.0
+        fd = FieldDistribution("sphere-plane", 5e-3)
+        EN = streamer_EN(C, p, d, toy, T, fd, 200, hint=hint)
+        assert np.isfinite(EN)
+        assert aed_integral(EN, p, d, toy, T, fd, 200) == pytest.approx(C, rel=1e-6)
+        # A hint only changes the cost, not which crossing is found.
+        cold = streamer_EN(C, p, d, toy, T, fd, 200)
+        assert EN == pytest.approx(cold, rel=1e-8)
+
+    def test_unreachable_C_gives_nan(self, toy):
+        fd = FieldDistribution("uniform")
+        assert np.isnan(streamer_EN(1e12, 1.0, 1e-3, toy, 293.0, fd, 200))

@@ -98,7 +98,9 @@ Inputs
        field and grid, just below and just above the root, must change
        sign.  Reported with each progress line.  Can be expensive.
    * - ``--silent``
-     - Print only the result tables, no per-point progress.
+     - Print only the result tables, no per-point progress.  With
+       ``--verify`` this also turns off the :math:`\det\bm{Q}` check,
+       which is reported with the progress.
    * - ``--lam LAM``
      - Temporal growth rate :math:`\lambda` in s\ :sup:`-1` for the
        generalized criterion :math:`\det\bm{Q}(\lambda) = 0` (default 0).

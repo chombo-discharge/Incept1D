@@ -5,6 +5,8 @@
 """Parallel sweeps: same answers as sequential ones, in the same order."""
 
 import functools
+import os
+import time
 
 import numpy as np
 import pytest
@@ -51,6 +53,24 @@ class TestParallelMap:
         starts = [i for i, (_, prev) in enumerate(out) if prev is None]
         assert starts == [0, 4, 8]
         assert all(prev == i - 1 for i, (_, prev) in enumerate(out) if prev is not None)
+
+    def test_one_dead_worker_is_reported_while_others_run(self):
+        """
+        A worker that dies without a traceback (killed, or a crash in native
+        code) owes results it will never send.  The sweep must fail promptly,
+        not wait for them while another worker is still busy.
+        """
+
+        def task(i, prev):
+            if i == 0:
+                os._exit(1)
+            time.sleep(60.0)
+            return i
+
+        start = time.monotonic()
+        with pytest.raises(RuntimeError, match="exited after 0 of 2"):
+            parallel_map(task, 2, jobs=2)
+        assert time.monotonic() - start < 15.0
 
     def test_one_job_runs_in_this_process(self):
         order = []

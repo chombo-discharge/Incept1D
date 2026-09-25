@@ -45,7 +45,7 @@ from incept1d.solver import (
     polarities_equivalent,
 )
 from incept1d.inception import compute_inception_curve
-from incept1d.ionization import aed_integral
+from incept1d.ionization import aed_integral, streamer_EN
 from incept1d.output import write_metadata_header
 from incept1d.parallel import parallel_map, physical_cores
 
@@ -297,6 +297,11 @@ def run(args, parser):
     parser : argparse.ArgumentParser
         The (sub)parser that produced *args*; used for ``parser.error``.
     """
+    if args.verify and args.silent:
+        print(
+            "note: --silent turns off the det Q check of --verify",
+            file=sys.stderr,
+        )
     _criterion = CRITERIA[args.criterion]
     if args.jobs is None:
         args.jobs = physical_cores()
@@ -876,55 +881,14 @@ def run(args, parser):
 
     if args.streamer_criterion is not None:
         _C = args.streamer_criterion
-        # From 0.1 Td, like the inception search: a strongly non-uniform gap
-        # puts its gap-averaged field far below 10 Td at large pd.  The scan
-        # only brackets the first crossing for a cold start; brentq refines.
-        _EN_sc = np.logspace(-1.0, np.log10(3e5), 30)
-
-        def _streamer_root(p_i, d_i, mod_i, hint):
-            """E/N (Td) where the ionization integral reaches C, or NaN.
-
-            Starts from *hint* (the root at the neighbouring pd) when given:
-            the bracket is widened geometrically around it, a handful of
-            integrals instead of a scan of the whole E/N range.
-            """
-
-            def g(en):
-                return _aed_integral(en, p_i, d_i, mod_i) - _C
-
-            lo = hi = None
-            if hint is not None and np.isfinite(hint):
-                a, b = hint / 1.1, hint * 1.1
-                fa, fb = g(a), g(b)
-                for _ in range(40):
-                    if not (np.isfinite(fa) and np.isfinite(fb)):
-                        break
-                    if fa < 0.0 < fb:
-                        lo, hi = a, b
-                        break
-                    if fa >= 0.0:
-                        a /= 2.0
-                        fa = g(a)
-                    if fb <= 0.0:
-                        b *= 2.0
-                        fb = g(b)
-            if lo is None:
-                fvals = np.array([g(en) for en in _EN_sc])
-                idx = np.where(fvals[:-1] * fvals[1:] < 0)[0]
-                if idx.size == 0:
-                    return float("nan")
-                lo, hi = _EN_sc[idx[0]], _EN_sc[idx[0] + 1]
-            try:
-                return scipy.optimize.brentq(g, lo, hi, xtol=1e-6, rtol=1e-10)
-            except ValueError:
-                return float("nan")
-
         for _cs_label, _p_arr_cs, _d_arr_cs, _mod_cs in curve_specs:
             _s_label = f"Streamer (C={_C}), {_cs_label}"
             print(f"\nSolving streamer criterion: {_s_label}")
 
             def _streamer_task(i, previous, _p=_p_arr_cs, _d=_d_arr_cs, _m=_mod_cs):
-                return _streamer_root(_p[i], _d[i], _m, previous)
+                return streamer_EN(
+                    _C, _p[i], _d[i], _m, args.T, _field_dist, _AED_N, hint=previous
+                )
 
             _EN_s = np.array(
                 parallel_map(_streamer_task, len(pd_arr), args.jobs), dtype=float

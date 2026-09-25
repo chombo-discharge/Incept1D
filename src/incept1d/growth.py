@@ -71,6 +71,10 @@ def peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist, n_samples=201):
 _SCAN_FACTOR = 3.0
 
 
+class _Unresolved(Exception):
+    """The criterion was not finite inside a bracket in λ."""
+
+
 def find_lambda_for_voltage(
     EN_ref,
     pd,
@@ -185,7 +189,6 @@ def find_lambda_for_voltage(
         return float("nan"), "no_bracket_found"
 
     # Scan down to the first sign change: the largest root.
-    lam_lo = lam_hi
     while True:
         lam_lo = lam_hi / _SCAN_FACTOR
         if lam_lo < 1.0:
@@ -198,9 +201,20 @@ def find_lambda_for_voltage(
             break
         lam_hi, f_hi = lam_lo, f_lo
 
-    lam_star = scipy.optimize.brentq(
-        _det, lam_lo, lam_hi, xtol=1e-3, rtol=1e-9, maxiter=100
-    )
+    def _det_finite(lam):
+        # The ends are finite, but det Q (--criterion detq) can still be NaN
+        # inside the bracket; Brent's method must not be handed that.
+        val = _det(lam)
+        if not np.isfinite(val):
+            raise _Unresolved(lam)
+        return val
+
+    try:
+        lam_star = scipy.optimize.brentq(
+            _det_finite, lam_lo, lam_hi, xtol=1e-3, rtol=1e-9, maxiter=100
+        )
+    except _Unresolved:
+        return float("nan"), "det_Q_unresolved"
 
     # Very small result means V ≈ V*.
     if lam_star < 1.0:
@@ -208,8 +222,7 @@ def find_lambda_for_voltage(
 
     # A root must be a crossing, not a jump: det Q has to change sign across
     # a small neighbourhood of λ*.  (Brent's method also converges on a
-    # discontinuity, e.g. where a photon group crosses κd = 12 and leaves the
-    # augmented system, changing the size of Q.)
+    # discontinuity, such as a pole of the Riccati criterion.)
     below = _det(lam_star * (1.0 - 1e-4))
     above = _det(lam_star * (1.0 + 1e-4))
     if not (below < 0.0 < above):

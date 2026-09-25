@@ -281,20 +281,27 @@ def find_all_breakdown_EN(
     # every mechanism) tells at a single point whether the lowest root lies
     # below the scan range.  Then no scan above EN_lo can find it; search
     # down instead, where a strongly non-uniform gap puts its gap-averaged
-    # inception field.
-    if first_only and _has_physical_sign(det_fn):
+    # inception field.  With every root wanted, the scan above still runs
+    # and the root found here is added to its roots.
+    below = []
+    if _has_physical_sign(det_fn):
         f_lo = f_brentq(EN_lo)
         if f_lo < 0.0:
             EN_b = EN_lo
             while EN_b > _EN_FLOOR:
                 EN_a = max(EN_b / 2.0, _EN_FLOOR)
                 if f_brentq(EN_a) > 0.0:
-                    root = scipy.optimize.brentq(
-                        f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
-                    )
-                    return [float(root)]
+                    below = [
+                        float(
+                            scipy.optimize.brentq(
+                                f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
+                            )
+                        )
+                    ]
+                    break
                 EN_b = EN_a
-            return []
+            if first_only:
+                return below
 
     EN_scan = np.logspace(np.log10(EN_lo), np.log10(EN_hi), n_scan)
 
@@ -405,7 +412,7 @@ def find_all_breakdown_EN(
         # roots that fast_det missed, so using it only adds scan overhead before
         # the full fallback (which is always needed anyway).
         roots, _ = _scan_with(det_fn)
-    return roots
+    return below + roots
 
 
 def compute_inception_curve(

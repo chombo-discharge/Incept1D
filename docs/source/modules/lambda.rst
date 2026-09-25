@@ -92,7 +92,8 @@ Each result is printed as soon as it is solved, and the tables at the end
 are in voltage order.  ``--verify`` checks every root with
 :math:`\det\bm{Q}` — across :math:`(E/N)^*` for each inception voltage and
 across :math:`\lambda^*` for each growth rate — and reports ✓ or ✗ with
-the progress; it can be expensive.  ``--silent`` prints only the tables.  The
+the progress; it can be expensive.  ``--silent`` prints only the tables,
+and so also turns off that check.  The
 remaining options are shared with ``incept1d pdiv``.  The output table lists, for each voltage, the
 over-voltage ratio :math:`U/U^*`, :math:`E/N`, :math:`\lambda` and the
 corresponding e-folding time :math:`1/\lambda`.

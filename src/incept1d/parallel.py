@@ -155,6 +155,12 @@ def parallel_map(task, n, jobs, on_result=None, blocks_per_job=1):
     # stays held forever in the child: under pytest that deadlocked.
     context = multiprocessing.get_context("fork")
     results_q = context.Queue()
+    owner, missing = {}, [0] * workers
+    for w in range(workers):
+        for block in blocks[w::workers]:
+            for i in block:
+                owner[i] = w
+            missing[w] += len(block)
     procs = [
         context.Process(
             target=_worker, args=(task, blocks[w::workers], results_q), daemon=True
@@ -165,19 +171,31 @@ def parallel_map(task, n, jobs, on_result=None, blocks_per_job=1):
         proc.start()
     try:
         received = 0
+        stalled = False
         while received < n:
             try:
                 i, result = results_q.get(timeout=1.0)
             except queue.Empty:
-                if not any(proc.is_alive() for proc in procs):
-                    raise RuntimeError(
-                        f"worker processes exited after {received} of {n} results"
-                    )
+                # A worker that has exited with results still owed (killed,
+                # or crashed in native code) will never send them, while the
+                # others may keep running.  Allow one more timeout for results
+                # still in transit before calling it.
+                if any(
+                    missing[w] and not proc.is_alive() for w, proc in enumerate(procs)
+                ):
+                    if stalled:
+                        raise RuntimeError(
+                            f"a worker process exited after {received} of {n} "
+                            "results"
+                        )
+                    stalled = True
                 continue
             if i is None:
                 raise RuntimeError(f"a worker process failed:\n{result}")
             results[i] = result
             received += 1
+            missing[owner[i]] -= 1
+            stalled = False
             if on_result is not None:
                 on_result(i, result)
     finally:

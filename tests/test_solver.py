@@ -345,9 +345,10 @@ class TestExpmStructuralZeros:
     def test_chains_are_kept(self):
         # 0 -> 1 -> 2: entry (2, 0) is reached through (1, 0) and (2, 1).
         M = np.array([[1.0, 0.0, 0.0], [2.0, 1.0, 0.0], [0.0, 3.0, 1.0]])
-        E = _expm(M)
-        assert E[2, 0] == pytest.approx(math.e * 3.0, rel=1e-12)
-        assert E == pytest.approx(scipy.linalg.expm(M), rel=1e-12, abs=0.0)
+        # M = I + N with N nilpotent: exp(M) = e (I + N + N²/2), exactly.
+        N = M - np.eye(3)
+        exact = math.e * (np.eye(3) + N + N @ N / 2.0)
+        assert _expm(M) == pytest.approx(exact, rel=1e-12, abs=0.0)
 
 
 class TestCompoundRoute:

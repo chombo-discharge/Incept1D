@@ -187,6 +187,23 @@ class TestRootFinding:
             assert every == sorted(every)
             assert first[0] == pytest.approx(min(every), rel=1e-8)
 
+    def test_every_root_includes_one_below_the_scan_range(self, toy, uniform):
+        """
+        With a physically signed criterion, a root below EN_lo is found by
+        searching down from it — also when every root is wanted, not only
+        the lowest.  EN_lo is put above the true root to force that case.
+        """
+        det = functools.partial(riccati_criterion, field_dist=uniform)
+        p, T, pd = 1.0, 293.0, 20e-3
+        truth = find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=det)[0]
+        for first_only in (True, False):
+            got = find_all_breakdown_EN(
+                pd, toy, p, T, EN_lo=2.0 * truth, first_only=first_only, det_fn=det
+            )
+            assert got, f"first_only={first_only}: no root returned"
+            assert got == sorted(got)
+            assert got[0] == pytest.approx(truth, rel=1e-8)
+
     def test_lowest_root_does_not_pay_for_the_whole_scan(self, toy, counting_det):
         """
         I8a: the scan runs bottom up and stops at the first confirmed root,
