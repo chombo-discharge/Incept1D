@@ -1,0 +1,27 @@
+{
+    "_comment": [
+        "Photoionization sensitivity with the other feedback loops at fixed values.",
+        "gamma0 = 1E-2 is the ion-induced secondary-emission yield (gamma1 defaults",
+        "to 0, so gamma+ = gamma0 exactly).  xi_emit = 1 is the default photoemission",
+        "multiplier; the photon-induced yield is 0.1 * xi_emit in this mechanism.",
+        "Detachment (O2- + O2, O- + N2) is left at its default rate.  xi_photo scales",
+        "the photoionization coupling from 1E-2 to 1E2 times the default."
+    ],
+    "configurations": [
+    {
+        "label": "xi_photo=0.1",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1E-1
+    },
+    {
+        "label": "xi_photo=1",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1.0
+    },
+    {
+        "label": "xi_photo=10",
+        "cross_sections": "../lxcat/lisbon.txt",
+        "xi_photo": 1E1
+    }
+  ]
+}
