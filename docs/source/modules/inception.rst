@@ -49,6 +49,7 @@ Inputs
        [--p P [P ...]] [--d D [D ...]] [--T T]
        [--pd-min PD] [--pd-max PD] [--pd-num N]
        [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
+       [--criterion {riccati,detq}] [--jobs N] [--verify] [--silent]
        [--lam LAM] [--all-branches] [--plot-separate-branches]
        [--plot-ionization-integral] [--streamer-criterion C]
        [--write-to-file FILE] [--save-subplots] [--no-plot]
@@ -76,10 +77,28 @@ Inputs
      - Geometry: ``uniform`` | ``sphere-plane R_mm`` | ``sphere-sphere R_mm``
        | ``fieldline FILE [UNIT]``.  See :ref:`Chap:FieldDistributions`.
    * - ``--dx N_min [N_max [tol]]``
-     - Adaptive integration grid (defaults 5, 1000, 10\ :sup:`-3`).  See
+     - Adaptive integration grid (defaults 5, 200, 0.03).  See
        :ref:`Chap:Numerics:Propagator`.
    * - ``--method``
      - Propagator: ``midpoint`` (default, adaptive) or ``magnus2``.
+   * - ``--criterion``
+     - How the inception condition is evaluated: ``riccati`` (default), the
+       reflection operator carried from the anode
+       (:ref:`Chap:Numerics:Riccati`), or ``detq``, the determinant
+       :math:`\det\bm{Q}` itself (:ref:`Chap:Numerics:Determinant`).  Both
+       solve the same discrete problem; ``detq`` is far slower when a
+       photon group is optically thick.
+   * - ``--jobs N``
+     - Worker processes for the sweep (default: the number of physical
+       cores, or 1 if it cannot be determined).  The :math:`pd` points are
+       split into contiguous blocks solved concurrently, each with warm
+       starts; the result is the same as with ``--jobs 1``.
+   * - ``--verify``
+     - Check every root independently: :math:`\det\bm{Q}` on the same
+       field and grid, just below and just above the root, must change
+       sign.  Reported with each progress line.  Can be expensive.
+   * - ``--silent``
+     - Print only the result tables, no per-point progress.
    * - ``--lam LAM``
      - Temporal growth rate :math:`\lambda` in s\ :sup:`-1` for the
        generalized criterion :math:`\det\bm{Q}(\lambda) = 0` (default 0).
@@ -136,7 +155,10 @@ Outputs
 While the sweep runs, every :math:`pd` point is printed as soon as it is
 solved — its index, :math:`pd`, :math:`p`, the lowest :math:`(E/N)^*`, the
 inception voltage :math:`U^*` and the time it took — so a long sweep shows
-its progress.  A point without inception in the scan range says so.
+its progress.  A point without inception in the scan range says so.  With
+``--jobs`` above one the points arrive in the order they finish; with
+``--verify`` each line also shows :math:`\det\bm{Q}` just below and just
+above the root, and ✓ if it changes sign.
 
 Unless ``--no-plot`` is given, a two-panel figure is shown: the inception
 voltage :math:`U^*(pd)` and the reduced field :math:`(E/N)^*(pd)`, one curve
@@ -176,10 +198,13 @@ below are the solve itself.
 .. automodule:: incept1d.solver
    :members:
    :undoc-members:
-   :private-members: _build_A_aug, _det_Q, _det_Q_norm, _det_Q_compound, _propagate_compound, _adaptive_midpoint_segment, _expm_shifted
+   :private-members: _build_A_aug, _riccati_g, _slab_scattering, _star, _spectral_radius, _det_Q, _det_Q_norm, _det_Q_compound, _propagate_compound, _adaptive_midpoint_segment, _expm_shifted
 
 ``incept1d.inception``
 ~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: incept1d.parallel
+   :members:
 
 .. automodule:: incept1d.inception
    :members:

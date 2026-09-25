@@ -3,10 +3,14 @@
 Evaluating the determinant
 ==========================
 
-With :math:`\bm{M}(d)` in hand, :math:`\bm{Q}` of :eq:`eq_Q_system` is
-assembled and its determinant evaluated.  Only the *sign* of
-:math:`\det\bm{Q}` matters for root finding, and the evaluation is designed
-around keeping that sign reliable.
+This page describes ``--criterion detq``
+(:func:`incept1d.solver.inception_det`): :math:`\bm{Q}` of
+:eq:`eq_Q_system` is assembled from :math:`\bm{M}(d)` and its determinant
+evaluated.  It is the formulation of the Theory chapter and the reference
+the default criterion (:ref:`Chap:Numerics:Riccati`) is checked against,
+by ``--verify`` and by the test suite.  Only the *sign* of
+:math:`\det\bm{Q}` matters for root finding, and the evaluation is
+designed around keeping that sign reliable.
 
 :func:`incept1d.solver._det_Q_norm` does not return ``numpy.linalg.det(Q)``
 directly.  Four things happen instead:
@@ -21,11 +25,14 @@ directly.  Four things happen instead:
    :math:`\mathrm{sign}\cdot\min(e^{\log|\det|}, 10^{300})`, taken from
    ``numpy.linalg.slogdet``.
 
-The ``NaN`` convention is central to the root finders: **above** the
-inception field the propagator grows so fast that :math:`\bm{Q}` becomes
-numerically singular, so ``NaN`` reliably means "above threshold", where
-the true sign of :math:`\det\bm{Q}` is negative.  The inception scans in :math:`E/N` rely on
-that and never evaluate :math:`\det\bm{Q}` further.
+This direct evaluation fails whenever :math:`\bm{Q}` is numerically
+singular: far above inception, at :math:`\lambda > 0`, and — since every
+photon group is explicit — wherever a group is optically thick, below
+inception as well as above.  It then returns ``NaN``, and by default
+(``resolve=True``) the determinant is computed by the compound-matrix
+route below instead.  With ``resolve=False`` the ``NaN`` is returned; the
+root finders then treat it as "above threshold", which is only safe when
+no thick photon group is present.
 
 When Q is singular: the compound-matrix route
 ---------------------------------------------
@@ -75,6 +82,9 @@ than on the spread of the eigenvalues, because :math:`\bm{\mathcal{A}}` is
 strongly non-normal, electron and ion speeds differing by orders of
 magnitude.
 
-The compound route costs :math:`10^2`–:math:`10^4` times the direct one, so
-it runs only where the direct evaluation returns ``NaN``, and only when
-``resolve`` is requested.
+The compound route costs :math:`10^2`–:math:`10^4` times the direct one
+and grows combinatorially with the number of photon groups, so it runs
+only where the direct evaluation returns ``NaN``.  This is why the default
+criterion is the reflection operator (:ref:`Chap:Numerics:Riccati`), which
+avoids the singular :math:`\bm{Q}` altogether at the cost of the direct
+route.

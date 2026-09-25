@@ -111,13 +111,13 @@ Variations to try
 
 * **Change the outer radius.**  If the wire region decides inception,
   :math:`b` should barely matter.  With :math:`b = 25` mm instead of 10 mm
-  the curves for :math:`a = 1` and 4 mm move by less than 2 %.  Keep an
-  eye on the thinnest wire at high pressure, though.  A large radius ratio
-  puts most of a long gap deep in attachment, which is where the
-  determinant formulation runs out of range
-  (:ref:`Chap:Numerics:Determinant`): with :math:`b = 25` mm and
-  :math:`a = 0.25` mm the positive-polarity curve develops a kink above
-  about 1 bar and then loses its root.
+  the curves for :math:`a = 1` and 4 mm move by less than 2 %.  A thin
+  wire in a wide tube is a demanding case — :math:`a = 0.25` mm with
+  :math:`b = 25` mm confines the ionization to a layer a few tenths of a
+  millimetre thick in a 25 mm gap — and the integration grid starts from
+  segments that follow the field so that layer is resolved
+  (:ref:`Chap:Numerics:Propagator`); both polarities then give smooth
+  curves up to tens of bar, a few per cent apart.
 * **Look at the profile first.**  ``incept1d field --field coaxial 1 10``
   plots :math:`f(\xi)` and the integration grid, and prints :math:`f(0)`,
   the ratio of the surface field to the mean field :math:`U/d`.

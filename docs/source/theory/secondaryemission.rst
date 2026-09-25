@@ -98,10 +98,9 @@ For the six-species dry-air scheme
    ``get_Pi_e()``, ``get_Pi_plus()`` and ``get_Pi_minus()``, each of shape
    ``(rows, N_s)``.  The photon selectors are built by the solver as
    ``Pi_fwd`` and ``Pi_bck`` (:math:`\bm{\Pi}_{\Psi^+}` and
-   :math:`\bm{\Pi}_{\Psi^-}`), because it decides at run time which photon
-   groups are propagated explicitly and which are folded into
-   :math:`\bm{A}`; their width is therefore the *augmented* dimension rather
-   than :math:`N_s` (:ref:`Chap:Numerics:Propagator`).
+   :math:`\bm{\Pi}_{\Psi^-}`), since they act on the photon part of the
+   augmented state; their width is therefore the *augmented* dimension
+   :math:`N_s + 2N_\gamma` rather than :math:`N_s`.
 
 The secondary-emission condition
 --------------------------------

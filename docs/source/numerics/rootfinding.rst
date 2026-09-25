@@ -11,28 +11,43 @@ Root finding in :math:`E/N`
 ---------------------------
 
 :func:`incept1d.inception.find_all_breakdown_EN` locates the :math:`E/N` roots of
-:math:`\det\bm{Q}(0; E/N)` at a single :math:`pd`:
+the inception criterion at a single :math:`pd` — the reflection criterion
+:math:`g` by default (:ref:`Chap:Numerics:Riccati`), or
+:math:`\det\bm{Q}(0; E/N)` with ``--criterion detq``:
 
-1. **Coarse scan.**  :math:`\det\bm{Q}` is evaluated on 200 log-spaced
-   points between 10 Td and :math:`3\times10^5` Td and every sign change is
-   bracketed.  For non-uniform fields the scan uses a cheap proxy — a
-   single-step uniform-field determinant — and each bracket is confirmed
-   with the full determinant before refinement.
-2. **Refinement.**  Each bracket is refined with
-   :func:`scipy.optimize.brentq` (``xtol=1e-8``, ``rtol=1e-14``).  ``NaN``
-   values are mapped to a tiny negative sentinel (:math:`-10^{-300}`) so
-   that Brent's method converges *through* the singular region rather than
-   failing.
-3. **Acceptance.**  :func:`incept1d.inception._accept_root` distinguishes a genuine
-   root (finite bracket endpoints of opposite sign; ``NaN`` at the root
-   itself is then the expected consequence of :math:`\bm{Q}` being exactly
-   singular) from an artefact created by the sentinel at a bracket
-   endpoint (discarded with a warning).  A finite but large residual is
-   accepted with a warning.
-4. **Hidden roots.**  A sign change lying just below the ``NaN`` boundary
-   would be invisible to the coarse scan; when the scan goes from positive
-   directly to ``NaN`` the interval is re-scanned finely with the full
-   determinant.
+1. **Below the scan range.**  :math:`g` is positive below inception and
+   negative above for every mechanism, so one evaluation at the bottom of
+   the scan range, 10 Td, tells whether inception lies below it.  If it
+   does — a strongly non-uniform gap can put its gap-averaged inception
+   field there — :math:`E/N` is halved until :math:`g` turns positive
+   (down to 0.1 Td) and that bracket is refined; no scan above it could
+   find the root.  (:math:`\det\bm{Q}` has no such invariant sign and
+   skips this step.)
+2. **Coarse scan.**  The criterion is evaluated on 200 log-spaced points
+   between 10 Td and :math:`3\times10^5` Td, from the bottom up, and every
+   sign change is bracketed.  When only the lowest root is wanted the scan
+   stops at the first confirmed root instead of paying for the points
+   above it.  For non-uniform fields the scan uses a cheap proxy — a
+   single-step uniform-field evaluation — and each bracket is confirmed
+   with the full criterion before refinement.
+3. **Refinement.**  Each bracket is refined with
+   :func:`scipy.optimize.brentq` (``xtol=1e-8``, ``rtol=1e-14``).  For
+   :math:`\det\bm{Q}`, ``NaN`` values are mapped to a tiny negative
+   sentinel (:math:`-10^{-300}`) so that Brent's method converges
+   *through* a singular region rather than failing.
+4. **Acceptance.**  :func:`incept1d.inception._accept_root` decides whether a
+   refined root is genuine.  For :math:`g` a root must be a crossing from
+   :math:`+` to :math:`-` in increasing :math:`E/N`: any such crossing is
+   accepted — a zero, or the pole at which :math:`g` jumps from about
+   :math:`+1` to :math:`-1` when the cathode contributes little — and a
+   crossing from :math:`-` to :math:`+` is rejected, since it cannot be
+   inception.  For :math:`\det\bm{Q}` a root bracketed by the ``NaN``
+   sentinel is discarded, and a finite but large residual is accepted
+   with a warning.
+5. **Hidden roots.**  For :math:`\det\bm{Q}`, a sign change lying just
+   below a ``NaN`` boundary would be invisible to the coarse scan; when the
+   scan goes from positive directly to ``NaN`` the interval is re-scanned
+   finely with the full determinant.
 
 By default only the lowest root is kept (``first_only``); with
 ``--all-branches`` every root is returned.
@@ -80,6 +95,15 @@ running the scan it replaces — only cheaper, because the interval is
 shorter.  Without this check a single spurious root at one end of the sweep
 propagates through every subsequent :math:`pd` point.
 
+The warm start matters most in non-uniform gaps, where the uniform-field
+proxy misleads a cold search into unconfirmed brackets and fallback scans;
+there, starting every point cold cost more than twice the work.  A
+parallel sweep (``--jobs``, :func:`incept1d.parallel.parallel_map`)
+therefore splits the :math:`pd` points into contiguous blocks, one per
+worker, each solved in order with warm starts, so only the first point of
+each block starts cold; the roots are assigned to branches afterwards in
+:math:`pd` order, and the result is the same as a sequential sweep.
+
 Branch tracking
 ---------------
 
@@ -94,26 +118,31 @@ lowest :math:`pd`.
 Root finding in :math:`\lambda`
 -------------------------------
 
-:func:`incept1d.growth.find_lambda_for_voltage` solves
-:math:`\det\bm{Q}(\lambda; E/N) = 0` at fixed :math:`E/N` above threshold
-for the growth rate of the dominant mode, which is the **largest** real
-root (:ref:`Sec:Lambda:Range` explains why).  Every evaluation uses the
-compound-matrix route where :math:`\bm{Q}` is singular
-(:ref:`Chap:Numerics:Determinant`), so no ``NaN`` convention is involved:
+:func:`incept1d.growth.find_lambda_for_voltage` solves the inception
+criterion at fixed :math:`E/N` above threshold, as a function of
+:math:`\lambda`, for the growth rate of the dominant mode, which is the
+**largest** real root (:ref:`Sec:Lambda:Range` explains why).  With the
+default reflection criterion :math:`g` (:ref:`Chap:Numerics:Riccati`) that
+root is also the only one: every loop gain falls as :math:`\lambda` grows,
+so :math:`g` rises through zero once.  The search does not rely on that,
+and works for :math:`\det\bm{Q}` as well:
 
-1. Evaluate :math:`\det\bm{Q}(0)`.  If it has the sub-threshold sign, the
-   voltage is below inception and :math:`\lambda^* = 0`.
-2. Start from :math:`\lambda_\mathrm{hi} = 10\,\nu_\mathrm{ion}`, ten times
-   the fastest local ionization rate in the gap — well above any rate at
-   which the gap as a whole can grow — and raise it by decades until
-   :math:`\det\bm{Q}(\lambda_\mathrm{hi})` has the sub-threshold sign.
+1. Evaluate the criterion at :math:`\lambda = 0`.  If it has the
+   sub-threshold sign, the voltage is below inception and
+   :math:`\lambda^* = 0`.
+2. Start from :math:`\lambda_\mathrm{hi} = 10\,\nu_\mathrm{ion}`, ten
+   times the fastest local ionization rate in the gap — well above any
+   rate at which the gap as a whole can grow — and raise it by decades
+   until the criterion has the sub-threshold sign there.
 3. Scan **down** by a factor of three until the sign changes.  Since no
    root lies above the dominant one, the first sign change met from above
    brackets it; scanning up from zero could stop at a slower mode instead.
    Two roots closer than the scan factor can be missed, but roots from
    different feedback loops are usually orders of magnitude apart.
 4. Refine the bracket with Brent's method.
-5. Check that :math:`\det\bm{Q}` changes sign across
-   :math:`\lambda^*(1 \pm 10^{-4})`.  Brent's method also converges on a
-   discontinuity — :math:`\bm{Q}` changes size where a photon group crosses
-   :math:`\kappa_j d = 12` — which is reported as ``suspect``.
+5. Check that the criterion changes sign across
+   :math:`\lambda^*(1 \pm 10^{-4})`; a bracket that closes on a jump
+   rather than a zero is reported as ``suspect``.
+
+The voltages of a sweep are independent, and are solved concurrently on
+``--jobs`` worker processes (:func:`incept1d.growth.solve_voltage`).
