@@ -19,6 +19,7 @@ from incept1d.solver import (
     _compound_index,
     _det_Q_compound,
     _det_Q_norm,
+    _expm,
     _expm_shifted,
     inception_det,
     magnus2_propagator,
@@ -324,6 +325,29 @@ class TestPolarityEquivalence:
 
         assert det(toy, True) == det(toy, False)
         assert det(overridden, True) != pytest.approx(det(overridden, False))
+
+
+class TestExpmStructuralZeros:
+    """exp(M) is exactly zero where no chain of M's entries reaches."""
+
+    def test_lower_triangular_step_stays_lower_triangular(self):
+        # The step that SciPy 1.18 returned with 1e36 above the diagonal.
+        M = np.array([[120.0, 0.0, 0.0], [72.2, 24.0, 0.0], [48.2, 0.0, 25.68]])
+        E = _expm(M)
+        assert np.all(E[np.triu_indices(3, 1)] == 0.0)
+        assert E[2, 1] == 0.0
+        # The non-zero entries are the closed form of this triangular exp.
+        assert E[0, 0] == pytest.approx(math.exp(120.0), rel=1e-12)
+        assert E[1, 0] == pytest.approx(
+            72.2 * (math.exp(120.0) - math.exp(24.0)) / 96.0, rel=1e-12
+        )
+
+    def test_chains_are_kept(self):
+        # 0 -> 1 -> 2: entry (2, 0) is reached through (1, 0) and (2, 1).
+        M = np.array([[1.0, 0.0, 0.0], [2.0, 1.0, 0.0], [0.0, 3.0, 1.0]])
+        E = _expm(M)
+        assert E[2, 0] == pytest.approx(math.e * 3.0, rel=1e-12)
+        assert E == pytest.approx(scipy.linalg.expm(M), rel=1e-12, abs=0.0)
 
 
 class TestCompoundRoute:

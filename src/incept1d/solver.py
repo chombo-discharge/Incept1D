@@ -102,6 +102,39 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     return A_aug, N_gamma_eff, aug_mask, n_aug
 
 
+def _expm(M):
+    """scipy.linalg.expm(M), with the structural zeros of exp(M) kept exact.
+
+    An entry of exp(M) is structurally zero when no chain of non-zero
+    entries of M links its column to its row; the series then gives
+    exactly 0.  SciPy >= 1.18 no longer returns 0 there, only a value small
+    relative to the norm of exp(M) (1e36 beside 1e52 for a lower-triangular
+    step).  The compound route and the Riccati criterion need each entry to
+    its own relative precision — a transiently tiny electron component is
+    later amplified back to O(1) — so those entries are reset to 0.  The
+    non-zero entries are unaffected (6e-13 against a 400-digit reference).
+    """
+    E = scipy.linalg.expm(M)
+    pattern = np.asarray(M) != 0.0
+    key = (pattern.shape, pattern.tobytes())
+    unreached = _UNREACHED.get(key)
+    if unreached is None:
+        reach = pattern | np.eye(pattern.shape[0], dtype=bool)
+        while True:
+            grown = (reach.astype(float) @ reach.astype(float)) > 0.0
+            if np.array_equal(grown, reach):
+                break
+            reach = grown
+        unreached = _UNREACHED[key] = ~reach
+    E[unreached] = 0.0
+    return E
+
+
+# Entries of exp(M) that no chain of non-zeros of M reaches, by the pattern
+# of M: a solve meets only a handful of patterns, one per species layout.
+_UNREACHED = {}
+
+
 def _expm_shifted(M):
     """Matrix exponential of M, shifted so that it cannot overflow.
 
@@ -118,7 +151,7 @@ def _expm_shifted(M):
     real_eigs = np.real(np.linalg.eigvals(M))
     lam_max = float(np.max(real_eigs))
     lam = lam_max if lam_max > 0.0 else 0.0
-    return scipy.linalg.expm(M - lam * np.eye(M.shape[0]))
+    return _expm(M - lam * np.eye(M.shape[0]))
 
 
 DX_N_MIN_DEFAULT = 5
@@ -448,9 +481,7 @@ def _propagate_compound(exponents, Y):
         # of Ω, so that the compound propagator cannot overflow.
         shift = float(mu[:k].sum()) / m
         if len(subsets) <= _DENSE_COMPOUND_MAX:
-            Pk = scipy.linalg.expm(
-                _additive_compound(Omega / m, k) - shift * np.eye(len(subsets))
-            )
+            Pk = _expm(_additive_compound(Omega / m, k) - shift * np.eye(len(subsets)))
             step = Pk.__matmul__
         else:
             Kk = _additive_compound(Omega / m, k, sparse=True) - shift * (
@@ -499,7 +530,7 @@ def _log_row_norm(row, exponents):
         mu = np.real(np.linalg.eigvals(Omega))
         m = max(1, math.ceil((mu.max() - mu.min()) / 30.0))
         shift = float(mu.max()) / m
-        P = scipy.linalg.expm(Omega / m - shift * np.eye(n))
+        P = _expm(Omega / m - shift * np.eye(n))
         done = 0
         while done < m:
             q = r @ P
