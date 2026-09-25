@@ -555,6 +555,44 @@ class TestGrowthInputs:
         assert "--distance 5 mm is ignored" in text and "10 mm" in text
         assert "# Distance:    10 mm" in out.read_text()
 
+    def test_verify_checks_every_root(self, capsys):
+        """One check for V* and one per growth rate, all sign changes."""
+        rc = _run(
+            "growth",
+            TOY,
+            "--distance",
+            "20",
+            "--n-voltages",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert out.count("det Q(E/N*") == 1 and out.count("det Q(λ*") == 2
+        assert "✗" not in out
+
+    def test_silent_prints_only_the_table(self, capsys):
+        rc = _run(
+            "growth",
+            TOY,
+            "--distance",
+            "20",
+            "--n-voltages",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--silent",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "Finding" not in out and "det Q(" not in out and "[1/3]" not in out
+        assert "λ (s⁻¹)" in out  # the table still prints
+
     def test_parallel_voltages_write_the_same_file(self, tmp_path, capsys):
         rows = []
         for jobs in ("1", "2"):

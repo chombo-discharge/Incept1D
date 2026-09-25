@@ -11,6 +11,7 @@ det Q(λ, E/N) = 0 for λ at each voltage V ∈ [V*, F·V*].  See
 """
 
 import functools
+import math
 import time
 import os
 
@@ -25,6 +26,7 @@ from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.output import write_metadata_header
 from incept1d.parallel import parallel_map, physical_cores
 from incept1d.solver import (
+    inception_det,
     DX_N_MAX_DEFAULT,
     DX_N_MIN_DEFAULT,
     DX_TOL_DEFAULT,
@@ -39,7 +41,36 @@ from incept1d.solver import (
 _POLARITIES = (("positive", True), ("negative", False))
 
 
-def _progress(label, i, n, row, seconds):
+#: Relative distance from a root at which det Q is checked for a sign change;
+#: not smaller, since the adaptive grid is chosen per evaluation.
+_VERIFY_EPS = 1e-3
+
+
+#: At most this many markers on a plotted curve; the line carries the rest.
+_MAX_MARKERS = 20
+
+
+def _markevery(mask):
+    """Every k-th point, k chosen so a curve gets at most _MAX_MARKERS markers."""
+    return max(1, math.ceil(int(np.count_nonzero(mask)) / _MAX_MARKERS))
+
+
+def _verdict(check):
+    """' det Q(...) = a / b ✓' for a (below, above) pair, '' for None."""
+    if check is None:
+        return ""
+    what, below, above = check
+    ok = (
+        np.isfinite(below)
+        and np.isfinite(above)
+        and np.sign(below) * np.sign(above) < 0.0  # the product can underflow
+    )
+    return f"   det Q({what}·(1∓{_VERIFY_EPS:g})) = {below:+.2e} / {above:+.2e} " + (
+        "✓" if ok else "✗"
+    )
+
+
+def _progress(label, i, n, row, seconds, check=None):
     """Print one voltage of one curve as soon as it is solved."""
     V_kV, V_ratio, EN_ref, lam, tau_ns, nu_ion, status = row
     head = (
@@ -53,7 +84,7 @@ def _progress(label, i, n, row, seconds):
         body = f"λ = {lam:.4e} s⁻¹   τ = {tau_ns:10.3f} ns"
     else:
         body = "λ = NaN"
-    print(f"{head}   {body}{tag}   ({seconds:.1f} s)", flush=True)
+    print(f"{head}   {body}{tag}   ({seconds:.1f} s){_verdict(check)}", flush=True)
 
 
 def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_dist):
@@ -168,6 +199,24 @@ def add_arguments(parser):
     )
     add_field_argument(parser)
     add_criterion_argument(parser)
+    parser.add_argument(
+        "--silent",
+        action="store_true",
+        default=False,
+        help="Print only the result tables, no progress.",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        default=False,
+        help=(
+            "Check every root with the independent det Q criterion on the same "
+            "field and grid: det Q must change sign across E/N* for each "
+            "inception voltage and across lambda* for each growth rate.  "
+            "Printed with the progress (so not with --silent).  Expensive: det "
+            "Q with every photon group explicit takes the compound route."
+        ),
+    )
     parser.add_argument(
         "--jobs",
         type=int,
@@ -286,8 +335,26 @@ def run(args, parser):
             propagator=_propagator,
         )
 
+    def detq_for(c):
+        """det Q on the same field, grid and polarity, for --verify."""
+        return functools.partial(
+            inception_det,
+            field_dist=_field_dist,
+            N_min=_N_min,
+            N_max=_N_max,
+            tol=_tol,
+            positive_polarity=c["positive"],
+            propagator=_propagator,
+        )
+
+    verify = args.verify and not args.silent and args.criterion != "detq"
+
+    def say(*a, **k):
+        if not args.silent:
+            print(*a, **k)
+
     # ── Phase 1: the inception voltage of every curve, in parallel ─────────
-    print(
+    say(
         f"\nFinding the inception voltages (p = {args.pressure:g} bar, "
         f"d = {args.distance:g} mm, pd = {pd_mm:.6g} bar·mm):"
     )
@@ -302,17 +369,30 @@ def run(args, parser):
             first_only=True,
             det_fn=criterion_for(solved[k]),
         )
-        return (roots[0] if roots else None), time.perf_counter() - t_start
+        seconds = time.perf_counter() - t_start
+        EN_star = roots[0] if roots else None
+        check = None
+        if verify and EN_star is not None:
+            detq = detq_for(solved[k])
+            m, p = solved[k]["mod"], args.pressure
+            check = (
+                "E/N*",
+                detq(EN_star * (1.0 - _VERIFY_EPS), pd_m, m, p, args.T),
+                detq(EN_star * (1.0 + _VERIFY_EPS), pd_m, m, p, args.T),
+            )
+        return EN_star, seconds, check
 
     def report_star(k, result):
-        EN_star, seconds = result
+        if args.silent:
+            return
+        EN_star, seconds, check = result
         if EN_star is None:
             print(f"  [{solved[k]['label']}]  no inception found  ({seconds:.1f} s)")
             return
         V_star = EN_star * pd_m * 1e-16 / (_kB * args.T)
         print(
             f"  [{solved[k]['label']}]  V* = {V_star * 1e-3:.4f} kV   "
-            f"E/N* = {EN_star:.2f} Td   ({seconds:.1f} s)",
+            f"E/N* = {EN_star:.2f} Td   ({seconds:.1f} s){_verdict(check)}",
             flush=True,
         )
 
@@ -320,13 +400,13 @@ def run(args, parser):
 
     # ── Phase 2: every (curve, voltage) in one pool ─────────────────────────
     sweeps = {}
-    for k, (EN_star, _) in enumerate(stars):
+    for k, (EN_star, *_) in enumerate(stars):
         if EN_star is not None:
             sweeps[k] = voltage_sweep(
                 EN_star, pd_m, args.T, args.n_voltages, args.v_max_factor
             )
     tasks = [(k, i) for k in sweeps for i in range(args.n_voltages)]
-    print(
+    say(
         f"\nComputing λ(V) from V* to {args.v_max_factor:.2g}×V* "
         f"({len(tasks)} voltages on {min(args.jobs, max(len(tasks), 1))} workers):"
     )
@@ -335,7 +415,7 @@ def run(args, parser):
         k, i = tasks[t]
         V_star, voltages = sweeps[k]
         c = solved[k]
-        return solve_voltage(
+        row, seconds = solve_voltage(
             voltages[i],
             V_star,
             pd_m,
@@ -351,14 +431,27 @@ def run(args, parser):
             criterion=CRITERIA[args.criterion],
             at_inception=(i == 0),
         )
+        lam, EN_ref = row[3], row[2]
+        check = None
+        if verify and i > 0 and np.isfinite(lam) and lam > 0.0:
+            detq = detq_for(c)
+            m, p = c["mod"], args.pressure
+            check = (
+                "λ*",
+                detq(EN_ref, pd_m, m, p, args.T, lam=lam * (1.0 - _VERIFY_EPS)),
+                detq(EN_ref, pd_m, m, p, args.T, lam=lam * (1.0 + _VERIFY_EPS)),
+            )
+        return row, seconds, check
 
     def report_task(t, result):
+        if args.silent:
+            return
         k, i = tasks[t]
         _progress(solved[k]["label"], i, args.n_voltages, *result)
 
     results = parallel_map(solve_task, len(tasks), args.jobs, on_result=report_task)
     rows_of = {k: [None] * args.n_voltages for k in sweeps}
-    for (k, i), (row, _) in zip(tasks, results):
+    for (k, i), (row, *_) in zip(tasks, results):
         rows_of[k][i] = row
 
     # list of (label, config_label, polarity, rows), in curve order; a mirrored
@@ -437,9 +530,9 @@ def run(args, parser):
         )
 
         mask = np.isfinite(lam_arr) & (lam_arr > 0.0)  # λ = 0 at V* has no log
-        ax1.semilogy(V_arr[mask], lam_arr[mask], **kw)
+        ax1.semilogy(V_arr[mask], lam_arr[mask], markevery=_markevery(mask), **kw)
         mask2 = np.isfinite(tau_arr)
-        ax2.semilogy(V_arr[mask2], tau_arr[mask2], **kw)
+        ax2.semilogy(V_arr[mask2], tau_arr[mask2], markevery=_markevery(mask2), **kw)
 
     ax1.set_xlabel("Voltage (kV)")
     ax1.set_ylabel(r"$\lambda$  (s$^{-1}$)")
