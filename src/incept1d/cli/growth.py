@@ -22,6 +22,7 @@ from incept1d.growth import compute_lambda_curve
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.output import write_metadata_header
+from incept1d.parallel import physical_cores
 from incept1d.solver import (
     DX_N_MAX_DEFAULT,
     DX_N_MIN_DEFAULT,
@@ -35,6 +36,20 @@ from incept1d.solver import (
 )
 
 _POLARITIES = (("positive", True), ("negative", False))
+
+
+def _progress(i, n, row, seconds):
+    """Print one voltage of the sweep as soon as it is solved."""
+    V_kV, V_ratio, EN_ref, lam, tau_ns, nu_ion, status = row
+    head = f"  [{i + 1:{len(str(n))}d}/{n}]  V = {V_kV:10.4f} kV ({V_ratio:.3f}×V*)"
+    tag = f"  [{status}]" if status != "ok" else ""
+    if i == 0:
+        body = "λ = 0  (inception)"
+    elif np.isfinite(lam):
+        body = f"λ = {lam:.4e} s⁻¹   τ = {tau_ns:10.3f} ns"
+    else:
+        body = "λ = NaN"
+    print(f"{head}   {body}{tag}   ({seconds:.1f} s)", flush=True)
 
 
 def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_dist):
@@ -54,8 +69,9 @@ def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_di
     with open(out_path, "w") as fh:
         write_metadata_header(fh, extra_paths=[args.mechanism])
         fh.write(f"# Mechanism:   {mech_name}\n")
-        fh.write(f"# pd:          {args.pd} bar·mm\n")
-        fh.write(f"# Pressure:    {args.p} bar\n")
+        fh.write(f"# Pressure:    {args.pressure:g} bar\n")
+        fh.write(f"# Distance:    {args.distance:g} mm\n")
+        fh.write(f"# pd:          {args.pressure * args.distance:.6g} bar·mm\n")
         fh.write(f"# Temperature: {args.T} K\n")
         fh.write(f"# Field type:  {field_dist.label}\n")
         fh.write(f"# V_max_factor:{args.v_max_factor}\n")
@@ -109,18 +125,22 @@ def add_arguments(parser):
         ),
     )
     parser.add_argument(
-        "--pd",
-        type=float,
-        required=True,
-        metavar="PD",
-        help="Pressure × gap product in bar·mm.",
-    )
-    parser.add_argument(
-        "--p",
+        "--pressure",
         type=float,
         default=1.0,
         metavar="P",
         help="Gas pressure in bar (default: 1.0).",
+    )
+    parser.add_argument(
+        "--distance",
+        type=float,
+        default=None,
+        metavar="D",
+        help=(
+            "Gap length in mm.  Required unless the geometry fixes it: a "
+            "coaxial gap is b - a long and a field line its arc length, and "
+            "--distance is then ignored (with a message saying so)."
+        ),
     )
     parser.add_argument(
         "--T",
@@ -144,6 +164,17 @@ def add_arguments(parser):
     )
     add_field_argument(parser)
     add_criterion_argument(parser)
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Worker processes; the voltages are solved concurrently (default: "
+            f"the number of physical cores, {physical_cores()} here, or 1 if it "
+            "cannot be determined).  --jobs 1 solves them one after another."
+        ),
+    )
     parser.add_argument(
         "--dx",
         nargs="*",
@@ -191,7 +222,30 @@ def run(args, parser):
         midpoint_propagator if args.method == "midpoint" else magnus2_propagator
     )
 
-    pd_m = args.pd * 1e-3  # bar·mm → bar·m
+    if args.jobs is None:
+        args.jobs = physical_cores()
+    if args.jobs < 1:
+        parser.error("--jobs must be >= 1")
+    if args.pressure <= 0.0:
+        parser.error("--pressure must be > 0")
+
+    # The gap length: given, or fixed by the geometry.
+    fixed = _field_dist.fixed_gap_length
+    if fixed is not None:
+        why = "b - a" if _field_dist.field_type == "coaxial" else "its arc length"
+        if args.distance is not None and abs(args.distance * 1e-3 / fixed - 1.0) > 1e-9:
+            print(
+                f"Note: --distance {args.distance:g} mm is ignored: the "
+                f"{_field_dist.field_type} geometry fixes the gap at "
+                f"{fixed * 1e3:.6g} mm ({why})."
+            )
+        args.distance = fixed * 1e3
+    elif args.distance is None:
+        parser.error(f"--distance is required for --field {_field_dist.field_type}")
+    elif args.distance <= 0.0:
+        parser.error("--distance must be > 0")
+    pd_mm = args.pressure * args.distance  # bar·mm
+    pd_m = pd_mm * 1e-3  # bar·m
     mech_name = os.path.basename(args.mechanism)
 
     raw_dicts = read_json_configs(args.configs) if args.configs else [{}]
@@ -229,10 +283,11 @@ def run(args, parser):
 
             print(
                 f"\nFinding inception voltage: {pol_label}  "
-                f"(pd = {args.pd} bar·mm, p = {args.p} bar)"
+                f"(p = {args.pressure:g} bar, d = {args.distance:g} mm, "
+                f"pd = {pd_mm:.6g} bar·mm)"
             )
             roots = find_all_breakdown_EN(
-                pd_m, mod, args.p, args.T, first_only=True, det_fn=det_fn
+                pd_m, mod, args.pressure, args.T, first_only=True, det_fn=det_fn
             )
             if not roots:
                 print(f"  [{pol_label}] No inception found — skipping.")
@@ -247,7 +302,7 @@ def run(args, parser):
                 EN_star,
                 pd_m,
                 mod,
-                args.p,
+                args.pressure,
                 args.T,
                 _field_dist,
                 _N_min,
@@ -258,6 +313,8 @@ def run(args, parser):
                 args.v_max_factor,
                 positive_polarity=positive,
                 criterion=CRITERIA[args.criterion],
+                progress=_progress,
+                jobs=args.jobs,
             )
             curve_records.append((pol_label, label, polarity, rows))
             if positive:
@@ -301,7 +358,7 @@ def run(args, parser):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
     fig.suptitle(
         f"Growth rate vs. voltage  —  {mech_name},  "
-        f"pd = {args.pd} bar·mm,  p = {args.p} bar,  T = {args.T} K,  "
+        f"p = {args.pressure:g} bar,  d = {args.distance:g} mm,  T = {args.T} K,  "
         f"{_field_dist.label}",
         fontsize=12,
     )

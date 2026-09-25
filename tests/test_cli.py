@@ -412,7 +412,7 @@ class TestPolarity:
             "growth",
             TOY,
             *extra,
-            "--pd",
+            "--distance",
             "20",
             "--n-voltages",
             "3",
@@ -522,6 +522,62 @@ class TestJobs:
 
     def test_jobs_must_be_positive(self, capsys):
         assert _run("pdiv", TOY, "--no-plot", "--jobs", "0") != 0
+
+
+class TestGrowthInputs:
+    """--pressure / --distance, and geometries that fix the gap themselves."""
+
+    def test_distance_is_required_for_a_free_gap(self, capsys):
+        assert _run("growth", TOY, "--no-plot") != 0
+        assert "--distance is required" in capsys.readouterr().err
+
+    def test_distance_is_ignored_for_coaxial(self, tmp_path, capsys):
+        out = tmp_path / "coax.dat"
+        rc = _run(
+            "growth",
+            TOY,
+            "--field",
+            "coaxial",
+            "1",
+            "11",
+            "--distance",
+            "5",
+            "--n-voltages",
+            "2",
+            "--jobs",
+            "1",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        text = capsys.readouterr().out
+        assert rc == 0
+        assert "--distance 5 mm is ignored" in text and "10 mm" in text
+        assert "# Distance:    10 mm" in out.read_text()
+
+    def test_parallel_voltages_write_the_same_file(self, tmp_path, capsys):
+        rows = []
+        for jobs in ("1", "2"):
+            out = tmp_path / f"g{jobs}.dat"
+            rc = _run(
+                "growth",
+                TOY,
+                "--distance",
+                "20",
+                "--n-voltages",
+                "4",
+                "--no-plot",
+                "--jobs",
+                jobs,
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            rows.append(
+                [ln for ln in out.read_text().splitlines() if not ln.startswith("#")]
+            )
+        capsys.readouterr()
+        assert rows[0] == rows[1]
 
 
 class TestArgumentValidation:

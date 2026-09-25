@@ -16,11 +16,14 @@ bracketed, is described in ``docs/source/numerics/rootfinding.rst``.
 The command-line front end is :mod:`incept1d.cli.growth`.
 """
 
+import time
+
 import numpy as np
 import scipy.optimize
 
 from incept1d.constants import kB as _kB
 from incept1d.eigenvalues import max_real_eigenvalue as _max_real_eigenvalue
+from incept1d.parallel import parallel_map
 from incept1d.solver import inception_det, riccati_criterion
 
 # ── Core solver ───────────────────────────────────────────────────────────────
@@ -229,6 +232,8 @@ def compute_lambda_curve(
     v_max_factor,
     positive_polarity=True,
     criterion=None,
+    progress=None,
+    jobs=1,
 ):
     """
     Sweep voltages from V* to v_max_factor·V* and find λ at each point.
@@ -258,6 +263,13 @@ def compute_lambda_curve(
         inception field for the same polarity.
     criterion : callable
         Passed on to :func:`find_lambda_for_voltage`.
+    progress : callable or None
+        Called as ``progress(i, n, row, seconds)`` after each voltage, with
+        the row described below and the time it took; in completion order
+        when ``jobs > 1``.
+    jobs : int
+        Worker processes (see :func:`incept1d.parallel.parallel_map`); the
+        voltages are independent, so they are solved concurrently.
 
     Returns
     -------
@@ -271,14 +283,13 @@ def compute_lambda_curve(
     V_star = EN_star * pd * 1e-16 / (_kB * T)  # inception voltage in V
     voltages_V = np.geomspace(V_star, v_max_factor * V_star, n_voltages)
 
-    results = []
-    for i, V in enumerate(voltages_V):
+    def solve(i, previous=None):
+        # The voltages are independent: *previous* (see parallel_map) is not
+        # needed, since each lambda search brackets from its own upper bound.
+        t_start = time.perf_counter()
+        V = voltages_V[i]
         EN_ref = V * _kB * T / (pd * 1e-16)  # Townsend
-        V_kV = V * 1e-3
-        V_ratio = V / V_star
-
         nu_ion = peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist)
-
         if i == 0:
             # V = V* by construction; λ* = 0 by definition.
             lam_star, status = 0.0, "ok"
@@ -298,26 +309,19 @@ def compute_lambda_curve(
                 positive_polarity=positive_polarity,
                 criterion=criterion,
             )
-
         tau_ns = (
             1e9 / lam_star
             if (np.isfinite(lam_star) and lam_star > 0.0)
             else float("nan")
         )
-        results.append((V_kV, V_ratio, EN_ref, lam_star, tau_ns, nu_ion, status))
+        row = (V * 1e-3, V / V_star, EN_ref, lam_star, tau_ns, nu_ion, status)
+        return row, time.perf_counter() - t_start
 
-        tag = f"  [{status}]" if status != "ok" else ""
-        if i == 0:
-            print(f"  V = {V_kV:8.4f} kV  (1.000×V*)  λ = 0  (inception){tag}")
-        elif np.isfinite(lam_star):
-            print(
-                f"  V = {V_kV:8.4f} kV  ({V_ratio:.3f}×V*)  "
-                f"λ = {lam_star:.4e} s⁻¹  τ = {tau_ns:.3f} ns{tag}"
-            )
-        else:
-            print(f"  V = {V_kV:8.4f} kV  ({V_ratio:.3f}×V*)  λ = NaN{tag}")
+    def report(i, result):
+        if progress is not None:
+            progress(i, n_voltages, *result)
 
-    return results
+    return [row for row, _ in parallel_map(solve, n_voltages, jobs, on_result=report)]
 
 
 # ── File output ───────────────────────────────────────────────────────────────

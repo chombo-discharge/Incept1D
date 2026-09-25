@@ -66,14 +66,20 @@ Inputs
 .. code-block:: console
 
    incept1d growth MECHANISM.py [CONFIG.json ...]
-       --pd PD [--p P] [--T T] [--n-voltages N] [--v-max-factor F]
+       [--pressure P] [--distance D] [--T T] [--n-voltages N] [--v-max-factor F]
        [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
-       [--no-plot] [--write-to-file FILE]
+       [--criterion {riccati,detq}] [--jobs N] [--no-plot] [--write-to-file FILE]
 
-``--pd`` is the :math:`pd` product in bar·mm (required); ``--n-voltages``
-(default 20) and ``--v-max-factor`` (default 2.0) define the log-spaced
-voltage sweep from :math:`U^*` to :math:`F U^*`.  The remaining options are
-shared with ``incept1d pdiv``.  The output table lists, for each voltage, the
+``--pressure`` is the gas pressure in bar (default 1) and ``--distance`` the
+gap length in mm.  ``--distance`` is required unless the geometry fixes the
+gap itself: a coaxial gap is :math:`b - a` long and a field line its arc
+length, and a ``--distance`` given with those is ignored, with a message
+saying so.  ``--n-voltages`` (default 20) and ``--v-max-factor`` (default
+2.0) define the log-spaced voltage sweep from :math:`U^*` to :math:`F U^*`.
+The voltages are independent and are solved concurrently on ``--jobs``
+worker processes (default: the number of physical cores); each is printed
+as soon as it is solved, and the table at the end is in voltage order.  The
+remaining options are shared with ``incept1d pdiv``.  The output table lists, for each voltage, the
 over-voltage ratio :math:`U/U^*`, :math:`E/N`, :math:`\lambda` and the
 corresponding e-folding time :math:`1/\lambda`.
 
@@ -82,7 +88,7 @@ Example
 
 .. code-block:: bash
 
-   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.py --pd 10 --p 1 --n-voltages 30 --v-max-factor 1.5
+   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.py --pressure 1 --distance 10 --n-voltages 30 --v-max-factor 1.5
 
 Outputs
 -------
