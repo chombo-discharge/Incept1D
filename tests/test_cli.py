@@ -593,6 +593,47 @@ class TestGrowthInputs:
         assert "Finding" not in out and "det Q(" not in out and "[1/3]" not in out
         assert "λ (s⁻¹)" in out  # the table still prints
 
+    def test_ranges_give_every_combination(self, tmp_path, capsys):
+        """2 pressures (a MIN:MAX:N range) x 2 distances = 4 labelled cases."""
+        out = tmp_path / "matrix.dat"
+        rc = _run(
+            "growth",
+            TOY,
+            "--pressure",
+            "1:4:2",
+            "--distance",
+            "10",
+            "20",
+            "--n-voltages",
+            "2",
+            "--jobs",
+            "2",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        text = capsys.readouterr().out
+        assert rc == 0
+        col = _columns(out)
+        cases = {
+            n.split("[", 1)[1].rsplit(" (", 1)[0] for n in col if n.startswith("V_kV[")
+        }
+        assert cases == {
+            f"Baseline, p={p} bar, d={d} mm" for p in ("1", "4") for d in ("10", "20")
+        }
+        assert "4 cases: 2 pressure(s) × 2 distance(s)" in text
+        header = out.read_text()
+        assert (
+            "# Pressure:    1, 4 bar" in header and "# Distance:    10, 20 mm" in header
+        )
+
+    @pytest.mark.parametrize("bad", ["1:10", "1:10:1", "0:10:3", "a", "-2"])
+    def test_malformed_values_are_rejected(self, bad, capsys):
+        assert (
+            _run("growth", TOY, "--distance", "10", "--pressure", bad, "--no-plot") != 0
+        )
+        assert "--pressure" in capsys.readouterr().err
+
     def test_parallel_voltages_write_the_same_file(self, tmp_path, capsys):
         rows = []
         for jobs in ("1", "2"):

@@ -17,6 +17,7 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 
 from incept1d.constants import kB as _kB
 from incept1d.fields import add_field_argument, parse_field_spec
@@ -44,6 +45,44 @@ _POLARITIES = (("positive", True), ("negative", False))
 #: Relative distance from a root at which det Q is checked for a sign change;
 #: not smaller, since the adaptive grid is chosen per evaluation.
 _VERIFY_EPS = 1e-3
+
+
+def _listing(values):
+    """'2', or '1, 2.5, 10' for a short list, or '1–10 (5 values)'."""
+    if len(values) == 1:
+        return f"{values[0]:.4g}"
+    if len(values) <= 4:
+        return ", ".join(f"{v:.4g}" for v in values)
+    return f"{min(values):.4g}–{max(values):.4g} ({len(values)} values)"
+
+
+def _parse_values(tokens, option, parser):
+    """
+    Values of --pressure / --distance: numbers, or MIN:MAX:N ranges.
+
+    MIN:MAX:N expands to N log-spaced values from MIN to MAX inclusive.
+    Returns the values in the order given, each positive.
+    """
+    values = []
+    for token in tokens:
+        parts = token.split(":")
+        try:
+            if len(parts) == 1:
+                values.append(float(parts[0]))
+            elif len(parts) == 3:
+                lo, hi, n = float(parts[0]), float(parts[1]), int(parts[2])
+                if n < 1 or (n == 1 and lo != hi):
+                    raise ValueError("N must be >= 2 unless MIN = MAX")
+                if lo <= 0.0 or hi <= 0.0:
+                    raise ValueError("MIN and MAX must be > 0")
+                values.extend(float(v) for v in np.geomspace(lo, hi, n))
+            else:
+                raise ValueError("expected a number or MIN:MAX:N")
+        except ValueError as exc:
+            parser.error(f"{option} {token!r}: {exc}")
+    if any(v <= 0.0 for v in values):
+        parser.error(f"{option} values must be > 0")
+    return values
 
 
 #: At most this many markers on a plotted curve; the line carries the rest.
@@ -104,9 +143,14 @@ def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_di
     with open(out_path, "w") as fh:
         write_metadata_header(fh, extra_paths=[args.mechanism])
         fh.write(f"# Mechanism:   {mech_name}\n")
-        fh.write(f"# Pressure:    {args.pressure:g} bar\n")
-        fh.write(f"# Distance:    {args.distance:g} mm\n")
-        fh.write(f"# pd:          {args.pressure * args.distance:.6g} bar·mm\n")
+        fh.write(f"# Pressure:    {_listing(args.pressures)} bar\n")
+        fh.write(f"# Distance:    {_listing(args.distances)} mm\n")
+        if len(args.pressures) == len(args.distances) == 1:
+            fh.write(
+                f"# pd:          {args.pressures[0] * args.distances[0]:.6g} bar·mm\n"
+            )
+        else:
+            fh.write("# Cases:       every pressure with every distance (see labels)\n")
         fh.write(f"# Temperature: {args.T} K\n")
         fh.write(f"# Field type:  {field_dist.label}\n")
         fh.write(f"# V_max_factor:{args.v_max_factor}\n")
@@ -161,19 +205,23 @@ def add_arguments(parser):
     )
     parser.add_argument(
         "--pressure",
-        type=float,
-        default=1.0,
+        nargs="+",
+        default=["1"],
         metavar="P",
-        help="Gas pressure in bar (default: 1.0).",
+        help=(
+            "Gas pressure(s) in bar (default: 1).  One or more values; "
+            "MIN:MAX:N expands to N log-spaced values, e.g. 1:10:5."
+        ),
     )
     parser.add_argument(
         "--distance",
-        type=float,
+        nargs="+",
         default=None,
         metavar="D",
         help=(
-            "Gap length in mm.  Required unless the geometry fixes it: a "
-            "coaxial gap is b - a long and a field line its arc length, and "
+            "Gap length(s) in mm, as for --pressure; every pressure is combined "
+            "with every distance.  Required unless the geometry fixes the gap: "
+            "a coaxial gap is b - a long and a field line its arc length, and "
             "--distance is then ignored (with a message saying so)."
         ),
     )
@@ -279,26 +327,30 @@ def run(args, parser):
         args.jobs = physical_cores()
     if args.jobs < 1:
         parser.error("--jobs must be >= 1")
-    if args.pressure <= 0.0:
-        parser.error("--pressure must be > 0")
+    pressures = _parse_values(args.pressure, "--pressure", parser)
 
-    # The gap length: given, or fixed by the geometry.
+    # The gap length(s): given, or fixed by the geometry.
     fixed = _field_dist.fixed_gap_length
     if fixed is not None:
         why = "b - a" if _field_dist.field_type == "coaxial" else "its arc length"
-        if args.distance is not None and abs(args.distance * 1e-3 / fixed - 1.0) > 1e-9:
+        given = (
+            _parse_values(args.distance, "--distance", parser) if args.distance else []
+        )
+        if any(abs(d * 1e-3 / fixed - 1.0) > 1e-9 for d in given):
+            shown = " ".join(args.distance)
             print(
-                f"Note: --distance {args.distance:g} mm is ignored: the "
+                f"Note: --distance {shown} mm is ignored: the "
                 f"{_field_dist.field_type} geometry fixes the gap at "
                 f"{fixed * 1e3:.6g} mm ({why})."
             )
-        args.distance = fixed * 1e3
+        distances = [fixed * 1e3]
     elif args.distance is None:
         parser.error(f"--distance is required for --field {_field_dist.field_type}")
-    elif args.distance <= 0.0:
-        parser.error("--distance must be > 0")
-    pd_mm = args.pressure * args.distance  # bar·mm
-    pd_m = pd_mm * 1e-3  # bar·m
+    else:
+        distances = _parse_values(args.distance, "--distance", parser)
+    # Every pressure with every distance.
+    cases = [(p, d) for p in pressures for d in distances]
+    args.pressures, args.distances = pressures, distances
     mech_name = os.path.basename(args.mechanism)
 
     raw_dicts = read_json_configs(args.configs) if args.configs else [{}]
@@ -306,22 +358,33 @@ def run(args, parser):
     # ── The curves: one per configuration and polarity ─────────────────────
     # A symmetric gap with identical electrodes solves positive polarity only
     # and mirrors it for negative.
+    # With several (pressure, distance) cases every label names its case;
+    # "config" then groups a configuration at one case (colour in the plot).
     curves = []
     for cfg_dict in raw_dicts:
         mod = load_mechanism(args.mechanism, cfg_dict)
-        label = mod.label or "Baseline"
+        name = mod.label or "Baseline"
         same = polarities_equivalent(mod, _field_dist)
-        for polarity, positive in _POLARITIES:
-            curves.append(
-                dict(
-                    label=f"{label} ({_field_dist.polarity_label(polarity)})",
-                    config=label,
-                    polarity=polarity,
-                    positive=positive,
-                    mod=mod,
-                    mirror=(not positive and same),
-                )
+        for p_bar, d_mm in cases:
+            label = (
+                name
+                if len(cases) == 1
+                else f"{name}, p={p_bar:.4g} bar, d={d_mm:.4g} mm"
             )
+            for polarity, positive in _POLARITIES:
+                curves.append(
+                    dict(
+                        label=f"{label} ({_field_dist.polarity_label(polarity)})",
+                        config=label,
+                        polarity=polarity,
+                        positive=positive,
+                        mod=mod,
+                        mirror=(not positive and same),
+                        p=p_bar,
+                        d=d_mm,
+                        pd_m=p_bar * d_mm * 1e-3,  # bar·m
+                    )
+                )
     solved = [c for c in curves if not c["mirror"]]
 
     def criterion_for(c):
@@ -354,31 +417,39 @@ def run(args, parser):
             print(*a, **k)
 
     # ── Phase 1: the inception voltage of every curve, in parallel ─────────
-    say(
-        f"\nFinding the inception voltages (p = {args.pressure:g} bar, "
-        f"d = {args.distance:g} mm, pd = {pd_mm:.6g} bar·mm):"
-    )
+    if len(cases) == 1:
+        ((p_bar, d_mm),) = cases
+        say(
+            f"\nFinding the inception voltages (p = {p_bar:g} bar, "
+            f"d = {d_mm:g} mm, pd = {p_bar * d_mm:.6g} bar·mm):"
+        )
+    else:
+        say(
+            f"\nFinding the inception voltages ({len(cases)} cases: "
+            f"{len(pressures)} pressure(s) × {len(distances)} distance(s)):"
+        )
 
     def find_star(k, previous=None):
         t_start = time.perf_counter()
+        c = solved[k]
         roots = find_all_breakdown_EN(
-            pd_m,
-            solved[k]["mod"],
-            args.pressure,
+            c["pd_m"],
+            c["mod"],
+            c["p"],
             args.T,
             first_only=True,
-            det_fn=criterion_for(solved[k]),
+            det_fn=criterion_for(c),
         )
         seconds = time.perf_counter() - t_start
         EN_star = roots[0] if roots else None
         check = None
         if verify and EN_star is not None:
-            detq = detq_for(solved[k])
-            m, p = solved[k]["mod"], args.pressure
+            detq = detq_for(c)
+            m, p, pd = c["mod"], c["p"], c["pd_m"]
             check = (
                 "E/N*",
-                detq(EN_star * (1.0 - _VERIFY_EPS), pd_m, m, p, args.T),
-                detq(EN_star * (1.0 + _VERIFY_EPS), pd_m, m, p, args.T),
+                detq(EN_star * (1.0 - _VERIFY_EPS), pd, m, p, args.T),
+                detq(EN_star * (1.0 + _VERIFY_EPS), pd, m, p, args.T),
             )
         return EN_star, seconds, check
 
@@ -389,7 +460,7 @@ def run(args, parser):
         if EN_star is None:
             print(f"  [{solved[k]['label']}]  no inception found  ({seconds:.1f} s)")
             return
-        V_star = EN_star * pd_m * 1e-16 / (_kB * args.T)
+        V_star = EN_star * solved[k]["pd_m"] * 1e-16 / (_kB * args.T)
         print(
             f"  [{solved[k]['label']}]  V* = {V_star * 1e-3:.4f} kV   "
             f"E/N* = {EN_star:.2f} Td   ({seconds:.1f} s){_verdict(check)}",
@@ -403,7 +474,7 @@ def run(args, parser):
     for k, (EN_star, *_) in enumerate(stars):
         if EN_star is not None:
             sweeps[k] = voltage_sweep(
-                EN_star, pd_m, args.T, args.n_voltages, args.v_max_factor
+                EN_star, solved[k]["pd_m"], args.T, args.n_voltages, args.v_max_factor
             )
     tasks = [(k, i) for k in sweeps for i in range(args.n_voltages)]
     say(
@@ -418,9 +489,9 @@ def run(args, parser):
         row, seconds = solve_voltage(
             voltages[i],
             V_star,
-            pd_m,
+            c["pd_m"],
             c["mod"],
-            args.pressure,
+            c["p"],
             args.T,
             _field_dist,
             _N_min,
@@ -435,11 +506,11 @@ def run(args, parser):
         check = None
         if verify and i > 0 and np.isfinite(lam) and lam > 0.0:
             detq = detq_for(c)
-            m, p = c["mod"], args.pressure
+            m, p, pd = c["mod"], c["p"], c["pd_m"]
             check = (
                 "λ*",
-                detq(EN_ref, pd_m, m, p, args.T, lam=lam * (1.0 - _VERIFY_EPS)),
-                detq(EN_ref, pd_m, m, p, args.T, lam=lam * (1.0 + _VERIFY_EPS)),
+                detq(EN_ref, pd, m, p, args.T, lam=lam * (1.0 - _VERIFY_EPS)),
+                detq(EN_ref, pd, m, p, args.T, lam=lam * (1.0 + _VERIFY_EPS)),
             )
         return row, seconds, check
 
@@ -505,24 +576,41 @@ def run(args, parser):
         return
 
     plt.rcParams["font.size"] += 2
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    # Room below the panels for a shared legend when there are many curves.
+    n_drawn = len({id(rec[3]) for rec in curve_records})
+    extra = 0.2 * math.ceil(n_drawn / (2 if n_drawn > 6 else 1)) if n_drawn > 4 else 0.0
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5 + extra))
     fig.suptitle(
         f"Growth rate vs. voltage  —  {mech_name},  "
-        f"p = {args.pressure:g} bar,  d = {args.distance:g} mm,  T = {args.T} K,  "
+        f"p = {_listing(args.pressures)} bar,  d = {_listing(args.distances)} mm,  "
+        f"T = {args.T} K,  "
         f"{_field_dist.label}",
         fontsize=12,
     )
 
     _markers = ["o", "s", "^", "D", "v", "P", "X", "*"]
-    # One colour and marker per configuration; linestyle marks the polarity.
-    _config_idx = {}
+    # One colour and marker per configuration (and case); linestyle marks the
+    # polarity.  A mirrored negative polarity (symmetric gap, identical
+    # electrodes) has the very same rows as its positive one: draw it once.
+    plotted = []  # (label, config, polarity, rows) actually drawn
     for label, config, polarity, rows in curve_records:
+        twin = next((k for k, rec in enumerate(plotted) if rec[3] is rows), None)
+        if twin is not None:
+            name = plotted[twin][0].rsplit(" (", 1)[0]
+            plotted[twin] = (f"{name} (both polarities)",) + plotted[twin][1:]
+            continue
+        plotted.append((label, config, polarity, rows))
+
+    _config_idx = {}
+    all_V = []
+    for label, config, polarity, rows in plotted:
         idx = _config_idx.setdefault(config, len(_config_idx))
         V_arr = np.array([r[0] for r in rows])  # kV
         lam_arr = np.array([r[3] for r in rows])
         tau_arr = np.array([r[4] for r in rows])
+        all_V.extend(V_arr)
         kw = dict(
-            color=f"C{idx}",
+            color=f"C{idx % 10}",
             marker=_markers[idx % len(_markers)],
             markersize=5,
             ls="-" if polarity == "positive" else "--",
@@ -534,6 +622,17 @@ def run(args, parser):
         mask2 = np.isfinite(tau_arr)
         ax2.semilogy(V_arr[mask2], tau_arr[mask2], markevery=_markevery(mask2), **kw)
 
+    # Cases at very different voltages: a log axis gives each of them room.
+    if all_V and max(all_V) / min(all_V) > 5.0:
+        for ax in (ax1, ax2):
+            ax.set_xscale("log")
+            # Plain numbers at 1, 2 and 5 per decade, not 2×10^1 3×10^1 ...
+            ax.xaxis.set_major_locator(
+                mticker.LogLocator(base=10, subs=(1.0, 2.0, 5.0))
+            )
+            ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%g"))
+            ax.xaxis.set_minor_formatter(mticker.NullFormatter())
+
     ax1.set_xlabel("Voltage (kV)")
     ax1.set_ylabel(r"$\lambda$  (s$^{-1}$)")
     ax1.set_title("Temporal growth rate")
@@ -544,9 +643,24 @@ def run(args, parser):
     ax2.set_title("e-folding time")
     ax2.grid(True, which="both", ls="--", alpha=0.4)
 
-    if len(curve_records) > 1:
-        ax1.legend(loc="best", framealpha=1.0)
-        ax2.legend(loc="best", framealpha=1.0)
-
-    plt.tight_layout()
+    if len(plotted) > 4:
+        # Many curves: one legend below the panels, not over the data.
+        handles, labels = ax1.get_legend_handles_labels()
+        ncol = 2 if len(plotted) > 6 else 1
+        n_rows = math.ceil(len(plotted) / ncol)
+        fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            ncol=ncol,
+            framealpha=1.0,
+            fontsize="small",
+        )
+        bottom = min(0.5, (0.25 + 0.19 * n_rows) / fig.get_size_inches()[1])
+        plt.tight_layout(rect=(0.0, bottom, 1.0, 1.0))
+    else:
+        if len(plotted) > 1:
+            ax1.legend(loc="best", framealpha=1.0)
+            ax2.legend(loc="best", framealpha=1.0)
+        plt.tight_layout()
     plt.show()
