@@ -10,9 +10,9 @@ Cost and accuracy
 What a calculation costs
 ------------------------
 
-The cost of a calculation is the number of propagator evaluations times the
-cost of one.  Measured on a laptop, for a chemistry with
-:math:`\dim\bm{\mathcal{A}} = 12`:
+The cost of a calculation is the number of criterion evaluations times the
+cost of one.  Measured on a desktop, for a chemistry with six species and
+three photon groups, all explicit (:math:`\dim\bm{\mathcal{A}} = 12`):
 
 .. list-table::
    :header-rows: 1
@@ -21,22 +21,26 @@ cost of one.  Measured on a laptop, for a chemistry with
    * - Evaluation
      - Time
      - Notes
-   * - :math:`\det\bm{Q}`, uniform field
-     - ≈ 0.4 ms
-     - One ``expm`` and one :math:`\bm{\mathcal{A}}` assembly — exact, so
-       ``--dx`` and ``--method`` do not apply
-   * - :math:`\det\bm{Q}`, sphere gap, default ``--dx``
-     - ≈ 4.5 ms
-     - Adaptive midpoint, :math:`N_{\min} = 5`, :math:`N_{\max} = 200`;
-       15 ``expm`` and 16 :math:`\bm{\mathcal{A}}` assemblies, the latter
-       dominated by Python overhead in ``get_R``
+   * - reflection criterion, uniform field
+     - ≈ 1 ms
+     - One exponent, split into well-conditioned substeps combined by
+       adding–doubling; ``--dx`` and ``--method`` do not apply
+   * - reflection criterion, sphere gap, default ``--dx``
+     - ≈ 10 ms
+     - Adaptive midpoint from a field-following start, :math:`N_{\min} = 5`,
+       :math:`N_{\max} = 200`, tolerance 0.03.  The same grid costs about as
+       much for the direct :math:`\det\bm{Q}`
+   * - :math:`\det\bm{Q}` with an optically thick photon group
+     - 0.1 s to minutes
+     - Takes the compound-matrix route (:ref:`Chap:Numerics:Determinant`);
+       why ``--criterion detq`` and ``--verify`` are not the default
    * - one :math:`pd` point of an inception curve
-     - 60–250 evaluations
-     - Warm start ≈ 20 + the guard scan below it, full scan ≈ 200 +
-       refinement
-   * - 100-point inception curve, sphere gap, two configurations
-     - Minutes
-     - The :ref:`Chap:Examples:IEC60052` runs
+     - 30–300 evaluations
+     - Warm start plus the guard scan below it, or a bottom-up scan that
+       stops at the first root, plus refinement
+   * - 40-point inception curve, strongly non-uniform gap, both polarities
+     - ≈ 10 s on 16 cores
+     - ≈ 30 s with ``--jobs 1``
 
 Non-uniform fields are roughly an order of magnitude more expensive than
 uniform ones: the uniform propagator is a single exact ``expm``, whereas a
@@ -53,11 +57,22 @@ following controls trade accuracy for time:
      - Effect
    * - ``--pd-num N``
      - Number of :math:`pd` points; cost is linear in it.
+   * - ``--jobs N``
+     - Worker processes (default: the number of physical cores).  The
+       :math:`pd` points of ``pdiv``, and the voltages and cases of
+       ``growth``, are solved concurrently; the answer does not change.
+   * - ``--criterion detq``
+     - Evaluates :math:`\det\bm{Q}` instead of the reflection criterion:
+       the same roots, but far slower wherever a photon group is optically
+       thick.
+   * - ``--verify``
+     - Adds two :math:`\det\bm{Q}` evaluations per root; with a thick
+       photon group these can cost far more than the root search itself.
    * - ``--dx N_min N_max tol``
      - Fewer initial segments, a smaller refinement budget or a looser
        tolerance reduce the number of ``expm`` calls per evaluation.
        ``--dx 5 25 0.05`` (used for the ELECTRA example) is 5–10× cheaper
-       than the default ``5 200 0.03`` at small :math:`pd`.
+       than the default ``5 200 0.03`` at small :math:`pd`, and less accurate.
    * - ``--method magnus2 --dx N N``
      - Fourth-order propagator on a fixed grid; no adaptive refinement.
        Cheap and accurate for smooth profiles when :math:`N` is chosen
@@ -66,9 +81,10 @@ following controls trade accuracy for time:
      - Disables warm starts, so every :math:`pd` point pays for a full
        coarse scan.
    * - ``ngroups`` (configuration)
-     - Each explicitly propagated photon group adds two rows and columns to
-       :math:`\bm{\mathcal{A}}`; groups with :math:`\kappa_jd > 12` are
-       folded into :math:`\bm{A}` at no cost (:ref:`Chap:Numerics:Propagator`).
+     - Each photon group adds two rows and columns to
+       :math:`\bm{\mathcal{A}}`.  The reflection criterion's cost grows
+       mildly with them; the compound route of :math:`\det\bm{Q}` grows
+       combinatorially.
 
 Checking accuracy
 -----------------
@@ -77,15 +93,19 @@ The solver has no built-in error estimate for the final :math:`E/N`; the
 adaptive tolerance controls the propagator, not the root.  To check a
 result:
 
-* **Grid convergence.**  Tighten ``--dx`` (e.g. ``5 400 0.01``) or double
-  a fixed ``magnus2`` grid and compare the curves; differences below a
-  percent in :math:`E/N` are typical for the default settings.
+* **Grid convergence.**  Tighten ``--dx`` (e.g. ``5 1000 1e-3``, about
+  0.01 %) or double a fixed ``magnus2`` grid and compare the curves.  The
+  defaults keep :math:`E/N` within about 0.1–0.2 % of the converged value
+  on sphere-plane and thin-wire coaxial gaps.
 * **Propagator cross-check.**  ``--method midpoint`` and ``--method
   magnus2`` converge to the same answer; a persistent difference points to
   an under-resolved profile.
 * **Closed-form limit.**  Reducing the chemistry to a single ionizing
   reaction with no attachment gives a case with an analytic answer
   (:eq:`eq_standard_paschen`) that the solver must reproduce.
-* **Root residual.**  The ``[det Q check]`` messages printed during a run
-  flag roots whose residual is large relative to the bracket
+* **Independent check.**  ``--verify`` evaluates :math:`\det\bm{Q}` on the
+  same field and grid just below and just above every root, and marks the
+  root ✓ if it changes sign (:ref:`Chap:Numerics:Riccati`).
+* **Root messages.**  ``[root check]`` and ``[det Q check]`` messages
+  printed during a run flag rejected or suspect roots
   (:ref:`Chap:Numerics:RootFinding`); a clean run prints none.

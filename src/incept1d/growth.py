@@ -10,32 +10,99 @@ Above it, det Q(λ) = 0 has a root λ > 0, which is the rate at which the
 discharge grows in time.  This module finds the inception point first and
 then follows λ up the voltage range.
 
-The root finding, and the NaN convention it relies on, are described in
-``docs/source/numerics/rootfinding.rst``.
+Why the growth rate is the *largest* real root of det Q(λ), and how it is
+bracketed, is described in ``docs/source/numerics/rootfinding.rst``.
 
 The command-line front end is :mod:`incept1d.cli.growth`.
 """
+
+import time
 
 import numpy as np
 import scipy.optimize
 
 from incept1d.constants import kB as _kB
 from incept1d.eigenvalues import max_real_eigenvalue as _max_real_eigenvalue
-from incept1d.solver import inception_det
+from incept1d.parallel import parallel_map
+from incept1d.solver import inception_det, riccati_criterion
 
 # ── Core solver ───────────────────────────────────────────────────────────────
 
 
+def peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist, n_samples=201):
+    """
+    The fastest local net ionization rate anywhere in the gap, in s⁻¹.
+
+    The largest real eigenvalue of A = R V⁻¹ times the electron speed,
+    evaluated at the peak of the field profile.  In a non-uniform gap the
+    gap-averaged field can be below the ionization threshold while the
+    field at the electrode is far above it, so the average would give 0.
+
+    Parameters
+    ----------
+    mod : Mechanism
+        Loaded mechanism.
+    EN_ref : float
+        Uniform-equivalent reduced field in Townsend.
+    pd : float
+        Pressure × gap in bar·m.
+    p, T : float
+        Pressure in bar and temperature in K.
+    field_dist : FieldDistribution
+        Gap geometry.
+    n_samples : int
+        Points at which the profile f(ξ) is sampled, endpoints included.
+
+    Returns
+    -------
+    float
+        ν_ion ≥ 0 in s⁻¹.
+    """
+    f = field_dist.build(pd / p)
+    EN_peak = EN_ref * max(f(xi) for xi in np.linspace(0.0, 1.0, n_samples))
+    lam_eig = _max_real_eigenvalue(mod, EN_peak, p, T)  # m⁻¹
+    v_e = abs(float(np.diag(mod.get_V(EN_peak, p, T))[mod.ELECTRON_INDEX]))
+    return max(lam_eig, 0.0) * v_e
+
+
+# Ratio between successive λ in the downward scan for the largest root.  Two
+# roots closer than this factor can be missed; roots from different feedback
+# loops (ion transit, photons) are usually orders of magnitude apart.
+_SCAN_FACTOR = 3.0
+
+
+class _Unresolved(Exception):
+    """The criterion was not finite inside a bracket in λ."""
+
+
 def find_lambda_for_voltage(
-    EN_ref, pd, mod, p, T, field_dist, N_min, N_max, tol, propagator, lam_scale=None
+    EN_ref,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min,
+    N_max,
+    tol,
+    propagator,
+    lam_scale=None,
+    positive_polarity=True,
+    criterion=None,
 ):
     """
-    Find λ* > 0 such that det Q(λ*, EN_ref) = 0.
+    Find the growth rate λ* > 0 of the dominant mode at E/N = EN_ref.
 
-    Above inception det Q(0) is NaN, because Q is numerically singular; a
-    large enough λ damps the solution and restores a finite, positive
-    determinant.  The bracket between the two is refined with Brent's
-    method.
+    det Q(λ) = 0 has many roots — one per mode of the gap, including
+    complex ones.  Every coupling of the linear model is a non-negative
+    source, so the gain of each feedback loop decreases with λ; the dominant
+    mode is then the unique real λ* at which the strongest loop gain is 1,
+    and no root, real or complex, lies above it.  λ* is therefore the
+    *largest* real root, and it is bracketed from above: det Q is evaluated
+    at ten times the fastest local ionization rate — well above any rate at
+    which the gap as a whole can grow — and then at successively smaller λ
+    until its sign changes, and that bracket is refined with Brent's method.
+    Searching upward from λ = 0 instead can stop at a slower mode.
 
     Parameters
     ----------
@@ -54,19 +121,32 @@ def find_lambda_for_voltage(
     propagator : callable
         Propagator algorithm.
     lam_scale : float or None
-        Approximate λ scale in s⁻¹ for the bracket search.  Estimated from
-        the dominant ionization eigenvalue and the electron speed if None.
+        The fastest local ionization rate in s⁻¹, from which the scan
+        starts; :func:`peak_ionization_frequency` if None.
+    positive_polarity : bool
+        True when the ξ = 0 electrode is the anode, as for
+        :func:`incept1d.solver.inception_det`.
+    criterion : callable or None
+        :func:`incept1d.solver.riccati_criterion` (the default, None) or
+        :func:`incept1d.solver.inception_det`.  Riccati's g is positive below
+        the dominant root and negative above it for every mechanism; det Q
+        has that sign only for mechanisms whose row parity gives it.
 
     Returns
     -------
     lam_star : float
         Growth rate in s⁻¹, NaN if no root could be resolved.
     status : str
-        'ok', 'suspect', or the reason for failure.
+        'ok'; 'below_inception'; 'suspect' if det Q does not change sign
+        across λ* (a jump rather than a zero); or the reason for failure.
     """
 
-    def _det_raw(lam_val):
-        return inception_det(
+    if criterion is None:
+        criterion = riccati_criterion
+    extra = {"resolve": True} if criterion is inception_det else {}
+
+    def _det(lam_val):
+        return criterion(
             EN_ref,
             pd,
             mod,
@@ -77,89 +157,140 @@ def find_lambda_for_voltage(
             N_max=N_max,
             tol=tol,
             lam=lam_val,
-            positive_polarity=True,
+            positive_polarity=positive_polarity,
             propagator=propagator,
+            **extra,
         )
 
-    # NaN convention: NaN → -1e-300 (= "above inception", same as Inception.py).
-    # This is correct for λ < λ* (where Q is near-singular due to overvoltage),
-    # AND is used consistently throughout brentq.
-    def _f_brentq(lam_val):
-        val = _det_raw(lam_val)
-        return val if np.isfinite(val) else -1e-300
-
-    # det Q(0) > 0 means V ≤ V*: already sub-threshold at λ=0.
-    f0 = _det_raw(0.0)
-    if np.isfinite(f0) and f0 > 0.0:
+    # det Q(0) > 0 means V ≤ V*: already sub-threshold at λ = 0.
+    f0 = _det(0.0)
+    if not np.isfinite(f0):
+        return float("nan"), "det_Q_unresolved"
+    if f0 > 0.0:
         return 0.0, "below_inception"
+    if f0 == 0.0:
+        return 0.0, "ok"
 
-    # Estimate the scale for the upper-bracket search.
     if lam_scale is None:
-        lam_eig = max(1.0, _max_real_eigenvalue(mod, EN_ref, p, T))
-        Vmat = mod.get_V(EN_ref, p, T)
-        v_e = abs(float(np.diag(Vmat)[mod.ELECTRON_INDEX]))
-        lam_scale = max(lam_eig * v_e, 1e4)
+        lam_scale = peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist)
+    lam_scale = max(lam_scale, 1e4)
 
-    # Probe around lam_scale (and broader) for a λ_hi where det Q is finite & > 0.
-    # This point is in the "sub-threshold" region (λ > λ*) where Q is well-conditioned.
-    lam_hi = None
-    probes = [1.0, 0.3, 3.0, 0.1, 10.0, 30.0, 0.03, 100.0, 300.0, 1000.0]
-    for factor in probes:
-        test_lam = lam_scale * factor
-        v = _det_raw(test_lam)
-        if np.isfinite(v) and v > 0.0:
-            lam_hi = test_lam
+    # Start above the fastest local ionization rate — no mode can outgrow
+    # the fastest local multiplication — and confirm det Q > 0 there.
+    lam_hi, f_hi = 10.0 * lam_scale, None
+    for _ in range(20):
+        f_hi = _det(lam_hi)
+        if not np.isfinite(f_hi):
+            return float("nan"), "det_Q_unresolved"
+        if f_hi > 0.0:
             break
-    if lam_hi is None:
-        for log_lam in range(3, 14):
-            v = _det_raw(10.0**log_lam)
-            if np.isfinite(v) and v > 0.0:
-                lam_hi = 10.0**log_lam
-                break
-    if lam_hi is None:
+        lam_hi *= 10.0
+    else:
         return float("nan"), "no_bracket_found"
 
-    # f_brentq(0) ≤ 0  (NaN → -1e-300, or genuinely negative)
-    # f_brentq(lam_hi) > 0
-    # → valid bracket for brentq.
-    lam_star = scipy.optimize.brentq(
-        _f_brentq,
-        0.0,
-        lam_hi,
-        xtol=1.0,
-        rtol=1e-6,
-        maxiter=60,
-    )
+    # Scan down to the first sign change: the largest root.
+    while True:
+        lam_lo = lam_hi / _SCAN_FACTOR
+        if lam_lo < 1.0:
+            lam_lo, f_lo = 0.0, f0
+            break
+        f_lo = _det(lam_lo)
+        if not np.isfinite(f_lo):
+            return float("nan"), "det_Q_unresolved"
+        if f_lo <= 0.0:
+            break
+        lam_hi, f_hi = lam_lo, f_lo
 
-    # Very small result means V ≈ V* (Q was singular at λ=0 and root is near zero).
+    def _det_finite(lam):
+        # The ends are finite, but det Q (--criterion detq) can still be NaN
+        # inside the bracket; Brent's method must not be handed that.
+        val = _det(lam)
+        if not np.isfinite(val):
+            raise _Unresolved(lam)
+        return val
+
+    try:
+        lam_star = scipy.optimize.brentq(
+            _det_finite, lam_lo, lam_hi, xtol=1e-3, rtol=1e-9, maxiter=100
+        )
+    except _Unresolved:
+        return float("nan"), "det_Q_unresolved"
+
+    # Very small result means V ≈ V*.
     if lam_star < 1.0:
         return 0.0, "ok"
 
-    f_check = _det_raw(lam_star)
-
-    # A root must have det Q ≈ 0.  A *NaN* there means brentq did not find a
-    # zero at all: _f_brentq maps NaN to a negative sentinel, so a run of NaN
-    # below a positive value looks exactly like a sign change, and brentq
-    # converges on the edge of the NaN region instead.
-    #
-    # That is not hypothetical.  Above roughly 1.2·V* the spectral spread of
-    # A_aug·d exceeds the double-precision underflow limit (~709), the
-    # subdominant modes of M underflow to exactly zero, Q becomes rank
-    # deficient and _assemble_det_Q returns NaN for *every* λ.  The apparent
-    # root is then the λ at which a photon group crosses κd = 12 and leaves
-    # the augmented block, changing Q's size — which is independent of E/N,
-    # so the same λ was reported for every overvoltage.
-    #
-    # There is no way to recover a growth rate from a determinant that cannot
-    # be evaluated, so report the failure rather than the artefact.  This is
-    # the same check _accept_root performs in incept1d.inception.
-    if not np.isfinite(f_check):
-        return float("nan"), "det_Q_unresolved"
-
-    f_ref = _det_raw(lam_hi)
-    if np.isfinite(f_ref) and abs(f_check) > 1e-2 * abs(f_ref):
+    # A root must be a crossing, not a jump: det Q has to change sign across
+    # a small neighbourhood of λ*.  (Brent's method also converges on a
+    # discontinuity, such as a pole of the Riccati criterion.)
+    below = _det(lam_star * (1.0 - 1e-4))
+    above = _det(lam_star * (1.0 + 1e-4))
+    if not (below < 0.0 < above):
         return lam_star, "suspect"
     return lam_star, "ok"
+
+
+def voltage_sweep(EN_star, pd, T, n_voltages, v_max_factor):
+    """
+    The voltages of a growth-rate sweep: V* and log-spaced values above it.
+
+    Returns ``(V_star, voltages)`` in volts, with ``voltages[0] = V_star``
+    and ``voltages[-1] = v_max_factor · V_star``.
+    """
+    V_star = EN_star * pd * 1e-16 / (_kB * T)  # inception voltage in V
+    return V_star, np.geomspace(V_star, v_max_factor * V_star, n_voltages)
+
+
+def solve_voltage(
+    V,
+    V_star,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min,
+    N_max,
+    tol,
+    propagator,
+    positive_polarity=True,
+    criterion=None,
+    at_inception=False,
+):
+    """
+    The growth rate at one voltage, as one row of a growth-rate sweep.
+
+    Self-contained, so any number of sweeps can share one pool of workers.
+    Returns ``(row, seconds)`` with ``row = (V_kV, V_ratio, EN_ref,
+    lam_star, tau_ns, nu_ion, status)`` as in :func:`compute_lambda_curve`;
+    ``at_inception`` marks V = V*, where λ* = 0 by definition.
+    """
+    t_start = time.perf_counter()
+    EN_ref = V * _kB * T / (pd * 1e-16)  # Townsend
+    nu_ion = peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist)
+    if at_inception:
+        lam_star, status = 0.0, "ok"
+    else:
+        lam_star, status = find_lambda_for_voltage(
+            EN_ref,
+            pd,
+            mod,
+            p,
+            T,
+            field_dist,
+            N_min,
+            N_max,
+            tol,
+            propagator,
+            lam_scale=nu_ion,
+            positive_polarity=positive_polarity,
+            criterion=criterion,
+        )
+    tau_ns = (
+        1e9 / lam_star if (np.isfinite(lam_star) and lam_star > 0.0) else float("nan")
+    )
+    row = (V * 1e-3, V / V_star, EN_ref, lam_star, tau_ns, nu_ion, status)
+    return row, time.perf_counter() - t_start
 
 
 def compute_lambda_curve(
@@ -175,6 +306,10 @@ def compute_lambda_curve(
     propagator,
     n_voltages,
     v_max_factor,
+    positive_polarity=True,
+    criterion=None,
+    progress=None,
+    jobs=1,
 ):
     """
     Sweep voltages from V* to v_max_factor·V* and find λ at each point.
@@ -199,6 +334,18 @@ def compute_lambda_curve(
         Number of voltages in the sweep.
     v_max_factor : float
         Upper end of the sweep, as a multiple of V*.
+    positive_polarity : bool
+        True when the ξ = 0 electrode is the anode.  *EN_star* must be the
+        inception field for the same polarity.
+    criterion : callable
+        Passed on to :func:`find_lambda_for_voltage`.
+    progress : callable or None
+        Called as ``progress(i, n, row, seconds)`` after each voltage, with
+        the row described below and the time it took; in completion order
+        when ``jobs > 1``.
+    jobs : int
+        Worker processes (see :func:`incept1d.parallel.parallel_map`); the
+        voltages are independent, so they are solved concurrently.
 
     Returns
     -------
@@ -206,61 +353,36 @@ def compute_lambda_curve(
         One ``(V_kV, V_ratio, EN_ref, lam_star, tau_ns, nu_ion, status)``
         per voltage: the voltage in kV and as a multiple of V*, the reduced
         field, the growth rate in s⁻¹, the e-folding time in ns, the
-        ionization frequency scale in s⁻¹, and the per-point status.
+        peak-field ionization frequency (:func:`peak_ionization_frequency`)
+        in s⁻¹, and the per-point status.
     """
-    V_star = EN_star * pd * 1e-16 / (_kB * T)  # inception voltage in V
-    voltages_V = np.geomspace(V_star, v_max_factor * V_star, n_voltages)
+    V_star, voltages_V = voltage_sweep(EN_star, pd, T, n_voltages, v_max_factor)
 
-    results = []
-    for i, V in enumerate(voltages_V):
-        EN_ref = V * _kB * T / (pd * 1e-16)  # Townsend
-        V_kV = V * 1e-3
-        V_ratio = V / V_star
-
-        # Ionisation frequency scale: max real eigenvalue of A = R V⁻¹, times v_e.
-        lam_eig = _max_real_eigenvalue(mod, EN_ref, p, T)  # m⁻¹
-        Vmat = mod.get_V(EN_ref, p, T)
-        v_e = abs(float(np.diag(Vmat)[mod.ELECTRON_INDEX]))  # m/s
-        nu_ion = max(lam_eig, 0.0) * v_e  # s⁻¹
-        lam_scale = max(nu_ion, 1e4)
-
-        if i == 0:
-            # V = V* by construction; λ* = 0 by definition.
-            lam_star, status = 0.0, "ok"
-        else:
-            lam_star, status = find_lambda_for_voltage(
-                EN_ref,
-                pd,
-                mod,
-                p,
-                T,
-                field_dist,
-                N_min,
-                N_max,
-                tol,
-                propagator,
-                lam_scale=lam_scale,
-            )
-
-        tau_ns = (
-            1e9 / lam_star
-            if (np.isfinite(lam_star) and lam_star > 0.0)
-            else float("nan")
+    def solve(i, previous=None):
+        # The voltages are independent: *previous* (see parallel_map) is not
+        # needed, since each lambda search brackets from its own upper bound.
+        return solve_voltage(
+            voltages_V[i],
+            V_star,
+            pd,
+            mod,
+            p,
+            T,
+            field_dist,
+            N_min,
+            N_max,
+            tol,
+            propagator,
+            positive_polarity=positive_polarity,
+            criterion=criterion,
+            at_inception=(i == 0),
         )
-        results.append((V_kV, V_ratio, EN_ref, lam_star, tau_ns, nu_ion, status))
 
-        tag = f"  [{status}]" if status != "ok" else ""
-        if i == 0:
-            print(f"  V = {V_kV:8.4f} kV  (1.000×V*)  λ = 0  (inception){tag}")
-        elif np.isfinite(lam_star):
-            print(
-                f"  V = {V_kV:8.4f} kV  ({V_ratio:.3f}×V*)  "
-                f"λ = {lam_star:.4e} s⁻¹  τ = {tau_ns:.3f} ns{tag}"
-            )
-        else:
-            print(f"  V = {V_kV:8.4f} kV  ({V_ratio:.3f}×V*)  λ = NaN{tag}")
+    def report(i, result):
+        if progress is not None:
+            progress(i, n_voltages, *result)
 
-    return results
+    return [row for row, _ in parallel_map(solve, n_voltages, jobs, on_result=report)]
 
 
 # ── File output ───────────────────────────────────────────────────────────────

@@ -36,7 +36,12 @@ The solver must reproduce it, and its documented limits, to about
 * Solutions in the attachment regime :math:`\alpha \le \eta`, where the
   long-gap limit is :math:`\alpha \to \eta/(1+\gamma)`;
 * The leading eigenvalue of :math:`\bm{R}\bm{V}^{-1}` equals
-  :math:`\lambda_+`.
+  :math:`\lambda_+`;
+* The growth rate is the fastest mode: an independent discretisation of the
+  time-dependent equations (``tests/eigen_reference.py``, which does not use
+  the solver) computes every mode, and the fastest resolved one must be
+  real, equal :math:`\lambda^*` and be non-negative, with no mode —
+  complex ones included — growing faster.
 
 The shipped dry-air mechanism is held to the same standard:
 ``mechanisms/air/pancheshnyi/paschen.json`` reduces it to the textbook limit, and it
@@ -54,8 +59,15 @@ must then satisfy :eq:`eq_standard_paschen` using its own tabulated
   protocol and JSON configuration shapes;
 * The propagators — ``magnus2`` reduces to the midpoint rule for constant
   :math:`\bm{\mathcal{A}}`; composed propagators reproduce a single
-  ``expm``; the uniform-field shortcut agrees with the stepped path; the
-  photon collapse switches exactly at :math:`\kappa d = 12`;
+  ``expm``; the uniform-field shortcut agrees with the stepped path; every
+  photon group is propagated, however optically thick;
+* The two criteria — the reflection criterion and :math:`\det\bm{Q}`
+  change sign at the same :math:`E/N` and :math:`\lambda`; both match
+  :math:`\det\bm{Q}` computed in high-precision arithmetic, including
+  cases where the ordinary evaluation fails; a root of the reflection
+  criterion must cross from :math:`+` to :math:`-`;
+* Parallel sweeps — ``--jobs`` gives the same result files as a
+  sequential run, for ``pdiv`` and ``growth``;
 * The command line — every subcommand parses, runs, and writes a file whose
   header describes its own columns.
 

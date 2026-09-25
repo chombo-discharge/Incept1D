@@ -16,6 +16,7 @@ The command-line front end is :mod:`incept1d.cli.ionization`.
 """
 
 import numpy as np
+import scipy.optimize
 
 from incept1d.eigenvalues import max_real_eigenvalue as _max_real_eigenvalue
 from incept1d.fields import FieldDistribution
@@ -93,6 +94,70 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
         return float("nan")
 
     return result if np.isfinite(result) else float("nan")
+
+
+def streamer_EN(C, p_val, d_val, mod, T, field_dist: FieldDistribution, N, hint=None):
+    """
+    E/N in Td at which ∫ max(α−η, 0) dx reaches *C* (streamer criterion).
+
+    With *hint* (typically the root at a neighbouring p·d) the bracket is
+    widened geometrically around it, a handful of integrals; otherwise, or
+    if that fails, a 30-point logarithmic scan from 0.1 Td to 3·10⁵ Td
+    brackets the first crossing.  Brent's method refines either bracket.
+    The scan starts that low because a strongly non-uniform gap puts its
+    gap-averaged field far below 10 Td at large p·d.
+
+    Parameters
+    ----------
+    C : float
+        Required value of the integral (dimensionless, e.g. 10).
+    p_val, d_val, T : float
+        Pressure in bar, gap distance in metres, temperature in K.
+    mod : Mechanism
+        Loaded mechanism; must expose ``alpha`` and ``eta``.
+    field_dist : FieldDistribution
+        Gap geometry.
+    N : int
+        Quadrature points of :func:`aed_integral`.
+    hint : float or None
+        Starting estimate of the root in Td.
+
+    Returns
+    -------
+    float
+        The reduced field in Td, or NaN if the integral never reaches *C*.
+    """
+
+    def g(en):
+        return aed_integral(en, p_val, d_val, mod, T, field_dist, N) - C
+
+    lo = hi = None
+    if hint is not None and np.isfinite(hint):
+        a, b = hint / 1.1, hint * 1.1
+        fa, fb = g(a), g(b)
+        for _ in range(40):
+            if not (np.isfinite(fa) and np.isfinite(fb)):
+                break
+            if fa < 0.0 < fb:
+                lo, hi = a, b
+                break
+            if fa >= 0.0:
+                a /= 2.0
+                fa = g(a)
+            if fb <= 0.0:
+                b *= 2.0
+                fb = g(b)
+    if lo is None:
+        scan = np.logspace(-1.0, np.log10(3e5), 30)
+        vals = np.array([g(en) for en in scan])
+        idx = np.where(vals[:-1] * vals[1:] < 0)[0]
+        if idx.size == 0:
+            return float("nan")
+        lo, hi = scan[idx[0]], scan[idx[0] + 1]
+    try:
+        return float(scipy.optimize.brentq(g, lo, hi, xtol=1e-6, rtol=1e-10))
+    except ValueError:
+        return float("nan")
 
 
 def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N: int):

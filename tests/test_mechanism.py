@@ -130,6 +130,13 @@ class TestMechanismWrapper:
         assert neg.get_gamma_plus(300.0, 1.0, 293.0) == pytest.approx([0.01])
         assert mod.get_gamma_plus(300.0, 1.0, 293.0) == pytest.approx([0.1])
 
+    def test_polarity_overrides_are_reported(self, toy, toy_path):
+        """An override for either polarity alone makes the electrodes differ."""
+        assert not toy.has_polarity_overrides
+        for key in ("pos_override", "neg_override"):
+            mod = load_mechanism(toy_path, {key: {"gamma0": 0.4}})
+            assert mod.has_polarity_overrides, key
+
     def test_resolve_without_override_returns_self(self, toy):
         """M7b: no override means no copy, so nothing can drift."""
         assert toy.resolve(True) is toy

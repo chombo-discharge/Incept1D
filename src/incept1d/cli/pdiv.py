@@ -33,13 +33,38 @@ from incept1d.fields import (
 )
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.solver import (
+    DX_N_MAX_DEFAULT,
+    DX_N_MIN_DEFAULT,
+    DX_TOL_DEFAULT,
     inception_det,
     midpoint_propagator,
     magnus2_propagator,
+    CRITERIA,
+    add_criterion_argument,
     parse_dx_spec,
+    polarities_equivalent,
 )
 from incept1d.inception import compute_inception_curve
+from incept1d.ionization import aed_integral, streamer_EN
 from incept1d.output import write_metadata_header
+from incept1d.parallel import parallel_map, physical_cores
+
+#: Quadrature points for the ionization integral (overlay and streamer
+#: criterion).  For a field that falls off from the electrode they are placed
+#: in the active layer only, which a handful of points over the whole gap
+#: would straddle.
+_AED_N = 200
+
+#: Relative distance from a root at which det Q is checked for a sign change.
+#: Not smaller: the adaptive grid is chosen per E/N, so det Q's root on the
+#: grids either side can sit up to the grid error (~1e-3) from the root found.
+_VERIFY_EPS = 1e-3
+
+
+def _as_detq(criterion_fn):
+    """det Q with the same field, grid and polarity as *criterion_fn*."""
+    return functools.partial(inception_det, *criterion_fn.args, **criterion_fn.keywords)
+
 
 HELP = "Inception curve PDIV(p·d): roots of det Q(E/N, p·d) = 0 over a p·d sweep."
 DESCRIPTION = (
@@ -133,6 +158,38 @@ def add_arguments(parser):
         ),
     )
     add_field_argument(parser)
+    add_criterion_argument(parser)
+    parser.add_argument(
+        "--silent",
+        action="store_true",
+        default=False,
+        help="Print only the result tables, no per-point progress.",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        default=False,
+        help=(
+            "Check every root with the independent det Q criterion: det Q "
+            "just below and just above the root, on the same field and grid, "
+            "must change sign.  Printed with the progress (so not with "
+            "--silent).  Expensive: det Q with every photon group explicit "
+            "takes the compound route, which can cost far more than the root "
+            "search itself."
+        ),
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Worker processes for the pd sweep; the pd points are solved "
+            "concurrently (default: the number of physical cores, "
+            f"{physical_cores()} here, or 1 if it cannot be determined).  "
+            "--jobs 1 solves them one after another."
+        ),
+    )
     parser.add_argument(
         "--dx",
         nargs="*",
@@ -140,11 +197,12 @@ def add_arguments(parser):
         metavar="SPEC",
         help=(
             "Adaptive integration stepping: N_min [N_max [tol]].  "
-            "N_min (default 5): minimum number of integration segments.  "
-            "N_max (default 200): maximum total fine steps; N_max = N_min gives "
-            "a constant uniform grid with no adaptive refinement.  "
-            "tol (default 0.03): relative Frobenius error threshold for the "
-            "midpoint step-halving check (fraction, not percent).  "
+            f"N_min (default {DX_N_MIN_DEFAULT}): minimum number of integration "
+            f"segments.  N_max (default {DX_N_MAX_DEFAULT}): maximum total fine "
+            "steps; N_max = N_min gives a constant uniform grid with no adaptive "
+            f"refinement.  tol (default {DX_TOL_DEFAULT:g}): relative Frobenius "
+            "error threshold for the midpoint step-halving check (fraction, not "
+            "percent).  "
             "Example: --dx 10 400 0.01  sets N_min=10, N_max=400, tol=1%%."
         ),
     )
@@ -239,6 +297,16 @@ def run(args, parser):
     parser : argparse.ArgumentParser
         The (sub)parser that produced *args*; used for ``parser.error``.
     """
+    if args.verify and args.silent:
+        print(
+            "note: --silent turns off the det Q check of --verify",
+            file=sys.stderr,
+        )
+    _criterion = CRITERIA[args.criterion]
+    if args.jobs is None:
+        args.jobs = physical_cores()
+    if args.jobs < 1:
+        parser.error("--jobs must be >= 1")
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
@@ -409,35 +477,56 @@ def run(args, parser):
     )
 
     def _aed_integral(EN_ref, p_val, d_val, _mod):
-        """Compute ∫max(α−η,0)dx respecting the actual field profile."""
-        if _field_dist.field_type == "uniform":
-            return (
-                max(
-                    0.0,
-                    _mod.alpha(EN_ref, p_val, args.T) - _mod.eta(EN_ref, p_val, args.T),
-                )
-                * d_val
-            )
-        f = _field_dist.build(d_val)
-        xis = (np.arange(_N_min) + 0.5) / _N_min
-        EN_arr = EN_ref * np.array([f(xi) for xi in xis])
-        ds = d_val / _N_min
-        diff = np.array(
-            [
-                _mod.alpha(en, p_val, args.T) - _mod.eta(en, p_val, args.T)
-                for en in EN_arr
-            ]
-        )
-        return float(np.sum(np.maximum(0.0, diff)) * ds)
+        """∫max(α−η,0)dx along the field line (:func:`incept1d.ionization.aed_integral`)."""
+        return aed_integral(EN_ref, p_val, d_val, _mod, args.T, _field_dist, _AED_N)
 
-    def _polarity_desc(polarity):
-        if _field_dist.field_type == "uniform":
-            return polarity  # "positive" / "negative"
-        if _field_dist.field_type == "fieldline":
-            return f"start={polarity}"  # xi = 0 (first data row) is anode/cathode
-        if _field_dist.field_type == "coaxial":
-            return f"inner={polarity}"  # inner conductor is anode/cathode
-        return f"sphere={polarity}"  # "sphere=positive" / "sphere=negative"
+    def _progress(i, n, pd_i, p_i, roots, seconds, check):
+        """Print one pd point of the sweep as soon as it is solved."""
+        head = f"  [{i + 1:{len(str(n))}d}/{n}]  pd = {pd_i * 1e3:10.4g} bar·mm  p = {p_i:6.4g} bar"
+        if not roots:
+            print(
+                f"{head}   no inception in the scan range   ({seconds:.1f} s)",
+                flush=True,
+            )
+            return
+        EN = roots[0]
+        U_kV = EN * pd_i * 1e-21 / (_kB * args.T) * 1e5 * 1e-3
+        more = f"  (+{len(roots) - 1} higher)" if len(roots) > 1 else ""
+        verdict = ""
+        if check is not None:
+            below, above = check
+            # Compare signs: the product of two values near 1e-200 underflows.
+            ok = (
+                np.isfinite(below)
+                and np.isfinite(above)
+                and np.sign(below) * np.sign(above) < 0.0
+            )
+            verdict = (
+                f"   det Q(E*·(1∓{_VERIFY_EPS:g})) = {below:+.2e} / {above:+.2e} "
+                + ("✓" if ok else "✗")
+            )
+        print(
+            f"{head}   E/N* = {EN:10.4f} Td   U* = {U_kV:10.4g} kV{more}"
+            f"   ({seconds:.1f} s){verdict}",
+            flush=True,
+        )
+
+    def _verifier(criterion_fn):
+        """det Q just below and above the lowest root, same field and grid."""
+        if not args.verify or args.silent or args.criterion == "detq":
+            return None
+        detq_fn = _as_detq(criterion_fn)
+
+        def verify(pd_i, p_i, roots):
+            if not roots:
+                return None
+            EN = roots[0]
+            return (
+                detq_fn(EN * (1.0 - _VERIFY_EPS), pd_i, mod, p_i, args.T),
+                detq_fn(EN * (1.0 + _VERIFY_EPS), pd_i, mod, p_i, args.T),
+            )
+
+        return verify
 
     def _branch0_grids(branches):
         V_g = np.full_like(pd_arr, np.nan)
@@ -528,16 +617,22 @@ def run(args, parser):
         # fast_det_fn  — uniform field, always N=1 (coarse sign-change scan)
         # med_det_fn   — N=min(5,N), modest resolution (fallback scan)
         # det_fn       — full field_dist accuracy (Brentq)
+        # A symmetric field with identical electrodes needs one solve; per-
+        # polarity overrides make the cathodes differ even in a uniform gap.
+        same_polarity = polarities_equivalent(mod, _field_dist)
         if _field_dist.field_type == "uniform":
-            det_pos = det_neg = functools.partial(
-                inception_det,
-                field_dist=_field_dist,
-                N_min=_N_min,
-                N_max=_N_max,
-                tol=_dx_tol,
-                lam=args.lam,
-                positive_polarity=True,
-                propagator=_propagator,
+            det_pos, det_neg = (
+                functools.partial(
+                    _criterion,
+                    field_dist=_field_dist,
+                    N_min=_N_min,
+                    N_max=_N_max,
+                    tol=_dx_tol,
+                    lam=args.lam,
+                    positive_polarity=positive,
+                    propagator=_propagator,
+                )
+                for positive in (True, False)
             )
             fast_det_pos = fast_det_neg = None
             med_det_pos = med_det_neg = None
@@ -548,7 +643,7 @@ def run(args, parser):
                 5, _N_min
             )  # cheap constant scan; N_med = N_med disables adaptation
             det_pos = functools.partial(
-                inception_det,
+                _criterion,
                 field_dist=_field_dist,
                 N_min=_N_min,
                 N_max=_N_max,
@@ -559,9 +654,9 @@ def run(args, parser):
             )
             det_neg = (
                 det_pos
-                if _field_dist.is_symmetric
+                if same_polarity
                 else functools.partial(
-                    inception_det,
+                    _criterion,
                     field_dist=_field_dist,
                     N_min=_N_min,
                     N_max=_N_max,
@@ -571,17 +666,23 @@ def run(args, parser):
                     propagator=_propagator,
                 )
             )
-            fast_det_pos = fast_det_neg = functools.partial(
-                inception_det,
-                field_dist=_fast_fd,
-                N_min=1,
-                N_max=1,
-                tol=_dx_tol,
-                lam=args.lam,
-                propagator=_propagator,
+            # The uniform stand-in field has no orientation, but the cathode
+            # surface parameters still follow the polarity.
+            fast_det_pos, fast_det_neg = (
+                functools.partial(
+                    _criterion,
+                    field_dist=_fast_fd,
+                    N_min=1,
+                    N_max=1,
+                    tol=_dx_tol,
+                    lam=args.lam,
+                    positive_polarity=positive,
+                    propagator=_propagator,
+                )
+                for positive in (True, False)
             )
             med_det_pos = functools.partial(
-                inception_det,
+                _criterion,
                 field_dist=_med_fd,
                 N_min=_N_med,
                 N_max=_N_med,
@@ -592,9 +693,9 @@ def run(args, parser):
             )
             med_det_neg = (
                 med_det_pos
-                if _field_dist.is_symmetric
+                if same_polarity
                 else functools.partial(
-                    inception_det,
+                    _criterion,
                     field_dist=_med_fd,
                     N_min=_N_med,
                     N_max=_N_med,
@@ -605,7 +706,11 @@ def run(args, parser):
                 )
             )
 
-        print(f"\nSolving inception curve: {label} ({_polarity_desc('positive')})")
+        if not args.silent:
+            print(
+                f"\nSolving inception curve: {label} "
+                f"({_field_dist.polarity_label('positive')})"
+            )
         branches_pos = compute_inception_curve(
             pd_arr,
             mod,
@@ -615,11 +720,18 @@ def run(args, parser):
             det_fn=det_pos,
             fast_det_fn=fast_det_pos,
             med_det_fn=med_det_pos,
+            progress=None if args.silent else _progress,
+            jobs=args.jobs,
+            verify=_verifier(det_pos),
         )
-        if _field_dist.is_symmetric:
+        if same_polarity:
             branches_neg = branches_pos  # symmetric; reuse same object
         else:
-            print(f"\nSolving inception curve: {label} ({_polarity_desc('negative')})")
+            if not args.silent:
+                print(
+                    f"\nSolving inception curve: {label} "
+                    f"({_field_dist.polarity_label('negative')})"
+                )
             branches_neg = compute_inception_curve(
                 pd_arr,
                 mod,
@@ -629,6 +741,9 @@ def run(args, parser):
                 det_fn=det_neg,
                 fast_det_fn=fast_det_neg,
                 med_det_fn=med_det_neg,
+                progress=None if args.silent else _progress,
+                jobs=args.jobs,
+                verify=_verifier(det_neg),
             )
 
         if not branches_pos and not branches_neg:
@@ -644,7 +759,7 @@ def run(args, parser):
         for polarity, branches, ls_pol in polarity_pairs:
             if not branches:
                 continue
-            pol_label = f"{label} ({_polarity_desc(polarity)})"
+            pol_label = f"{label} ({_field_dist.polarity_label(polarity)})"
             for b_idx, br in enumerate(branches):
                 order = np.argsort(br["pd"])
                 br_pd = br["pd"][order]
@@ -745,7 +860,7 @@ def run(args, parser):
 
         _file_records.append(
             (
-                f"{label} ({_polarity_desc('positive')})",
+                f"{label} ({_field_dist.polarity_label('positive')})",
                 p_grid,
                 d_grid,
                 EN_pos,
@@ -755,7 +870,7 @@ def run(args, parser):
         )
         _file_records.append(
             (
-                f"{label} ({_polarity_desc('negative')})",
+                f"{label} ({_field_dist.polarity_label('negative')})",
                 p_grid,
                 d_grid,
                 EN_neg,
@@ -766,37 +881,19 @@ def run(args, parser):
 
     if args.streamer_criterion is not None:
         _C = args.streamer_criterion
-        _EN_sc = np.logspace(1.0, np.log10(3e5), 200)
-
         for _cs_label, _p_arr_cs, _d_arr_cs, _mod_cs in curve_specs:
             _s_label = f"Streamer (C={_C}), {_cs_label}"
-            _EN_s = np.full_like(pd_arr, np.nan)
-            _V_s = np.full_like(pd_arr, np.nan)
-
             print(f"\nSolving streamer criterion: {_s_label}")
-            for _i, (_pd_i, _p_i, _d_i) in enumerate(zip(pd_arr, _p_arr_cs, _d_arr_cs)):
-                _fvals = np.array(
-                    [_aed_integral(_en, _p_i, _d_i, _mod_cs) - _C for _en in _EN_sc]
+
+            def _streamer_task(i, previous, _p=_p_arr_cs, _d=_d_arr_cs, _m=_mod_cs):
+                return streamer_EN(
+                    _C, _p[i], _d[i], _m, args.T, _field_dist, _AED_N, hint=previous
                 )
-                _idx = np.where(_fvals[:-1] * _fvals[1:] < 0)[0]
-                if _idx.size == 0:
-                    continue
-                _k = _idx[0]
-                try:
-                    _root = scipy.optimize.brentq(
-                        lambda _en, __p=_p_i, __d=_d_i, __m=_mod_cs: _aed_integral(
-                            _en, __p, __d, __m
-                        )
-                        - _C,
-                        _EN_sc[_k],
-                        _EN_sc[_k + 1],
-                        xtol=1e-6,
-                        rtol=1e-10,
-                    )
-                    _EN_s[_i] = _root
-                    _V_s[_i] = _root * _pd_i * 1e-21 / (_kB * args.T) * 1e5
-                except ValueError:
-                    pass
+
+            _EN_s = np.array(
+                parallel_map(_streamer_task, len(pd_arr), args.jobs), dtype=float
+            )
+            _V_s = _EN_s * pd_arr * 1e-21 / (_kB * args.T) * 1e5
 
             _streamer_records.append((_s_label, _p_arr_cs, _d_arr_cs, _EN_s, _V_s))
 
@@ -817,6 +914,36 @@ def run(args, parser):
                 )
                 ax1.loglog(_x(pd_arr[_smask]), _V_s[_smask] / 1000, **_sm_kw)
                 ax2.loglog(_x(pd_arr[_smask]), _EN_s[_smask], **_sm_kw)
+                if ax1b is not None and args.verify:
+                    # The ionization integral along the streamer curve, for
+                    # verification: it must be flat at C.
+                    _aed_s = np.array(
+                        [
+                            _aed_integral(
+                                _EN_s[_j], _p_arr_cs[_j], _d_arr_cs[_j], _mod_cs
+                            )
+                            for _j in np.where(_smask)[0]
+                        ]
+                    )
+                    ax1b.plot(
+                        _x(pd_arr[_smask]),
+                        _aed_s,
+                        color="k",
+                        ls="-.",
+                        lw=1.5,
+                        alpha=_AED_ALPHA,
+                        zorder=1,
+                    )
+                    # A legend entry for it: the twin axis has no legend.
+                    ax1.plot(
+                        [],
+                        [],
+                        color="k",
+                        ls="-.",
+                        lw=1.5,
+                        alpha=_AED_ALPHA,
+                        label=f"∫max(α−η,0)dx along the streamer curve (= {_C:g})",
+                    )
 
             print(
                 f"\n  {_x_head:>14}"

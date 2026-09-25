@@ -102,6 +102,11 @@ class Mechanism:
         if hasattr(_mod, "eta"):
             self.eta = lambda EN, p, T: _mod.eta(EN, p, T)
 
+    @property
+    def has_polarity_overrides(self) -> bool:
+        """True when the configuration sets any parameter for one polarity only."""
+        return bool(self._pos_override) or bool(self._neg_override)
+
     def resolve(self, positive: bool) -> "Mechanism":
         """Return a polarity-resolved copy with cathode SEE overrides applied."""
         ovr = self._pos_override if positive else self._neg_override

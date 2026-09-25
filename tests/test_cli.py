@@ -332,6 +332,381 @@ class TestPdiv:
         assert rc != 0
 
 
+def _columns(path):
+    """Map ``# Column`` header names of a ``--write-to-file`` output to data."""
+    names = [
+        ln.split(":", 1)[1].strip()
+        for ln in path.read_text().splitlines()
+        if ln.startswith("# Column ")
+    ]
+    data = np.atleast_2d(np.genfromtxt(path))
+    assert data.shape[1] == len(names), "header must describe the data"
+    return {n: data[:, i] for i, n in enumerate(names)}
+
+
+@pytest.fixture
+def overridden_config(tmp_path):
+    """Two different cathodes: the gap is asymmetric even when uniform."""
+    import json
+
+    cfg = tmp_path / "overridden.json"
+    cfg.write_text(
+        json.dumps(
+            {
+                "label": "Overridden",
+                "pos_override": {"gamma0": 0.05},
+                "neg_override": {"gamma0": 0.001},
+            }
+        )
+    )
+    return cfg
+
+
+class TestPolarity:
+    """Both commands report both polarities, and solve each when they differ."""
+
+    @staticmethod
+    def _pdiv(tmp_path, *extra):
+        out = tmp_path / "pdiv.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            *extra,
+            "--p",
+            "1",
+            "--pd-min",
+            "5",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        assert rc == 0
+        col = _columns(out)
+        pos = [c for n, c in col.items() if n.startswith("U_kV[") and "positive" in n]
+        neg = [c for n, c in col.items() if n.startswith("U_kV[") and "negative" in n]
+        assert len(pos) == len(neg) == 1, list(col)
+        return pos[0], neg[0]
+
+    def test_pdiv_uniform_gap_is_symmetric(self, tmp_path, capsys):
+        pos, neg = self._pdiv(tmp_path)
+        capsys.readouterr()
+        assert np.array_equal(pos, neg)
+
+    def test_pdiv_uniform_gap_follows_polarity_overrides(
+        self, tmp_path, overridden_config, capsys
+    ):
+        """A lower negative-polarity gamma needs a higher inception voltage."""
+        pos, neg = self._pdiv(tmp_path, str(overridden_config))
+        capsys.readouterr()
+        assert np.all(np.isfinite(pos)) and np.all(np.isfinite(neg))
+        assert np.all(neg > pos)
+
+    @staticmethod
+    def _growth(tmp_path, *extra):
+        out = tmp_path / "growth.dat"
+        rc = _run(
+            "growth",
+            TOY,
+            *extra,
+            "--distance",
+            "20",
+            "--n-voltages",
+            "3",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        assert rc == 0
+        return _columns(out)
+
+    def test_growth_reports_both_polarities(self, tmp_path, capsys):
+        col = self._growth(tmp_path)
+        capsys.readouterr()
+        assert list(col)[0] == "V_ratio"
+        for quantity in ("V_kV", "lambda_s-1", "tau_ns", "nu_ion_s-1"):
+            assert f"{quantity}[Baseline (positive)]" in col
+            assert f"{quantity}[Baseline (negative)]" in col
+        assert np.array_equal(
+            col["V_kV[Baseline (positive)]"], col["V_kV[Baseline (negative)]"]
+        )
+
+    def test_growth_solves_each_polarity_when_they_differ(
+        self, tmp_path, overridden_config, capsys
+    ):
+        """V* is found per polarity, so the voltage columns must differ."""
+        col = self._growth(tmp_path, str(overridden_config))
+        out = capsys.readouterr().out
+        assert "[Overridden (negative)]  V* =" in out
+        V_pos = col["V_kV[Overridden (positive)]"]
+        V_neg = col["V_kV[Overridden (negative)]"]
+        assert np.all(V_neg > V_pos)
+        assert np.allclose(V_neg / V_neg[0], col["V_ratio"])
+
+
+class TestStreamerCriterion:
+    def test_streamer_curve_has_the_requested_integral(self, tmp_path, capsys):
+        """
+        Every point of the streamer curve satisfies I_alpha = C, recomputed
+        independently with the same quadrature the overlay uses.  A non-uniform
+        gap exercises the quadrature over the ionizing layer.
+        """
+        from incept1d.fields import FieldDistribution
+        from incept1d.ionization import aed_integral
+        from incept1d.mechanism import load_mechanism
+
+        out = tmp_path / "streamer.dat"
+        C = 5.0
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "sphere-plane",
+            "5",
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "100",
+            "--pd-num",
+            "4",
+            "--streamer-criterion",
+            str(C),
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        col = _columns(out)
+        EN = [c for n, c in col.items() if n.startswith("EN_Td[Streamer")][0]
+        pd = col["pd_bar_mm"]
+        toy = load_mechanism(TOY, {})
+        fd = FieldDistribution("sphere-plane", 5e-3)
+        solved = np.isfinite(EN)
+        assert solved.sum() >= 3
+        for en, pd_mm in zip(EN[solved], pd[solved]):
+            got = aed_integral(en, 1.0, pd_mm * 1e-3, toy, 293.0, fd, 200)
+            assert got == pytest.approx(C, rel=1e-4)
+
+
+class TestJobs:
+    def test_parallel_sweep_writes_the_same_file(self, tmp_path, capsys):
+        outs = []
+        for jobs in ("1", "2"):
+            out = tmp_path / f"jobs{jobs}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--p",
+                "1",
+                "--pd-min",
+                "1",
+                "--pd-max",
+                "50",
+                "--pd-num",
+                "5",
+                "--no-plot",
+                "--jobs",
+                jobs,
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            outs.append(
+                [ln for ln in out.read_text().splitlines() if not ln.startswith("#")]
+            )
+        capsys.readouterr()
+        assert outs[0] == outs[1]
+
+    def test_verify_reports_a_sign_change(self, capsys):
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert out.count("det Q(E*") == 3 and "✗" not in out
+
+    def test_silent_prints_no_progress(self, capsys):
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--silent",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "Solving inception curve" not in out and "det Q(E*" not in out
+        assert "E/N (Td)" in out  # the result tables still print
+
+    def test_jobs_must_be_positive(self, capsys):
+        assert _run("pdiv", TOY, "--no-plot", "--jobs", "0") != 0
+
+
+class TestGrowthInputs:
+    """--pressure / --distance, and geometries that fix the gap themselves."""
+
+    def test_distance_is_required_for_a_free_gap(self, capsys):
+        assert _run("growth", TOY, "--no-plot") != 0
+        assert "--distance is required" in capsys.readouterr().err
+
+    def test_distance_is_ignored_for_coaxial(self, tmp_path, capsys):
+        out = tmp_path / "coax.dat"
+        rc = _run(
+            "growth",
+            TOY,
+            "--field",
+            "coaxial",
+            "1",
+            "11",
+            "--distance",
+            "5",
+            "--n-voltages",
+            "2",
+            "--jobs",
+            "1",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        text = capsys.readouterr().out
+        assert rc == 0
+        assert "--distance 5 mm is ignored" in text and "10 mm" in text
+        assert "# Distance:    10 mm" in out.read_text()
+
+    def test_verify_checks_every_root(self, capsys):
+        """One check for V* and one per growth rate, all sign changes."""
+        rc = _run(
+            "growth",
+            TOY,
+            "--distance",
+            "20",
+            "--n-voltages",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert out.count("det Q(E/N*") == 1 and out.count("det Q(λ*") == 2
+        assert "✗" not in out
+
+    def test_silent_prints_only_the_table(self, capsys):
+        rc = _run(
+            "growth",
+            TOY,
+            "--distance",
+            "20",
+            "--n-voltages",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--silent",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "Finding" not in out and "det Q(" not in out and "[1/3]" not in out
+        assert "λ (s⁻¹)" in out  # the table still prints
+
+    def test_ranges_give_every_combination(self, tmp_path, capsys):
+        """2 pressures (a MIN:MAX:N range) x 2 distances = 4 labelled cases."""
+        out = tmp_path / "matrix.dat"
+        rc = _run(
+            "growth",
+            TOY,
+            "--pressure",
+            "1:4:2",
+            "--distance",
+            "10",
+            "20",
+            "--n-voltages",
+            "2",
+            "--jobs",
+            "2",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        text = capsys.readouterr().out
+        assert rc == 0
+        col = _columns(out)
+        cases = {
+            n.split("[", 1)[1].rsplit(" (", 1)[0] for n in col if n.startswith("V_kV[")
+        }
+        assert cases == {
+            f"Baseline, p={p} bar, d={d} mm" for p in ("1", "4") for d in ("10", "20")
+        }
+        assert "4 cases: 2 pressure(s) × 2 distance(s)" in text
+        header = out.read_text()
+        assert (
+            "# Pressure:    1, 4 bar" in header and "# Distance:    10, 20 mm" in header
+        )
+
+    @pytest.mark.parametrize("bad", ["1:10", "1:10:1", "0:10:3", "a", "-2"])
+    def test_malformed_values_are_rejected(self, bad, capsys):
+        assert (
+            _run("growth", TOY, "--distance", "10", "--pressure", bad, "--no-plot") != 0
+        )
+        assert "--pressure" in capsys.readouterr().err
+
+    def test_parallel_voltages_write_the_same_file(self, tmp_path, capsys):
+        rows = []
+        for jobs in ("1", "2"):
+            out = tmp_path / f"g{jobs}.dat"
+            rc = _run(
+                "growth",
+                TOY,
+                "--distance",
+                "20",
+                "--n-voltages",
+                "4",
+                "--no-plot",
+                "--jobs",
+                jobs,
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            rows.append(
+                [ln for ln in out.read_text().splitlines() if not ln.startswith("#")]
+            )
+        capsys.readouterr()
+        assert rows[0] == rows[1]
+
+
 class TestArgumentValidation:
     @pytest.mark.parametrize(
         "args",

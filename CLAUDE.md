@@ -30,20 +30,24 @@ transported, then the photons, then the electrodes, then the assembly:
   propagator `M(d)`.
 - `theory/inceptioncriterion.rst`, eqs. `eq_Qd` / `eq_Q_system` /
   `eq_det_criterion`: `Q(λ) θ_0 = 0` and `det Q(λ=0) = 0` — this is
-  `incept1d.solver._assemble_det_Q` / `incept1d.solver.inception_det`, whose root in
-  `E/N` at fixed `p·d` is what `incept1d.inception.compute_inception_curve` scans for.
+  `incept1d.solver.inception_det` (`--criterion detq`).  The default,
+  `incept1d.solver.riccati_criterion`, evaluates the same condition without
+  forming `M` (`numerics/riccati.rst`, eqs. `eq_riccati` /
+  `eq_riccati_criterion`: a reflection operator carried from the anode,
+  `g = 1 − loop gain`).  Their root in `E/N` at fixed `p·d` is what
+  `incept1d.inception.compute_inception_curve` scans for.
   The `3×3` reduced model (`eq_generalized_paschen`, `eq_standard_paschen`)
   is the closed-form sanity check for the attachment/detachment physics, and
   is what `tests/closed_form.py` transcribes.
-- `docs/source/numerics/`: how the propagator, determinant and root
-  finding are actually implemented — including the limits of the
-  determinant formulation (`numerics/determinant.rst`, and the range-of-
-  validity note in `modules/lambda.rst`).
+- `docs/source/numerics/`: how the propagator, the two criteria
+  (`numerics/riccati.rst`, `numerics/determinant.rst`) and root finding
+  are actually implemented.  Every photon group is propagated explicitly:
+  folding thick groups into `A` removed photon feedback and must not come
+  back.
 
 The reaction schemes are inputs, not part of the derivation: they live in
 `docs/source/configuration/examples/` (`air.rst`, table `tab_reactions`, is
-the scheme implemented by `mechanisms/air/pancheshnyi/air_pancheshnyi.py`;
-`morrowlowke.rst` documents `mechanisms/air/morrowlowke/air_morrowlowke.py`).
+the scheme implemented by `mechanisms/air/pancheshnyi/air_pancheshnyi.py`).
 
 Code docstrings still cite "manuscript, eq. NNN" in places; those numbers
 refer to an external LaTeX source and have drifted. When code and docs
@@ -72,16 +76,17 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `reactions.py` | Declarative reaction-string parser (`"e + N2 -> 2e + N2+"`) that assembles the reaction-rate matrix `R` (`build_R` / the pre-compiled fast path `compile_reactions` + `build_R_from_compiled`). Used by mechanism files, not by the solvers directly. |
 | `fields.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere / coaxial / tabulated field-line profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`. Shared `--field` CLI parsing (`add_field_argument` / `parse_field_spec`). |
 | `mechanism.py` | `load_mechanism` execs a mechanism file + optional JSON config (`read_json_configs`) into a `Mechanism` object; `REQUIRED_ATTRS` is the mechanism interface. |
-| `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping (`parse_dx_spec`, `DX_*_DEFAULT`), `_assemble_det_Q`, and `inception_det` which evaluates `det Q(λ)` for given `E/N`, `p·d`, geometry. |
-| `inception.py` | `find_all_breakdown_EN` finds the `E/N` roots of `det Q = 0`; `compute_inception_curve` tracks them (branches) over a `p·d` sweep → the inception curve PDIV(p·d). CLI: `cli/pdiv.py`. |
+| `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix, every photon group explicit), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping from a field-following start (`_field_following_edges`, `parse_dx_spec`, `DX_*_DEFAULT`), the two criteria — `riccati_criterion` (default; `_riccati_g`, adding–doubling in `_slab_scattering` / `_star`, pole test `_spectral_radius`) and `inception_det` (`det Q(λ)`, compound-matrix fallback `_det_Q_compound`) — and `CRITERIA` / `add_criterion_argument` for `--criterion`. |
+| `inception.py` | `find_all_breakdown_EN` finds the `E/N` roots of the criterion (bottom-up scan, floor check below 10 Td, + → − rule for Riccati); `compute_inception_curve` tracks them (branches) over a `p·d` sweep, in parallel blocks with `jobs` → the inception curve PDIV(p·d). CLI: `cli/pdiv.py`. |
 | `eigenvalues.py` | Diagnostic: eigenvalues of the *local* transport matrix `A = R V⁻¹` vs `E/N` (no gap integration); `max_real_eigenvalue` is shared with `ionization`/`growth`. CLI: `cli/eigenvalues.py`. |
 | `ionization.py` | Ionization integrals `∫max(α−η,0)dx` and `∫max(Re λ_max(RV⁻¹),0)dx` across the gap, for comparison against the full `det Q` criterion. CLI: `cli/ionization.py`. |
-| `growth.py` | For voltages above the inception voltage `V*`, solves `det Q(λ,E/N)=0` for the temporal growth rate `λ>0`. CLI: `cli/growth.py`. |
+| `growth.py` | For voltages above the inception voltage `V*`, finds the temporal growth rate `λ>0` as the largest real root of the criterion in `λ` (`find_lambda_for_voltage`; `solve_voltage` / `voltage_sweep` let many sweeps share a worker pool). CLI: `cli/growth.py` (`--pressure`/`--distance` ranges, `--jobs`, `--verify`). |
 | `chombo.py` | Transport-/rate-coefficient tables from a mechanism file for the external 3-D `chombo-discharge` solver; has its own `load_raw_mechanism` because it needs the raw `REACTIONS` list. CLI: `cli/chombo.py`. |
+| `parallel.py` | `physical_cores` (default `--jobs`: physical cores only, 1 if undeterminable) and `parallel_map` (forked workers, contiguous warm-started blocks, results streamed back in completion order); `limit_blas_threads` runs in `cli/__init__.py` before NumPy loads. |
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`, `mechanisms/air/morrowlowke/air_morrowlowke.py`)
+### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`)
 
 Mechanism files live one per directory under `mechanisms/<gas>/<scheme>/`
 and are **data, not part of the package**: they are `exec`'d by

@@ -42,7 +42,7 @@ def _param(path, mech_dir):
 def test_there_are_mechanism_directories():
     """Guard against the collection silently matching nothing."""
     names = {d.name for d in MECH_DIRS}
-    assert {"pancheshnyi", "2body", "morrowlowke", "paschen"} <= names
+    assert {"pancheshnyi", "2body", "paschen"} <= names
 
 
 @pytest.mark.parametrize("mech_dir", MECH_DIRS, ids=lambda d: d.name)
@@ -69,12 +69,6 @@ AIR = MECHANISMS / "air"
 @pytest.mark.parametrize(
     "mechanism, config, why",
     [
-        pytest.param(
-            AIR / "morrowlowke" / "air_morrowlowke.py",
-            AIR / "pancheshnyi" / "see.json",
-            "does not use",
-            id="cross_sections-for-an-analytic-mechanism",
-        ),
         pytest.param(
             AIR / "2body" / "air_2body.py",
             AIR / "pancheshnyi" / "nodetachment.json",

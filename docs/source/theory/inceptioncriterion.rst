@@ -69,16 +69,18 @@ of small matrix exponentials.
 
 .. admonition:: Code
 
-   :func:`incept1d.solver._assemble_det_Q` builds :math:`\bm{Q}` from
-   :math:`\bm{M}(d)`, the mechanism's row selectors and SEE yields, and
-   returns :math:`\det\bm{Q}` (row-normalised, via a signed
-   log-determinant, with ``NaN`` returned when :math:`\bm{Q}` is
-   ill-conditioned).  :func:`incept1d.solver.inception_det` is the end-to-end
-   evaluation for given :math:`E/N`, :math:`pd`, :math:`\lambda`, and field
-   geometry.  Root-finding in :math:`E/N` is done by
-   :func:`incept1d.inception.find_all_breakdown_EN`; root-finding in :math:`\lambda`
-   by :func:`Lambda.find_lambda_for_voltage`.  See :ref:`Chap:Numerics:RootFinding`
-   for how sign changes and ``NaN`` regions are handled.
+   The condition is evaluated in two equivalent ways, selected with
+   ``--criterion``.  :func:`incept1d.solver.riccati_criterion` (the default)
+   carries the anode condition back to the cathode as a reflection operator
+   and returns :math:`g = 1 -` (loop gain), which vanishes exactly where
+   :math:`\det\bm{Q}` does (:ref:`Chap:Numerics:Riccati`).
+   :func:`incept1d.solver.inception_det` builds :math:`\bm{Q}` itself and
+   returns its row-normalised determinant
+   (:ref:`Chap:Numerics:Determinant`).  Both take :math:`E/N`, :math:`pd`,
+   :math:`\lambda` and the field geometry.  Root finding in :math:`E/N` is
+   done by :func:`incept1d.inception.find_all_breakdown_EN`, and in
+   :math:`\lambda` by :func:`incept1d.growth.find_lambda_for_voltage`
+   (:ref:`Chap:Numerics:RootFinding`).
 
 Recovering the standard Paschen law
 -----------------------------------

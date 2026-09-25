@@ -8,17 +8,21 @@ across a p·d sweep, giving the (partial) discharge inception voltage
 PDIV = V*(p·d).
 
 The root finding, warm starts and branch tracking are described in
-``docs/source/numerics/rootfinding.rst``; the determinant itself is
-:func:`incept1d.solver.inception_det`.
+``docs/source/numerics/rootfinding.rst``.  The criterion whose root is
+sought is :func:`incept1d.solver.riccati_criterion` unless a ``det_fn`` is
+given; :func:`incept1d.solver.inception_det` evaluates the same condition
+as det Q.
 """
 
 import math
+import time
 
 import numpy as np
 import scipy.optimize
 
 from incept1d.constants import kB as _kB
-from incept1d.solver import inception_det
+from incept1d.parallel import parallel_map
+from incept1d.solver import riccati_criterion
 
 _ROOT_CHECK_TOL = 0.01  # |det Q(root)| / bracket-scale above this triggers a warning
 _NAN_SENTINEL = 1e-290  # |value| below this → came from NaN → -1e-300 mapping
@@ -54,7 +58,29 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
     -------
     bool
         True if the root is accepted.
+
+    Notes
+    -----
+    A criterion with a physical sign (Riccati, :func:`_has_physical_sign`)
+    is 1 − (loop gain): positive below inception, negative above, so a root
+    can only be a crossing from + to − in increasing E/N.  Any such crossing
+    is accepted as it is: inception shows either as a zero or, when the
+    photon loop alone sustains the discharge, as the pole where g jumps
+    from about +1 to −1, and the residual test below would call the pole
+    suspect.  A crossing from − to + cannot be inception and is rejected; it
+    is the signature of a mis-evaluated point (an isolated spurious "below"
+    far above inception once gave a false root).
     """
+    if _has_physical_sign(det_fn):
+        if fa > 0.0 > fb:
+            return True
+        print(
+            f"  [root check] EN = {root:.4f} Td  pd = {pd*1e3:.4g} bar·mm: the "
+            f"criterion goes from {fa:+.2e} to {fb:+.2e}, not from + to -, "
+            f"so this is not inception — discarded"
+        )
+        return False
+
     det_root = det_fn(root, pd, mod, p, T)
 
     if not np.isfinite(det_root):
@@ -88,6 +114,14 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
 #: bracket is declared unconfirmed.  A uniform-field proxy misplaces a root of
 #: a strongly non-uniform field by up to ~30 %, so this leaves margin on top.
 _CONFIRM_FACTOR = 1.6
+
+#: Lowest E/N (Td) searched when the criterion shows inception below EN_lo.
+_EN_FLOOR = 0.1
+
+
+def _has_physical_sign(det_fn):
+    """True when *det_fn* is (a partial of) the Riccati criterion."""
+    return getattr(det_fn, "func", det_fn) is riccati_criterion
 
 
 def find_all_breakdown_EN(
@@ -147,7 +181,7 @@ def find_all_breakdown_EN(
         Empty list if no sign change is found in [EN_lo, EN_hi].
     """
     if det_fn is None:
-        det_fn = inception_det
+        det_fn = riccati_criterion
     scan_fn = fast_det_fn if fast_det_fn is not None else det_fn
 
     def f_brentq(EN):
@@ -243,6 +277,32 @@ def find_all_breakdown_EN(
         # Warm start incomplete, or a lower root exists — fall through to the
         # full scan, which is authoritative.
 
+    # A criterion whose sign is physical (Riccati: g > 0 below inception for
+    # every mechanism) tells at a single point whether the lowest root lies
+    # below the scan range.  Then no scan above EN_lo can find it; search
+    # down instead, where a strongly non-uniform gap puts its gap-averaged
+    # inception field.  With every root wanted, the scan above still runs
+    # and the root found here is added to its roots.
+    below = []
+    if _has_physical_sign(det_fn):
+        f_lo = f_brentq(EN_lo)
+        if f_lo < 0.0:
+            EN_b = EN_lo
+            while EN_b > _EN_FLOOR:
+                EN_a = max(EN_b / 2.0, _EN_FLOOR)
+                if f_brentq(EN_a) > 0.0:
+                    below = [
+                        float(
+                            scipy.optimize.brentq(
+                                f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
+                            )
+                        )
+                    ]
+                    break
+                EN_b = EN_a
+            if first_only:
+                return below
+
     EN_scan = np.logspace(np.log10(EN_lo), np.log10(EN_hi), n_scan)
 
     def _scan_with(sfn):
@@ -258,10 +318,14 @@ def find_all_breakdown_EN(
             val = sfn(EN, pd, mod, p, T)
             return val if np.isfinite(val) else 0.0
 
-        D = np.array([f_s(en) for en in EN_scan])
+        # Evaluated lazily, bottom up: in first_only mode the scan stops at the
+        # first confirmed root instead of paying for every point above it,
+        # which matters when sfn is the full criterion.
+        D = [f_s(EN_scan[0])]
         local_roots = []
         unconfirmed = False
         for i in range(len(EN_scan) - 1):
+            D.append(f_s(EN_scan[i + 1]))
             if D[i] * D[i + 1] < 0.0:
                 EN_a, EN_b = EN_scan[i], EN_scan[i + 1]
                 fa, fb = f_brentq(EN_a), f_brentq(EN_b)
@@ -293,6 +357,13 @@ def find_all_breakdown_EN(
                     f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
                 )
                 if not _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
+                    # With a physically signed criterion a rejected crossing
+                    # went from - to +, so the criterion was already negative
+                    # below it: a genuine + -> - crossing lies lower still,
+                    # which only the full scan can locate.  Roots above must
+                    # not be accepted in its place.
+                    if _has_physical_sign(det_fn):
+                        unconfirmed = True
                     continue
                 local_roots.append(float(root))
                 if first_only:
@@ -341,7 +412,7 @@ def find_all_breakdown_EN(
         # roots that fast_det missed, so using it only adds scan overhead before
         # the full fallback (which is always needed anyway).
         roots, _ = _scan_with(det_fn)
-    return roots
+    return below + roots
 
 
 def compute_inception_curve(
@@ -353,6 +424,9 @@ def compute_inception_curve(
     det_fn=None,
     fast_det_fn=None,
     med_det_fn=None,
+    progress=None,
+    jobs=1,
+    verify=None,
 ):
     """
     Compute inception-curve branches across a p·d sweep.
@@ -374,6 +448,22 @@ def compute_inception_curve(
     all_branches : bool
         If False (default), only the lowest-E/N root (branch 0) is kept at
         each pd point.  If True, all roots are collected.
+    progress : callable or None
+        Called after each pd point as
+        ``progress(i, n, pd, p, roots, seconds, check)``, with the E/N roots
+        found there (ascending, possibly empty), the time it took and the
+        value *verify* returned (None without it), so a caller can report
+        the sweep as it runs.  With ``jobs > 1`` the calls come
+        in completion order, not pd order.
+    jobs : int
+        Worker processes for the root searches (see
+        :func:`incept1d.parallel.parallel_map`).  The pd points are split
+        into contiguous blocks solved concurrently, each in order with
+        warm starts, and assigned to branches afterwards in pd order.
+    verify : callable or None
+        ``verify(pd, p, roots) -> check``, evaluated next to the root search
+        (in the same worker) and handed to *progress*; e.g. an independent
+        check of the lowest root.
 
     Returns
     -------
@@ -388,25 +478,42 @@ def compute_inception_curve(
         Returns an empty list if no solutions are found anywhere.
     """
     if det_fn is None:
-        det_fn = inception_det
+        det_fn = riccati_criterion
     p_arr = np.full_like(pd_arr, p) if np.ndim(p) == 0 else np.asarray(p, dtype=float)
     branches = []
     branch_last_logEN = []  # last log10(EN) for each branch, for continuity tracking
-    prev_roots_EN = []  # roots found at the previous pd point (warm-start hints)
 
-    for i, (pd_i, p_i) in enumerate(zip(pd_arr, p_arr)):
+    def solve(i, previous=None):
+        # previous: this block's result at the pd point before, whose roots
+        # warm-start this one (see parallel_map).
+        hints = list(previous[0]) if previous is not None else None
+        t_start = time.perf_counter()
         roots = find_all_breakdown_EN(
-            pd_i,
+            pd_arr[i],
             mod,
-            p_i,
+            p_arr[i],
             T,
             first_only=not all_branches,
             det_fn=det_fn,
             fast_det_fn=fast_det_fn,
             med_det_fn=med_det_fn,
-            EN_hints=prev_roots_EN,
+            EN_hints=hints,
         )
-        prev_roots_EN = list(roots)
+        roots = sorted(float(r) for r in roots)
+        seconds = time.perf_counter() - t_start
+        check = verify(pd_arr[i], p_arr[i], roots) if verify is not None else None
+        return roots, seconds, check
+
+    def report(i, result):
+        if progress is not None:
+            progress(i, len(pd_arr), pd_arr[i], p_arr[i], *result)
+
+    # Contiguous blocks of pd points, each solved in order with warm starts;
+    # jobs = 1 is a single block, i.e. the plain sequential sweep.
+    solved = parallel_map(solve, len(pd_arr), jobs, on_result=report)
+
+    for i, (pd_i, p_i) in enumerate(zip(pd_arr, p_arr)):
+        roots = solved[i][0]
         if not roots:
             continue
         d_i = pd_i / p_i

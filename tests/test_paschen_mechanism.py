@@ -26,7 +26,7 @@ from incept1d.constants import kB
 from incept1d.fields import FieldDistribution
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism
-from incept1d.solver import inception_det
+from incept1d.solver import riccati_criterion
 
 MECH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -40,7 +40,7 @@ UNIFORM = FieldDistribution("uniform")
 
 @pytest.fixture(scope="module")
 def det():
-    return functools.partial(inception_det, field_dist=UNIFORM)
+    return functools.partial(riccati_criterion, field_dist=UNIFORM)
 
 
 def _load(gas, **cfg):

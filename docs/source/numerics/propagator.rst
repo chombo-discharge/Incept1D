@@ -97,10 +97,18 @@ default 200), so the total number of fine steps never exceeds
 :math:`N_{\max}`.  Setting :math:`N_{\max} = N_{\min}` disables adaptation and
 gives a fixed uniform grid.
 
-The initial :math:`N_{\min}` is additionally raised by
-:func:`incept1d.fields._compute_n_steps` for sphere geometries so that
-the field does not change by more than a set fraction over the first step
-near the sphere, where :math:`f(\xi)` is steepest.
+The step halving judges a segment by comparing one midpoint step with two
+half steps, and cannot see a feature that falls between those sample
+points: a thin high-field layer at a small electrode can be missed
+altogether, and with it the avalanche.  The :math:`N_{\min}` initial
+segments are therefore first split until the field changes by at most
+20 % across each (:func:`incept1d.solver._field_following_edges`), which
+for a wire of radius :math:`a` in a gap of :math:`100\,a` adds a couple of
+dozen short segments at the wire; a uniform or gently varying field keeps
+its :math:`N_{\min}` equal segments.  With that start the defaults keep
+the inception field within about 0.1–0.2 % of its converged value on
+sphere-plane and thin-wire coaxial gaps; ``--dx 5 1000 1e-3`` brings that
+to about 0.01 % at three to seven times the cost.
 
 Eigenvalue shifting
 -------------------
@@ -116,16 +124,17 @@ of the propagator, hence to every row of :math:`\bm{Q}_d`; it scales
 only thing the root finder needs — unchanged.  The factor is intentionally
 not restored.
 
-Local treatment of strongly absorbed photons
---------------------------------------------
+Photon groups
+-------------
 
-Photon groups whose optical depth over the gap is large,
-:math:`\kappa_j d > 12`, are re-absorbed within a small fraction of any
-integration step.  Propagating them explicitly adds stiff decay modes to
-:math:`\bm{\mathcal{A}}` without changing the physics, so
-:func:`incept1d.solver._build_A_aug` removes such groups from the augmented
-system and adds their steady-state contribution
-:math:`2\vec{b}_j\vec{c}_j^\intercal/\kappa_j` directly to :math:`\bm{A}`
-(the factor 2 accounts for both streams).  The number of explicitly
-propagated groups :math:`N_\gamma^\mathrm{eff}` is decided once per
-determinant evaluation and used consistently in :math:`\bm{Q}`.
+Every photon group is propagated explicitly, however large its optical
+depth :math:`\kappa_j d`.  Replacing a thick group by its steady-state
+contribution :math:`2\vec{b}_j\vec{c}_j^\intercal/\kappa_j` to
+:math:`\bm{A}` keeps the photoionization it produces but places every
+photoelectron at its point of emission, which removes the upstream seeding
+that makes photoionization a feedback loop; in a strongly non-uniform gap
+the ionization zone can be as thin as :math:`1/\kappa_j` even when
+:math:`\kappa_j d \gg 1`, and the inception field then changes by tens of
+per cent.  The stiff :math:`e^{\pm\kappa_j x}` modes this adds to
+:math:`\bm{\mathcal{A}}` are handled by how the inception condition is
+evaluated (:ref:`Chap:Numerics:Riccati`), not by the propagator.

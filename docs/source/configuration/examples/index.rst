@@ -17,13 +17,8 @@ cathode yields, and a family of ready-made configurations built on top.  Read
 it to see what each part of the interface looks like when the chemistry is
 not trivial.
 
-:ref:`Chap:MorrowLowkeScheme` is in between: the widely used analytic
-transport model for air, with three species and no data files, on top of the
-same photoionization and secondary emission as the full scheme.
-
 .. toctree::
    :maxdepth: 2
 
    paschen
    air
-   morrowlowke

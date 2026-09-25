@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pre-commit", "black", "flake8"]
+dev = ["pytest", "pre-commit", "black", "flake8", "mpmath"]
 docs = ["sphinx>=7.0", "sphinx-rtd-theme>=2.0"]
 
 [project.scripts]

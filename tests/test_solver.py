@@ -13,12 +13,19 @@ import scipy.linalg
 from incept1d.constants import c_light
 from incept1d.fields import FieldDistribution
 from incept1d.solver import (
+    _additive_compound,
+    _boundary_rows,
     _build_A_aug,
+    _compound_index,
+    _det_Q_compound,
+    _det_Q_norm,
+    _expm,
     _expm_shifted,
     inception_det,
     magnus2_propagator,
     midpoint_propagator,
     parse_dx_spec,
+    polarities_equivalent,
 )
 
 
@@ -85,58 +92,22 @@ class TestBuildAAug:
         assert Z_tr == pytest.approx(np.zeros((2, 2)))
         assert Z_bl == pytest.approx(np.zeros((2, 2)))
 
-    def test_optically_thick_group_is_folded_into_A(self):
+    @pytest.mark.parametrize("kd", [0.01, 11.99, 12.01, 100.0, 1e4])
+    def test_every_group_is_propagated(self, kd):
         """
-        S3: a group with kappa*d > 12 is treated as local.
+        S3: no photon group is folded into A, however optically thick.
 
-        It leaves the augmented block and contributes 2 B C / kappa to A.
+        Folding a thick group as the local source 2 B C / kappa removes the
+        upstream seeding by photons, which is the photoionization feedback.
         """
-        kappa = 1.0
-        mod = PhotonStub(n=2, kappa=(kappa,))
-        EN, p, T = 100.0, 1.0, 293.0
-        d_thick = 20.0 / kappa  # kappa*d = 20 > 12
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(EN, d_thick, mod, p, T)
-        assert n_gamma == 0 and n_aug == 2
-        assert list(mask) == [False]
-
-        A_local = mod.get_R(EN, p, T) @ np.linalg.inv(mod.get_V(EN, p, T))
-        B = mod.get_B(EN, p, T)
-        C = mod.get_C(EN, p, T) * (1.0 / np.diag(mod.get_V(EN, p, T)))[np.newaxis, :]
-        expected = A_local + 2.0 * np.outer(B[:, 0], C[0, :]) / kappa
-        assert A_aug == pytest.approx(expected)
-
-    def test_collapse_happens_exactly_at_the_threshold(self):
-        """
-        S3b: the switch is at kappa*d = 12, and only the thick group moves.
-
-        Below the threshold the group stays in the augmented block; above it,
-        it leaves the block and its contribution appears in the species block.
-        """
-        kappa = 1.0
-        mod = PhotonStub(n=2, kappa=(kappa,))
-        EN, p, T = 100.0, 1.0, 293.0
-
-        below, n_below, mask_below, _ = _build_A_aug(EN, 11.99 / kappa, mod, p, T)
-        above, n_above, mask_above, _ = _build_A_aug(EN, 12.01 / kappa, mod, p, T)
-
-        assert n_below == 1 and list(mask_below) == [True]
-        assert n_above == 0 and list(mask_above) == [False]
-        assert below.shape == (4, 4) and above.shape == (2, 2)
-
-        # The species block gains exactly the folded term 2 B C / kappa.
-        B = mod.get_B(EN, p, T)
-        C = mod.get_C(EN, p, T) * (1.0 / np.diag(mod.get_V(EN, p, T)))[np.newaxis, :]
-        assert above - below[:2, :2] == pytest.approx(
-            2.0 * np.outer(B[:, 0], C[0, :]) / kappa
-        )
-
-    def test_mixed_thin_and_thick_groups(self):
-        """S3c: only the thick groups collapse; the thin ones stay augmented."""
         mod = PhotonStub(n=2, kappa=(1.0, 1e4))
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(100.0, 1e-2, mod, 1.0, 293.0)
-        # kappa*d = 0.01 (thin, stays) and 100 (thick, collapses)
-        assert list(mask) == [True, False]
-        assert n_gamma == 1 and n_aug == 2 + 2 * 1
+        A_aug, n_gamma, mask, n_aug = _build_A_aug(100.0, kd, mod, 1.0, 293.0)
+        assert n_gamma == 2 and n_aug == 2 + 2 * 2
+        assert list(mask) == [True, True]
+        v_inv = 1.0 / np.diag(mod.get_V(100.0, 1.0, 293.0))
+        assert A_aug[:2, :2] == pytest.approx(
+            mod.get_R(100.0, 1.0, 293.0) * v_inv[np.newaxis, :]
+        )
 
     def test_lambda_shifts_A_and_kappa(self):
         """S4: A -> (R - lam I) V^-1 and kappa -> kappa + lam / c."""
@@ -308,3 +279,213 @@ class TestDeterminant:
             for EN in np.logspace(1, 3, 40)
         ]
         assert sum(np.isfinite(v) for v in vals) > 30
+
+
+class TestPolarityEquivalence:
+    """When may negative polarity reuse the positive-polarity answer?"""
+
+    @pytest.fixture
+    def overridden(self, toy_path):
+        from incept1d.mechanism import load_mechanism
+
+        return load_mechanism(
+            toy_path,
+            {"pos_override": {"gamma0": 0.4}, "neg_override": {"gamma0": 0.01}},
+        )
+
+    @pytest.mark.parametrize(
+        "field, expected",
+        [
+            (FieldDistribution("uniform"), True),
+            (FieldDistribution("sphere-sphere", 5e-3), True),
+            (FieldDistribution("sphere-plane", 5e-3), False),
+        ],
+    )
+    def test_geometry_decides_for_identical_electrodes(self, toy, field, expected):
+        assert polarities_equivalent(toy, field) is expected
+
+    def test_overrides_break_the_symmetry_of_a_uniform_gap(self, overridden):
+        """Two different cathodes are not a reflection of each other."""
+        assert not polarities_equivalent(overridden, FieldDistribution("uniform"))
+
+    def test_the_determinant_agrees(self, toy, overridden):
+        """
+        The helper's claim, checked against det Q itself.
+
+        In a uniform gap det Q is the same for both polarities exactly when
+        the electrodes are identical.
+        """
+        uniform = FieldDistribution("uniform")
+        args = (400.0, 20e-3)
+
+        def det(mod, positive):
+            return inception_det(
+                *args, mod, 1.0, 293.0, uniform, positive_polarity=positive
+            )
+
+        assert det(toy, True) == det(toy, False)
+        assert det(overridden, True) != pytest.approx(det(overridden, False))
+
+
+class TestExpmStructuralZeros:
+    """exp(M) is exactly zero where no chain of M's entries reaches."""
+
+    def test_lower_triangular_step_stays_lower_triangular(self):
+        # The step that SciPy 1.18 returned with 1e36 above the diagonal.
+        M = np.array([[120.0, 0.0, 0.0], [72.2, 24.0, 0.0], [48.2, 0.0, 25.68]])
+        E = _expm(M)
+        assert np.all(E[np.triu_indices(3, 1)] == 0.0)
+        assert E[2, 1] == 0.0
+        # The non-zero entries are the closed form of this triangular exp.
+        assert E[0, 0] == pytest.approx(math.exp(120.0), rel=1e-12)
+        assert E[1, 0] == pytest.approx(
+            72.2 * (math.exp(120.0) - math.exp(24.0)) / 96.0, rel=1e-12
+        )
+
+    def test_chains_are_kept(self):
+        # 0 -> 1 -> 2: entry (2, 0) is reached through (1, 0) and (2, 1).
+        M = np.array([[1.0, 0.0, 0.0], [2.0, 1.0, 0.0], [0.0, 3.0, 1.0]])
+        # M = I + N with N nilpotent: exp(M) = e (I + N + N²/2), exactly.
+        N = M - np.eye(3)
+        exact = math.e * (np.eye(3) + N + N @ N / 2.0)
+        assert _expm(M) == pytest.approx(exact, rel=1e-12, abs=0.0)
+
+
+class TestCompoundRoute:
+    """The singular-Q fallback must return the same number as the direct route."""
+
+    @pytest.mark.parametrize("n, k", [(3, 1), (4, 2), (6, 2), (6, 3)])
+    def test_additive_compound_generates_the_compound(self, n, k):
+        """exp(Ω^[k]) acts on k×k minors exactly as exp(Ω) acts on vectors."""
+        rng = np.random.default_rng(n * 10 + k)
+        Omega = rng.normal(size=(n, n))
+        P = scipy.linalg.expm(Omega)
+        subsets = _compound_index(n, k)[0]
+        minors = np.array(
+            [[np.linalg.det(P[np.ix_(r, c)]) for c in subsets] for r in subsets]
+        )
+        assert scipy.linalg.expm(_additive_compound(Omega, k)) == pytest.approx(
+            minors, rel=1e-9, abs=1e-12
+        )
+
+    @staticmethod
+    def _routes(mod, EN, pd, lam=0.0, n_steps=1, p=1.0, T=293.0):
+        d = pd / p
+        A, Ng, mask, n_aug = _build_A_aug(EN, d, mod, p, T, lam=lam)
+        Q0, S = _boundary_rows(EN, mod, p, T, Ng, mask, n_aug)
+        exponents = [A * d / n_steps] * n_steps
+        M = np.linalg.matrix_power(scipy.linalg.expm(A * d / n_steps), n_steps)
+        with np.errstate(over="ignore", invalid="ignore"):
+            direct = _det_Q_norm(np.vstack([Q0, S @ (M / np.abs(M).max())]))
+            compound = _det_Q_compound(exponents, Q0, S)
+        return direct, compound
+
+    @pytest.mark.parametrize("EN", [150.0, 300.0, 400.0, 600.0])
+    @pytest.mark.parametrize("lam", [0.0, 1e5])
+    @pytest.mark.parametrize("n_steps", [1, 7])
+    def test_equals_the_direct_route(self, toy, EN, lam, n_steps):
+        direct, compound = self._routes(toy, EN, 20e-3, lam, n_steps)
+        assert np.isfinite(direct)
+        assert compound == pytest.approx(direct, rel=1e-7)
+
+    # A hand-built gap the toy cannot provide: electrons and two positive
+    # ions, so the anode block S M has two rows that can become parallel.
+    # Ions feed nothing back, as in the air mechanisms.  Rows of Q0/S and
+    # the generator in the order (e, ion1, ion2).
+    Q0_TWO_IONS = np.array([[1.0, 1e-3, 2e-3]])
+    S_TWO_IONS = np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+
+    @staticmethod
+    def _generator(a, c1=300.0, c2=320.0):
+        """Electron growth a, ion production, ion-mode growth c1, c2 (1/m)."""
+        return np.array(
+            [
+                [a, 0.0, 0.0],
+                [0.6 * abs(a) + 50.0, c1, 0.0],
+                [0.4 * abs(a) + 50.0, 0.0, c2],
+            ]
+        )
+
+    def _exact(self, exponents):
+        """Row-normalised det [Q0; S M] in 300-digit arithmetic."""
+        mp = pytest.importorskip("mpmath")
+        mp.mp.dps = 300
+        M = mp.eye(3)
+        for Om in exponents:
+            M = mp.expm(mp.matrix(Om.tolist())) * M
+        Q = mp.matrix(3, 3)
+        rows = [list(self.Q0_TWO_IONS[0])] + [
+            [sum(self.S_TWO_IONS[r, j] * M[j, c] for j in range(3)) for c in range(3)]
+            for r in range(2)
+        ]
+        for r, row in enumerate(rows):
+            norm = mp.sqrt(sum(mp.mpf(v) ** 2 for v in row))
+            for c in range(3):
+                Q[r, c] = row[c] / norm
+        return float(mp.det(Q))
+
+    @pytest.mark.parametrize("scale", [1.0, 30.0, 300.0])
+    def test_uniform_gap_with_widely_separated_modes(self, scale):
+        """
+        The ion modes run far ahead of the electrons: at scale 300 they are
+        ~10^4 e-folds apart and the direct route has long since failed.
+        """
+        exponents = [self._generator(200.0, 300.0 * scale, 320.0 * scale) * 0.01]
+        exact = self._exact(exponents)
+        with np.errstate(over="ignore", invalid="ignore"):
+            got = _det_Q_compound(exponents, self.Q0_TWO_IONS, self.S_TWO_IONS)
+        assert np.sign(got) == np.sign(exact)
+        assert got == pytest.approx(exact, rel=1e-6, abs=1e-280)
+
+    @pytest.mark.parametrize("n_steps", [10, 200])
+    @pytest.mark.parametrize("c", [6000.0, 9000.0, 10500.0, 11000.0])
+    def test_transiently_tiny_electrons(self, n_steps, c):
+        """
+        Electrons decay by 160 e-folds over the first half of the gap and
+        avalanche by 600 over the second, so in mid-gap their component is
+        far below the ions' yet decides the sign at the anode.  That defeats
+        re-orthonormalisation (Godunov–Conte), which mixes components; and
+        for the two smaller ion growth rates c the rows S M are parallel, so
+        the direct route fails too.  The root lies between c = 10500 and
+        11000, so the sign flips across the parametrisation.
+        """
+        d = 0.04
+        h = d / n_steps
+        exponents = [
+            self._generator(-8000.0 if i < n_steps // 2 else 30000.0, c, 1.07 * c) * h
+            for i in range(n_steps)
+        ]
+        exact = self._exact(exponents)
+        assert exact != 0.0
+        with np.errstate(over="ignore", invalid="ignore"):
+            got = _det_Q_compound(exponents, self.Q0_TWO_IONS, self.S_TWO_IONS)
+        assert np.sign(got) == np.sign(exact)
+        assert got == pytest.approx(exact, rel=1e-6)
+
+
+class TestFieldFollowingStart:
+    """The initial segments must resolve a thin high-field layer."""
+
+    def test_thin_wire_layer_is_resolved(self):
+        """
+        A 0.25 mm wire in a 25 mm tube: no initial segment spans more than a
+        20 % change of the field, so sample points land in the ionizing
+        layer at the wire, which equal segments of ~5 mm would straddle.
+        """
+        from incept1d.solver import _field_following_edges
+
+        fd = FieldDistribution("coaxial", coax_a=0.25e-3, coax_b=25e-3)
+        f = fd.build(24.75e-3)
+        edges = _field_following_edges(f, 5)
+        values = np.array([f(x) for x in edges])
+        change = np.abs(np.diff(values)) / np.maximum(values[:-1], values[1:])
+        assert change.max() <= 0.2 + 1e-12
+        assert len(edges) - 1 > 5
+        # The wire is at xi = 0 (the field decreases away from it).
+        assert edges[1] < 0.02
+
+    def test_uniform_field_keeps_equal_segments(self):
+        from incept1d.solver import _field_following_edges
+
+        f = FieldDistribution("uniform").build(1e-2)
+        assert np.allclose(_field_following_edges(f, 5), np.linspace(0.0, 1.0, 6))

@@ -9,61 +9,61 @@ Temporal growth rate — ``incept1d growth``
 
 Once the applied voltage exceeds the inception voltage :math:`U^*`, the
 discharge does not merely "exist" — it grows at some rate.  ``incept1d growth``
-answers *how fast*.  For a fixed geometry (:math:`pd`, :math:`p`, :math:`T`,
-field profile) it first solves :math:`\det\bm{Q}(0; E/N) = 0` for the
-inception field :math:`(E/N)^*` (the same criterion as ``incept1d pdiv``),
-then for each voltage :math:`U \in [U^*, F U^*]` solves
-:math:`\det\bm{Q}(\lambda; E/N) = 0` for the growth rate
-:math:`\lambda^* > 0`.
+answers *how fast*.  For a geometry (field profile, pressure, gap length,
+temperature) it first finds the inception field :math:`(E/N)^*` — the same
+criterion as ``incept1d pdiv``, at :math:`\lambda = 0` — and then, for each
+voltage :math:`U \in [U^*, F U^*]`, solves the criterion at
+:math:`\lambda > 0` for the growth rate :math:`\lambda^*`.  Several
+pressures and gap lengths can be given at once; every combination is a
+case of its own.
 
-How that root is bracketed and refined is described in
-:ref:`Chap:Numerics:RootFinding`.  It is accepted only if
-:math:`\det\bm{Q}(\lambda^*)` is finite — see :ref:`Sec:Lambda:Range` for
-why that check matters.
+:math:`\det\bm{Q}(\lambda) = 0` has many roots, one for every mode of the
+gap; :math:`\lambda^*` is the one that sets the growth, as explained in
+:ref:`Sec:Lambda:Range`.  How it is bracketed and refined is described in
+:ref:`Chap:Numerics:RootFinding`.
 
 .. _Sec:Lambda:Range:
 
-Range of validity
------------------
+Which root, and range of validity
+---------------------------------
 
-.. warning::
+A mode :math:`\vec{n}(x)\,e^{\lambda t}` of the linearised gap exists for
+every root of :math:`\det\bm{Q}(\lambda) = 0`, and above :math:`U^*` several
+of them can grow at once.  The feedback loops (ions returning to the
+cathode, photons) act like delays, so besides real roots there are complex
+ones, oscillating modes whose real part can also be positive just above
+threshold.
 
-   ``incept1d growth`` only answers over a limited band of overvoltage.  For
-   dry air at :math:`pd = 10` bar·mm that band is roughly
-   :math:`U \lesssim 1.2\,U^*`; beyond it the command reports
-   ``det_Q_unresolved`` and returns no growth rate.
+Every coupling in the linear model is a non-negative source — ionization,
+attachment into negative ions, detachment, photoionization, secondary
+emission — so the gain of each feedback loop, the number of cathode
+electrons one generation produces with every path discounted by
+:math:`e^{-\lambda t}`, falls as :math:`\lambda` increases.  The dominant
+mode is then the unique real :math:`\lambda^*` at which the strongest loop
+gain is one; its density profile is positive everywhere, and no root, real
+or complex, lies above it.  :math:`\lambda^*` is therefore the **largest real
+root** of :math:`\det\bm{Q}`, and that is what ``incept1d growth`` reports:
+it scans down from well above any possible growth rate to the first sign
+change, rather than up from zero, which could stop at a slower mode.
 
-The limit is not in the root finder but in the determinant it is given.  The
-propagator is formed as :math:`\bm{M} = \exp(\bm{\mathcal{A}}d)` after
-shifting by the largest real eigenvalue
-(:func:`incept1d.solver._expm_shifted`), so the subdominant modes appear as
-:math:`e^{(\mu_i - \mu_\mathrm{max})d}`.  Once the spectral spread
-:math:`(\mu_\mathrm{max} - \mu_\mathrm{min})d` exceeds the
-double-precision underflow limit of about 709, those modes become *exactly*
-zero: at :math:`2U^*` in the case above the spread is 830, and
-:math:`\bm{M}` has numerical rank 2 out of 11.  The anode rows
-:math:`\bm{\Pi}_+\bm{M}` then carry no independent information,
-:math:`\bm{Q}` is rank deficient, and
-:func:`incept1d.solver._assemble_det_Q` returns ``NaN`` from its
-conditioning guard — for *every* :math:`\lambda`, not only near a root.
+Above threshold the propagator :math:`\bm{M}(d)` cannot be formed reliably:
+the modes it has to keep separate differ in growth by hundreds to thousands
+of e-folds, far beyond double precision, and the anode rows of
+:math:`\bm{Q}` become parallel.  The default criterion never forms
+:math:`\bm{M}` (:ref:`Chap:Numerics:Riccati`), and with it the growth rate
+is resolved at any overvoltage; with ``--criterion detq`` the determinant
+falls back on the much slower compound-matrix route
+(:ref:`Chap:Numerics:Determinant`).  An independent discretisation of the
+time-dependent equations, in the test suite, confirms that
+:math:`\lambda^*` found this way is the fastest mode, complex modes
+included.
 
-This matters because ``NaN`` is mapped to a negative sentinel inside the
-bracketing function, so a run of ``NaN`` below a finite positive value is
-indistinguishable from a sign change.  Brent's method then converges on the
-edge of the ``NaN`` region.  That edge is the :math:`\lambda` at which a
-photon group crosses :math:`\kappa d = 12` and collapses into
-:math:`\bm{A}` (:ref:`Chap:Numerics:Determinant`), which does not depend on
-:math:`E/N` — so before the acceptance check was added, the same
-:math:`\lambda \approx 1.9\times10^{11}` s\ :sup:`-1` was reported at every
-overvoltage.
-
-Lifting the restriction means not forming :math:`\bm{M}` at all.  The
-standard remedy for a linear boundary-value problem with this dynamic range
-is to propagate the *subspace* that satisfies the cathode conditions with
-periodic re-orthonormalisation (Godunov–Conte shooting), or to propagate the
-corresponding exterior product directly (the compound-matrix or Evans-function
-method), so that no individual mode is ever represented.  Until then, treat a
-``det_Q_unresolved`` row as "not answered" rather than "no growth".
+The limit that remains is physical.  The model is linear: it has no space
+charge.  At :math:`1.5\,U^*` an avalanche across a centimetre-scale gap can
+multiply by :math:`e^{400}` and more, far beyond the :math:`e^{18}`–:math:`e^{20}`
+at which space charge takes over, so :math:`\lambda^*` is a meaningful growth
+rate only close to :math:`U^*`, and the further above it the more it is a
+property of the equations rather than of the discharge.
 
 Inputs
 ------
@@ -71,14 +71,30 @@ Inputs
 .. code-block:: console
 
    incept1d growth MECHANISM.py [CONFIG.json ...]
-       --pd PD [--p P] [--T T] [--n-voltages N] [--v-max-factor F]
+       [--pressure P [P ...]] [--distance D [D ...]] [--T T]
+       [--n-voltages N] [--v-max-factor F]
        [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
+       [--criterion {riccati,detq}] [--jobs N] [--verify] [--silent]
        [--no-plot] [--write-to-file FILE]
 
-``--pd`` is the :math:`pd` product in bar·mm (required); ``--n-voltages``
-(default 20) and ``--v-max-factor`` (default 2.0) define the log-spaced
-voltage sweep from :math:`U^*` to :math:`F U^*`.  The remaining options are
-shared with ``incept1d pdiv``.  The output table lists, for each voltage, the
+``--pressure`` is the gas pressure in bar (default 1) and ``--distance`` the
+gap length in mm.  Each takes one or more values, and ``MIN:MAX:N`` expands
+to :math:`N` log-spaced values from MIN to MAX; every pressure is combined
+with every distance, so ``--pressure 1:10:3 --distance 5 10`` is six cases.
+``--distance`` is required unless the geometry fixes the gap itself: a
+coaxial gap is :math:`b - a` long and a field line its arc length, and a
+``--distance`` given with those is ignored, with a message saying so.  ``--n-voltages`` (default 20) and ``--v-max-factor`` (default
+2.0) define the log-spaced voltage sweep from :math:`U^*` to :math:`F U^*`.
+The work runs in two parallel phases on ``--jobs`` worker processes
+(default: the number of physical cores): first the inception voltage of
+every case, configuration and polarity, then all their voltages together.
+Each result is printed as soon as it is solved, and the tables at the end
+are in voltage order.  ``--verify`` checks every root with
+:math:`\det\bm{Q}` — across :math:`(E/N)^*` for each inception voltage and
+across :math:`\lambda^*` for each growth rate — and reports ✓ or ✗ with
+the progress; it can be expensive.  ``--silent`` prints only the tables,
+and so also turns off that check.  The
+remaining options are shared with ``incept1d pdiv``.  The output table lists, for each voltage, the
 over-voltage ratio :math:`U/U^*`, :math:`E/N`, :math:`\lambda` and the
 corresponding e-folding time :math:`1/\lambda`.
 
@@ -87,13 +103,17 @@ Example
 
 .. code-block:: bash
 
-   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.py --pd 10 --p 1 --n-voltages 30 --v-max-factor 1.5
+   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.py --pressure 1 --distance 10 --n-voltages 30 --v-max-factor 1.5
 
 Outputs
 -------
 
-The inception point is reported first (:math:`U^*` and :math:`(E/N)^*`),
-then a table with one row per voltage:
+Each configuration is solved once per polarity, with its own inception
+point, exactly as ``incept1d pdiv`` does: the two are solved separately
+unless the gap is symmetric and the configuration has no per-polarity
+overrides, in which case the negative-polarity curve repeats the positive
+one.  For each curve the inception point is reported first (:math:`U^*` and
+:math:`(E/N)^*`), then a table with one row per voltage:
 
 .. code-block:: text
 
@@ -102,16 +122,30 @@ then a table with one row per voltage:
 :math:`\tau = 1/\lambda` is the e-folding time, and the last column measures
 the growth rate against the ionization frequency, which says whether the
 discharge grows on the avalanche timescale or far more slowly.  The figure
-has two panels, :math:`\lambda` and :math:`\tau` against :math:`U/U^*`.
+has two panels, :math:`\lambda` and :math:`\tau` against the voltage in kV,
+one colour per configuration and case, with a solid line for positive and a
+dashed line for negative polarity; a negative polarity that only mirrors
+the positive one is drawn once, labelled "both polarities".  Each curve
+carries at most 20 markers, the voltage axis becomes logarithmic when the
+curves span more than a factor of five, and with more than four curves the
+legend sits below the panels.
 
-A row that cannot be resolved is reported as ``NaN`` and flagged with a
-status — ``det_Q_unresolved`` means the determinant could not be evaluated
-at any :math:`\lambda`, not that the gap does not grow; see *Range of
-validity* above.
+With ``--write-to-file`` all curves share the first column, :math:`U/U^*`.
+Because :math:`U^*` differs between configurations and polarities, every
+curve then has its own four columns: the voltage in kV, :math:`\lambda`,
+:math:`\tau` and :math:`\nu_\mathrm{ion}`, named after the curve (for
+example ``lambda_s-1[Baseline (negative)]``, or with several cases
+``lambda_s-1[Baseline, p=2 bar, d=10 mm (negative)]``) in the ``# Column``
+lines of the header, which also lists the pressures and distances.
 
-``--write-to-file`` writes one row per voltage with the columns ``V_kV``
-and ``V_ratio``, then ``lambda_s-1[LABEL]``, ``tau_ns[LABEL]`` and
-``nu_ion_s-1[LABEL]`` for every configuration side by side.
+:math:`\nu_\mathrm{ion}` is the fastest local net ionization rate in the gap,
+evaluated at the peak of the field profile; in a non-uniform gap the
+gap-averaged field can lie below the ionization threshold.
+
+A row that is not plainly resolved carries a status.  ``suspect`` means
+the criterion does not change sign across :math:`\lambda^*` — a jump, not
+a zero; ``det_Q_unresolved`` and ``no_bracket_found`` mean no growth rate
+could be determined, not that the gap does not grow.
 
 API reference
 -------------

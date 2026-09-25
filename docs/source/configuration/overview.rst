@@ -31,9 +31,6 @@ what they share:
    │   ├── baseline.json         configuration files       (optional)
    │   ├── nodetachment.json
    │   └── paschen.json
-   ├── morrowlowke/
-   │   ├── air_morrowlowke.py
-   │   └── config.py
    ├── lxcat/                    data the modules read     (optional)
    │   ├── lisbon.txt
    │   └── o2m_mobility.txt

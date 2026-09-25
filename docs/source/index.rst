@@ -207,6 +207,7 @@ Numerics
 
    numerics/overview
    numerics/propagator
+   numerics/riccati
    numerics/determinant
    numerics/rootfinding
    numerics/cost

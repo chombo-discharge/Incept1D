@@ -33,9 +33,12 @@ evaluated is described in :ref:`Chap:Numerics`.
 
 The sweep runs in either of two modes: **fixed pressure** (``--p``, vary
 :math:`d`) or **fixed gap distance** (``--d``, vary :math:`p`).  Both may be
-combined, and several pressures or distances may be given.  For a
-non-uniform field that is not symmetric — sphere-plane, or a field line —
-both polarities are computed.
+combined, and several pressures or distances may be given.  Both
+polarities are always reported.  They are solved separately unless the gap
+is symmetric under swapping the electrodes: a uniform or sphere-sphere field
+*and* a configuration without per-polarity overrides
+(:ref:`Chap:Configuration`).  Two different cathode surfaces make even a uniform
+gap asymmetric.
 
 Inputs
 ------
@@ -46,6 +49,7 @@ Inputs
        [--p P [P ...]] [--d D [D ...]] [--T T]
        [--pd-min PD] [--pd-max PD] [--pd-num N]
        [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
+       [--criterion {riccati,detq}] [--jobs N] [--verify] [--silent]
        [--lam LAM] [--all-branches] [--plot-separate-branches]
        [--plot-ionization-integral] [--streamer-criterion C]
        [--write-to-file FILE] [--save-subplots] [--no-plot]
@@ -77,6 +81,26 @@ Inputs
        :ref:`Chap:Numerics:Propagator`.
    * - ``--method``
      - Propagator: ``midpoint`` (default, adaptive) or ``magnus2``.
+   * - ``--criterion``
+     - How the inception condition is evaluated: ``riccati`` (default), the
+       reflection operator carried from the anode
+       (:ref:`Chap:Numerics:Riccati`), or ``detq``, the determinant
+       :math:`\det\bm{Q}` itself (:ref:`Chap:Numerics:Determinant`).  Both
+       solve the same discrete problem; ``detq`` is far slower when a
+       photon group is optically thick.
+   * - ``--jobs N``
+     - Worker processes for the sweep (default: the number of physical
+       cores, or 1 if it cannot be determined).  The :math:`pd` points are
+       split into contiguous blocks solved concurrently, each with warm
+       starts; the result is the same as with ``--jobs 1``.
+   * - ``--verify``
+     - Check every root independently: :math:`\det\bm{Q}` on the same
+       field and grid, just below and just above the root, must change
+       sign.  Reported with each progress line.  Can be expensive.
+   * - ``--silent``
+     - Print only the result tables, no per-point progress.  With
+       ``--verify`` this also turns off the :math:`\det\bm{Q}` check,
+       which is reported with the progress.
    * - ``--lam LAM``
      - Temporal growth rate :math:`\lambda` in s\ :sup:`-1` for the
        generalized criterion :math:`\det\bm{Q}(\lambda) = 0` (default 0).
@@ -86,11 +110,15 @@ Inputs
    * - ``--plot-separate-branches``
      - Give each branch its own line style and legend entry.
    * - ``--plot-ionization-integral``
-     - Overlay :math:`I_\alpha` along the solution on a second axis.
-       Requires ``alpha``/``eta`` in the mechanism.
+     - Overlay :math:`I_\alpha = \int\max(\alpha-\eta,0)\,dx` along the
+       solution on a second axis, computed as ``incept1d ionization`` does
+       (:func:`incept1d.ionization.aed_integral`, with its quadrature points
+       in the ionizing layer).  Requires ``alpha``/``eta`` in the mechanism.
    * - ``--streamer-criterion C``
      - Also solve :math:`I_\alpha = C` (streamer criterion) and plot/write
-       that curve.
+       that curve.  With ``--plot-ionization-integral`` and ``--verify`` the
+       overlay also shows :math:`I_\alpha` along the streamer curve, which must be flat
+       at :math:`C` — a check of the streamer solve.
    * - ``--write-to-file FILE``
      - Tab-separated output with a metadata header.
    * - ``--save-subplots``
@@ -130,9 +158,18 @@ Inception curve with the growth-rate contour :math:`\lambda = 10^{8}` s\ :sup:`-
 Outputs
 -------
 
+While the sweep runs, every :math:`pd` point is printed as soon as it is
+solved — its index, :math:`pd`, :math:`p`, the lowest :math:`(E/N)^*`, the
+inception voltage :math:`U^*` and the time it took — so a long sweep shows
+its progress.  A point without inception in the scan range says so.  With
+``--jobs`` above one the points arrive in the order they finish; with
+``--verify`` each line also shows :math:`\det\bm{Q}` just below and just
+above the root, and ✓ if it changes sign.
+
 Unless ``--no-plot`` is given, a two-panel figure is shown: the inception
 voltage :math:`U^*(pd)` and the reduced field :math:`(E/N)^*(pd)`, one curve
-per configuration and polarity.  The same numbers are printed as a table.
+per configuration and polarity.  The same numbers are printed as a table
+once each curve is complete.
 
 ``--write-to-file`` writes one row per :math:`pd` point.  The header records
 the date, git commit, full command line, mechanism, temperature, pressures,
@@ -167,10 +204,13 @@ below are the solve itself.
 .. automodule:: incept1d.solver
    :members:
    :undoc-members:
-   :private-members: _build_A_aug, _assemble_det_Q, _adaptive_midpoint_segment, _expm_shifted
+   :private-members: _build_A_aug, _riccati_g, _slab_scattering, _star, _spectral_radius, _det_Q, _det_Q_norm, _det_Q_compound, _propagate_compound, _adaptive_midpoint_segment, _expm_shifted
 
 ``incept1d.inception``
 ~~~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: incept1d.parallel
+   :members:
 
 .. automodule:: incept1d.inception
    :members:

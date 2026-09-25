@@ -18,7 +18,6 @@ The standalone field plotter is ``incept1d field`` (:mod:`incept1d.cli.field`).
 
 import argparse
 import dataclasses
-import functools
 import math
 import os
 from typing import Callable, Optional
@@ -72,42 +71,6 @@ def _coaxial_field(xi, ratio):
 
 
 # ── Step-count helpers (kept for backward compatibility / plot_sphere_plane.py) ──
-
-
-def _compute_n_steps(field_func, field_tol, max_steps=2000):
-    """Return minimum N so that the relative field change across the first step ≤ field_tol."""
-    f0 = field_func(0.0)
-    if f0 <= 0.0 or field_tol >= 1.0:
-        return 1
-    lo, hi = 1, max_steps
-    if (f0 - field_func(1.0 / hi)) / f0 > field_tol:
-        return hi
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if (f0 - field_func(1.0 / mid)) / f0 <= field_tol:
-            hi = mid
-        else:
-            lo = mid + 1
-    return lo
-
-
-@functools.lru_cache(maxsize=1024)
-def _n_steps_sphere_cached(alpha, is_plane, field_tol, max_steps):
-    """N_steps for sphere geometry — depends only on shape parameter alpha, not scale."""
-    sinh_a = math.sinh(float(alpha))
-    cosh_a = math.cosh(float(alpha))
-    a_norm = sinh_a / (2.0 * (cosh_a - 1.0))
-    if is_plane:
-
-        def _f(xi):
-            return _sphere_sphere_axial_field(0.5 * xi, float(alpha), a_norm, 1.0)
-
-    else:
-
-        def _f(xi):
-            return _sphere_sphere_axial_field(xi, float(alpha), a_norm, 1.0)
-
-    return _compute_n_steps(_f, field_tol, max_steps)
 
 
 # ── Tabulated field line ──────────────────────────────────────────────────────
@@ -320,8 +283,29 @@ class FieldDistribution:
 
     @property
     def is_symmetric(self) -> bool:
-        """True when both polarities give the same inception result."""
+        """
+        True when the geometry is unchanged by swapping the two electrodes.
+
+        This is a statement about the field alone.  Whether the two
+        polarities give the same answer also depends on the electrode
+        surfaces; see :func:`incept1d.solver.polarities_equivalent`.
+        """
         return self.field_type in ("uniform", "sphere-sphere")
+
+    def polarity_label(self, polarity: str) -> str:
+        """
+        Name *polarity* (``"positive"`` or ``"negative"``) for this geometry.
+
+        Says which electrode is the anode in positive polarity: the sphere,
+        the inner conductor, or the first tabulated point.
+        """
+        if self.field_type == "uniform":
+            return polarity
+        if self.field_type == "fieldline":
+            return f"start={polarity}"
+        if self.field_type == "coaxial":
+            return f"inner={polarity}"
+        return f"sphere={polarity}"
 
     @property
     def is_monotone_decreasing(self) -> bool:

@@ -31,7 +31,7 @@ from incept1d.inception import (
     compute_inception_curve,
     find_all_breakdown_EN,
 )
-from incept1d.solver import inception_det
+from incept1d.solver import inception_det, riccati_criterion
 
 
 def _coeffs(raw, EN, p=1.0, T=293.0):
@@ -187,25 +187,87 @@ class TestRootFinding:
             assert every == sorted(every)
             assert first[0] == pytest.approx(min(every), rel=1e-8)
 
-    def test_warm_start_still_saves_work(self, toy, counting_det):
+    def test_every_root_includes_one_below_the_scan_range(self, toy, uniform):
         """
-        I8: the guard must not silently disable the warm start.
+        With a physically signed criterion, a root below EN_lo is found by
+        searching down from it — also when every root is wanted, not only
+        the lowest.  EN_lo is put above the true root to force that case.
+        """
+        det = functools.partial(riccati_criterion, field_dist=uniform)
+        p, T, pd = 1.0, 293.0, 20e-3
+        truth = find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=det)[0]
+        for first_only in (True, False):
+            got = find_all_breakdown_EN(
+                pd, toy, p, T, EN_lo=2.0 * truth, first_only=first_only, det_fn=det
+            )
+            assert got, f"first_only={first_only}: no root returned"
+            assert got == sorted(got)
+            assert got[0] == pytest.approx(truth, rel=1e-8)
 
-        A valid hint should still cost markedly fewer determinant evaluations
-        than the full logarithmic scan.
+    def test_lowest_root_does_not_pay_for_the_whole_scan(self, toy, counting_det):
+        """
+        I8a: the scan runs bottom up and stops at the first confirmed root,
+        so a cold search in a uniform gap costs far fewer evaluations than
+        the full 200-point scan.
         """
         fn, counter = counting_det
         p, T, pd = 1.0, 293.0, 20e-3
-        truth = find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=fn)[0]
-        counter["n"] = 0
         find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=fn)
-        cold = counter["n"]
-        counter["n"] = 0
-        find_all_breakdown_EN(
-            pd, toy, p, T, first_only=True, det_fn=fn, EN_hints=[truth * 1.05]
+        assert counter["n"] < 100, f"{counter['n']} evaluations"
+
+    @pytest.mark.parametrize("pd", [5e-3, 20e-3])
+    def test_warm_start_saves_work_in_a_non_uniform_gap(self, toy, pd):
+        """
+        I8b: the guard must not silently disable the warm start.
+
+        In a non-uniform gap the uniform proxy misleads a cold search into
+        unconfirmed brackets and fallback scans; a hint from the neighbouring
+        pd point avoids them (on a real sweep, dropping the hints cost 2.3x
+        the CPU time), and must find the same root.
+        """
+        fd, uniform = FieldDistribution("sphere-plane", 1e-3), FieldDistribution(
+            "uniform"
         )
-        warm = counter["n"]
-        assert warm < cold, f"warm start saved nothing (warm={warm}, cold={cold})"
+        n = {"c": 0}
+
+        def counted(field, N=None):
+            def f(EN, pd_, mod, p_, T_):
+                n["c"] += 1
+                grid = dict(N_min=N, N_max=N) if N else {}
+                return riccati_criterion(EN, pd_, mod, p_, T_, field, **grid)
+
+            return f
+
+        full, proxy = counted(fd), counted(uniform, 1)
+        p, T = pd / 10e-3, 293.0
+        cold = find_all_breakdown_EN(
+            pd, toy, p, T, first_only=True, det_fn=full, fast_det_fn=proxy
+        )
+        n_cold, n["c"] = n["c"], 0
+        warm = find_all_breakdown_EN(
+            pd,
+            toy,
+            p,
+            T,
+            first_only=True,
+            det_fn=full,
+            fast_det_fn=proxy,
+            EN_hints=[cold[0] * 1.03],
+        )
+        assert warm[0] == pytest.approx(cold[0], rel=1e-6)
+        assert n["c"] < n_cold, f"warm {n['c']} vs cold {n_cold} evaluations"
+
+    def test_riccati_root_must_cross_from_plus_to_minus(self, toy, uniform, capsys):
+        """
+        I10: with a physically signed criterion, + -> - is accepted as is
+        (zero or pole), and - -> + is rejected: it cannot be inception.
+        """
+        ric = functools.partial(riccati_criterion, field_dist=uniform)
+        pd, p, T = 20e-3, 1.0, 293.0
+        assert _accept_root(80.0, 70.0, 90.0, 1.0, -1.0, pd, ric, toy, p, T) is True
+        assert capsys.readouterr().out == ""  # no "suspect root" for a pole
+        assert _accept_root(80.0, 70.0, 90.0, -1.0, 1e6, pd, ric, toy, p, T) is False
+        assert "not inception" in capsys.readouterr().out
 
     def test_accept_root_rejects_the_nan_sentinel_artefact(self, toy):
         """I9: a root bracketed by a NaN sentinel is discarded, not reported."""

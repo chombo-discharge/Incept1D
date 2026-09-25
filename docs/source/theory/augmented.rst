@@ -95,10 +95,14 @@ and :math:`\lambda`.  When the mechanism has no photon groups
    mechanism's ``get_R``, ``get_V``, ``get_B``, ``get_C``, and ``get_kappa``.
    Note that the mechanism returns :math:`\bm{C}` *without* the
    :math:`\bm{V}^{-1}` factor (it acts on densities); the solver applies
-   :math:`\bm{V}^{-1}` itself.  Photon groups whose optical depth
-   :math:`\kappa_j d` across the gap exceeds a threshold are not propagated
-   explicitly but folded into :math:`\bm{A}` as a local absorption term
-   :math:`2\vec{b}_j\vec{c}_j^\intercal/\kappa_j`; see :ref:`Chap:Numerics:Propagator`.
+   :math:`\bm{V}^{-1}` itself.  Every photon group is carried explicitly,
+   however optically thick: replacing a thick group by the local term
+   :math:`2\vec{b}_j\vec{c}_j^\intercal/\kappa_j` keeps the photoionization
+   it produces but places each photoelectron at its point of emission, which
+   removes the upstream seeding that makes photoionization a feedback loop.
+   The stiffness of the :math:`e^{\pm\kappa_j x}` photon modes is handled by
+   how the inception condition is evaluated
+   (:ref:`Chap:Numerics:Riccati`).
 
 Formal solution
 ---------------
