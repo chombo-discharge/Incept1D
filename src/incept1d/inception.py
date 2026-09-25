@@ -350,6 +350,13 @@ def find_all_breakdown_EN(
                     f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
                 )
                 if not _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
+                    # With a physically signed criterion a rejected crossing
+                    # went from - to +, so the criterion was already negative
+                    # below it: a genuine + -> - crossing lies lower still,
+                    # which only the full scan can locate.  Roots above must
+                    # not be accepted in its place.
+                    if _has_physical_sign(det_fn):
+                        unconfirmed = True
                     continue
                 local_roots.append(float(root))
                 if first_only:

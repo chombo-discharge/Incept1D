@@ -233,12 +233,12 @@ class TestAdaptiveGrid:
 
 class TestParseDxSpec:
     def test_defaults(self):
-        assert parse_dx_spec(None) == (5, 1000, 1e-3)
-        assert parse_dx_spec([]) == (5, 1000, 1e-3)
+        assert parse_dx_spec(None) == (5, 200, 0.03)
+        assert parse_dx_spec([]) == (5, 200, 0.03)
 
     def test_partial_specs(self):
-        assert parse_dx_spec(["10"]) == (10, 1000, 1e-3)
-        assert parse_dx_spec(["10", "400"]) == (10, 400, 1e-3)
+        assert parse_dx_spec(["10"]) == (10, 200, 0.03)
+        assert parse_dx_spec(["10", "400"]) == (10, 400, 0.03)
         assert parse_dx_spec(["10", "400", "0.01"]) == (10, 400, 0.01)
 
     @pytest.mark.parametrize(
@@ -436,3 +436,31 @@ class TestCompoundRoute:
             got = _det_Q_compound(exponents, self.Q0_TWO_IONS, self.S_TWO_IONS)
         assert np.sign(got) == np.sign(exact)
         assert got == pytest.approx(exact, rel=1e-6)
+
+
+class TestFieldFollowingStart:
+    """The initial segments must resolve a thin high-field layer."""
+
+    def test_thin_wire_layer_is_resolved(self):
+        """
+        A 0.25 mm wire in a 25 mm tube: no initial segment spans more than a
+        20 % change of the field, so sample points land in the ionizing
+        layer at the wire, which equal segments of ~5 mm would straddle.
+        """
+        from incept1d.solver import _field_following_edges
+
+        fd = FieldDistribution("coaxial", coax_a=0.25e-3, coax_b=25e-3)
+        f = fd.build(24.75e-3)
+        edges = _field_following_edges(f, 5)
+        values = np.array([f(x) for x in edges])
+        change = np.abs(np.diff(values)) / np.maximum(values[:-1], values[1:])
+        assert change.max() <= 0.2 + 1e-12
+        assert len(edges) - 1 > 5
+        # The wire is at xi = 0 (the field decreases away from it).
+        assert edges[1] < 0.02
+
+    def test_uniform_field_keeps_equal_segments(self):
+        from incept1d.solver import _field_following_edges
+
+        f = FieldDistribution("uniform").build(1e-2)
+        assert np.allclose(_field_following_edges(f, 5), np.linspace(0.0, 1.0, 6))
