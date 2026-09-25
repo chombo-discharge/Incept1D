@@ -447,6 +447,83 @@ class TestPolarity:
         assert np.allclose(V_neg / V_neg[0], col["V_ratio"])
 
 
+class TestJobs:
+    def test_parallel_sweep_writes_the_same_file(self, tmp_path, capsys):
+        outs = []
+        for jobs in ("1", "2"):
+            out = tmp_path / f"jobs{jobs}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--p",
+                "1",
+                "--pd-min",
+                "1",
+                "--pd-max",
+                "50",
+                "--pd-num",
+                "5",
+                "--no-plot",
+                "--jobs",
+                jobs,
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            outs.append(
+                [ln for ln in out.read_text().splitlines() if not ln.startswith("#")]
+            )
+        capsys.readouterr()
+        assert outs[0] == outs[1]
+
+    def test_verify_reports_a_sign_change(self, capsys):
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert out.count("det Q(E*") == 3 and "✗" not in out
+
+    def test_silent_prints_no_progress(self, capsys):
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--no-plot",
+            "--jobs",
+            "1",
+            "--silent",
+            "--verify",
+        )
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "Solving inception curve" not in out and "det Q(E*" not in out
+        assert "E/N (Td)" in out  # the result tables still print
+
+    def test_jobs_must_be_positive(self, capsys):
+        assert _run("pdiv", TOY, "--no-plot", "--jobs", "0") != 0
+
+
 class TestArgumentValidation:
     @pytest.mark.parametrize(
         "args",

@@ -78,6 +78,7 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `ionization.py` | Ionization integrals `∫max(α−η,0)dx` and `∫max(Re λ_max(RV⁻¹),0)dx` across the gap, for comparison against the full `det Q` criterion. CLI: `cli/ionization.py`. |
 | `growth.py` | For voltages above the inception voltage `V*`, solves `det Q(λ,E/N)=0` for the temporal growth rate `λ>0`. CLI: `cli/growth.py`. |
 | `chombo.py` | Transport-/rate-coefficient tables from a mechanism file for the external 3-D `chombo-discharge` solver; has its own `load_raw_mechanism` because it needs the raw `REACTIONS` list. CLI: `cli/chombo.py`. |
+| `parallel.py` | `physical_cores` (default `--jobs`: physical cores only, 1 if undeterminable) and `parallel_map` (forked workers, contiguous warm-started blocks, results streamed back in completion order); `limit_blas_threads` runs in `cli/__init__.py` before NumPy loads. |
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 

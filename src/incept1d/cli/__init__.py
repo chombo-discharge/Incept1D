@@ -20,6 +20,11 @@ import argparse
 import importlib
 
 from incept1d import __version__
+from incept1d.parallel import limit_blas_threads
+
+# Before any subcommand imports NumPy: one BLAS thread per process (see
+# limit_blas_threads for the measurement behind it).
+limit_blas_threads()
 
 #: Subcommand name → module (imported lazily so ``--help`` stays fast).
 COMMANDS = {

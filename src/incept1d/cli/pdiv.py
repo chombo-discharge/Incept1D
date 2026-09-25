@@ -36,6 +36,7 @@ from incept1d.solver import (
     DX_N_MAX_DEFAULT,
     DX_N_MIN_DEFAULT,
     DX_TOL_DEFAULT,
+    inception_det,
     midpoint_propagator,
     magnus2_propagator,
     CRITERIA,
@@ -45,6 +46,18 @@ from incept1d.solver import (
 )
 from incept1d.inception import compute_inception_curve
 from incept1d.output import write_metadata_header
+from incept1d.parallel import physical_cores
+
+#: Relative distance from a root at which det Q is checked for a sign change.
+#: Not smaller: the adaptive grid is chosen per E/N, so det Q's root on the
+#: grids either side can sit up to the grid error (~1e-3) from the root found.
+_VERIFY_EPS = 1e-3
+
+
+def _as_detq(criterion_fn):
+    """det Q with the same field, grid and polarity as *criterion_fn*."""
+    return functools.partial(inception_det, *criterion_fn.args, **criterion_fn.keywords)
+
 
 HELP = "Inception curve PDIV(p·d): roots of det Q(E/N, p·d) = 0 over a p·d sweep."
 DESCRIPTION = (
@@ -139,6 +152,37 @@ def add_arguments(parser):
     )
     add_field_argument(parser)
     add_criterion_argument(parser)
+    parser.add_argument(
+        "--silent",
+        action="store_true",
+        default=False,
+        help="Print only the result tables, no per-point progress.",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        default=False,
+        help=(
+            "Check every root with the independent det Q criterion: det Q "
+            "just below and just above the root, on the same field and grid, "
+            "must change sign.  Printed with the progress (so not with "
+            "--silent).  Expensive: det Q with every photon group explicit "
+            "takes the compound route, which can cost far more than the root "
+            "search itself."
+        ),
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Worker processes for the pd sweep; the pd points are solved "
+            "concurrently (default: the number of physical cores, "
+            f"{physical_cores()} here, or 1 if it cannot be determined).  "
+            "--jobs 1 solves them one after another."
+        ),
+    )
     parser.add_argument(
         "--dx",
         nargs="*",
@@ -247,6 +291,10 @@ def run(args, parser):
         The (sub)parser that produced *args*; used for ``parser.error``.
     """
     _criterion = CRITERIA[args.criterion]
+    if args.jobs is None:
+        args.jobs = physical_cores()
+    if args.jobs < 1:
+        parser.error("--jobs must be >= 1")
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
@@ -438,7 +486,7 @@ def run(args, parser):
         )
         return float(np.sum(np.maximum(0.0, diff)) * ds)
 
-    def _progress(i, n, pd_i, p_i, roots, seconds):
+    def _progress(i, n, pd_i, p_i, roots, seconds, check):
         """Print one pd point of the sweep as soon as it is solved."""
         head = f"  [{i + 1:{len(str(n))}d}/{n}]  pd = {pd_i * 1e3:10.4g} bar·mm  p = {p_i:6.4g} bar"
         if not roots:
@@ -450,10 +498,41 @@ def run(args, parser):
         EN = roots[0]
         U_kV = EN * pd_i * 1e-21 / (_kB * args.T) * 1e5 * 1e-3
         more = f"  (+{len(roots) - 1} higher)" if len(roots) > 1 else ""
+        verdict = ""
+        if check is not None:
+            below, above = check
+            # Compare signs: the product of two values near 1e-200 underflows.
+            ok = (
+                np.isfinite(below)
+                and np.isfinite(above)
+                and np.sign(below) * np.sign(above) < 0.0
+            )
+            verdict = (
+                f"   det Q(E*·(1∓{_VERIFY_EPS:g})) = {below:+.2e} / {above:+.2e} "
+                + ("✓" if ok else "✗")
+            )
         print(
-            f"{head}   E/N* = {EN:10.4f} Td   U* = {U_kV:10.4g} kV{more}   ({seconds:.1f} s)",
+            f"{head}   E/N* = {EN:10.4f} Td   U* = {U_kV:10.4g} kV{more}"
+            f"   ({seconds:.1f} s){verdict}",
             flush=True,
         )
+
+    def _verifier(criterion_fn):
+        """det Q just below and above the lowest root, same field and grid."""
+        if not args.verify or args.silent or args.criterion == "detq":
+            return None
+        detq_fn = _as_detq(criterion_fn)
+
+        def verify(pd_i, p_i, roots):
+            if not roots:
+                return None
+            EN = roots[0]
+            return (
+                detq_fn(EN * (1.0 - _VERIFY_EPS), pd_i, mod, p_i, args.T),
+                detq_fn(EN * (1.0 + _VERIFY_EPS), pd_i, mod, p_i, args.T),
+            )
+
+        return verify
 
     def _branch0_grids(branches):
         V_g = np.full_like(pd_arr, np.nan)
@@ -633,9 +712,11 @@ def run(args, parser):
                 )
             )
 
-        print(
-            f"\nSolving inception curve: {label} ({_field_dist.polarity_label('positive')})"
-        )
+        if not args.silent:
+            print(
+                f"\nSolving inception curve: {label} "
+                f"({_field_dist.polarity_label('positive')})"
+            )
         branches_pos = compute_inception_curve(
             pd_arr,
             mod,
@@ -645,14 +726,18 @@ def run(args, parser):
             det_fn=det_pos,
             fast_det_fn=fast_det_pos,
             med_det_fn=med_det_pos,
-            progress=_progress,
+            progress=None if args.silent else _progress,
+            jobs=args.jobs,
+            verify=_verifier(det_pos),
         )
         if same_polarity:
             branches_neg = branches_pos  # symmetric; reuse same object
         else:
-            print(
-                f"\nSolving inception curve: {label} ({_field_dist.polarity_label('negative')})"
-            )
+            if not args.silent:
+                print(
+                    f"\nSolving inception curve: {label} "
+                    f"({_field_dist.polarity_label('negative')})"
+                )
             branches_neg = compute_inception_curve(
                 pd_arr,
                 mod,
@@ -662,7 +747,9 @@ def run(args, parser):
                 det_fn=det_neg,
                 fast_det_fn=fast_det_neg,
                 med_det_fn=med_det_neg,
-                progress=_progress,
+                progress=None if args.silent else _progress,
+                jobs=args.jobs,
+                verify=_verifier(det_neg),
             )
 
         if not branches_pos and not branches_neg:

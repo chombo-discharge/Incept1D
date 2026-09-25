@@ -961,8 +961,9 @@ def _riccati_g(exponents, Q0, S):
 
     P stays finite below inception: it can only blow up where a sub-slab
     [x, d] is self-sustaining without the cathode, which makes the whole gap
-    supercritical.  That shows as a sign change of det(I − R_r P) (or of
-    det(I − R_r^A R_l^B) inside a step), and returns −1.
+    supercritical.  That shows as the loop gain R_r P (or R_r^A R_l^B inside
+    a step) reaching spectral radius 1 (see :func:`_spectral_radius`), and
+    returns −1.
     """
     n = Q0.shape[1]
     b = [int(np.argmax(row)) for row in S]
@@ -980,13 +981,13 @@ def _riccati_g(exponents, Q0, S):
             return -1.0
         R_l, R_r, T_f, T_b = slab
         # Riccati update across the step: with b = P f at its anode side,
-        # P ← R_l + T_b P (I − R_r P)⁻¹ T_f.  I − R_r P turns singular exactly
-        # where P passes through a pole (det X of the substep form, divided
-        # by det E_ff > 0), so a sign change there means above inception.
-        K = np.eye(nf) - R_r @ P
-        if np.linalg.slogdet(K)[0] <= 0:
+        # P ← R_l + T_b P (I − R_r P)⁻¹ T_f.  R_r P is the loop gain between
+        # this step and everything downstream of it; once its spectral
+        # radius reaches 1 that combination sustains itself: above inception.
+        loop = R_r @ P
+        if _spectral_radius(loop) >= 1.0:
             return -1.0
-        P = R_l + T_b @ P @ np.linalg.solve(K, T_f)
+        P = R_l + T_b @ P @ np.linalg.solve(np.eye(nf) - loop, T_f)
         if not np.all(np.isfinite(P)):
             return -1.0
     return float(np.linalg.det(Q0[:, fw] + Q0[:, b] @ P))
@@ -1045,18 +1046,37 @@ def _slab_scattering(Omega, b, fw):
     return result
 
 
+def _spectral_radius(M):
+    """
+    Largest |eigenvalue| of a loop-gain matrix.
+
+    The test for "self-sustaining" is ρ(loop) ≥ 1, not a sign change of
+    det(I − loop): for a system whose couplings are all non-negative
+    sources, I − K has a non-negative inverse exactly when ρ(K) < 1, and ρ
+    stays above 1 once it has crossed, whereas the determinant changes sign
+    back when a second mode crosses too.  Far above inception that happens
+    within one step, and a determinant test then reported an isolated,
+    spurious "below inception" (g ≈ +1e6 at 153 Td in a coaxial gap whose
+    inception field is 44 Td).
+    """
+    if M.size == 0:
+        return 0.0
+    return float(np.max(np.abs(np.linalg.eigvals(M))))
+
+
 def _star(A, B):
     """
     Redheffer star product: slab A (cathode side) followed by slab B.
 
-    Returns None if the pair is self-sustaining, i.e. I − R_r^A R_l^B has
-    turned singular (its determinant changed sign).
+    Returns None if the pair is self-sustaining: the loop gain R_r^A R_l^B
+    between them has spectral radius 1 or more.
     """
     Rl_a, Rr_a, Tf_a, Tb_a = A
     Rl_b, Rr_b, Tf_b, Tb_b = B
-    K = np.eye(Tf_a.shape[0]) - Rr_a @ Rl_b
-    if np.linalg.slogdet(K)[0] <= 0:
+    loop = Rr_a @ Rl_b
+    if _spectral_radius(loop) >= 1.0:
         return None
+    K = np.eye(Tf_a.shape[0]) - loop
     K_Tf = np.linalg.solve(K, Tf_a)
     K_Rr = np.linalg.solve(K, Rr_a)
     return (

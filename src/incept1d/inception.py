@@ -21,6 +21,7 @@ import numpy as np
 import scipy.optimize
 
 from incept1d.constants import kB as _kB
+from incept1d.parallel import parallel_map
 from incept1d.solver import riccati_criterion
 
 _ROOT_CHECK_TOL = 0.01  # |det Q(root)| / bracket-scale above this triggers a warning
@@ -388,6 +389,8 @@ def compute_inception_curve(
     fast_det_fn=None,
     med_det_fn=None,
     progress=None,
+    jobs=1,
+    verify=None,
 ):
     """
     Compute inception-curve branches across a p·d sweep.
@@ -411,9 +414,20 @@ def compute_inception_curve(
         each pd point.  If True, all roots are collected.
     progress : callable or None
         Called after each pd point as
-        ``progress(i, n, pd, p, roots, seconds)``, with the E/N roots found
-        there (ascending, possibly empty) and the time it took, so a caller
-        can report the sweep as it runs.
+        ``progress(i, n, pd, p, roots, seconds, check)``, with the E/N roots
+        found there (ascending, possibly empty), the time it took and the
+        value *verify* returned (None without it), so a caller can report
+        the sweep as it runs.  With ``jobs > 1`` the calls come
+        in completion order, not pd order.
+    jobs : int
+        Worker processes for the root searches (see
+        :func:`incept1d.parallel.parallel_map`).  The pd points are split
+        into contiguous blocks solved concurrently, each in order with
+        warm starts, and assigned to branches afterwards in pd order.
+    verify : callable or None
+        ``verify(pd, p, roots) -> check``, evaluated next to the root search
+        (in the same worker) and handed to *progress*; e.g. an independent
+        check of the lowest root.
 
     Returns
     -------
@@ -432,26 +446,38 @@ def compute_inception_curve(
     p_arr = np.full_like(pd_arr, p) if np.ndim(p) == 0 else np.asarray(p, dtype=float)
     branches = []
     branch_last_logEN = []  # last log10(EN) for each branch, for continuity tracking
-    prev_roots_EN = []  # roots found at the previous pd point (warm-start hints)
 
-    for i, (pd_i, p_i) in enumerate(zip(pd_arr, p_arr)):
+    def solve(i, previous=None):
+        # previous: this block's result at the pd point before, whose roots
+        # warm-start this one (see parallel_map).
+        hints = list(previous[0]) if previous is not None else None
         t_start = time.perf_counter()
         roots = find_all_breakdown_EN(
-            pd_i,
+            pd_arr[i],
             mod,
-            p_i,
+            p_arr[i],
             T,
             first_only=not all_branches,
             det_fn=det_fn,
             fast_det_fn=fast_det_fn,
             med_det_fn=med_det_fn,
-            EN_hints=prev_roots_EN,
+            EN_hints=hints,
         )
-        prev_roots_EN = list(roots)
+        roots = sorted(float(r) for r in roots)
+        seconds = time.perf_counter() - t_start
+        check = verify(pd_arr[i], p_arr[i], roots) if verify is not None else None
+        return roots, seconds, check
+
+    def report(i, result):
         if progress is not None:
-            progress(
-                i, len(pd_arr), pd_i, p_i, sorted(roots), time.perf_counter() - t_start
-            )
+            progress(i, len(pd_arr), pd_arr[i], p_arr[i], *result)
+
+    # Contiguous blocks of pd points, each solved in order with warm starts;
+    # jobs = 1 is a single block, i.e. the plain sequential sweep.
+    solved = parallel_map(solve, len(pd_arr), jobs, on_result=report)
+
+    for i, (pd_i, p_i) in enumerate(zip(pd_arr, p_arr)):
+        roots = solved[i][0]
         if not roots:
             continue
         d_i = pd_i / p_i
