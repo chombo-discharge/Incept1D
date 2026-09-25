@@ -11,6 +11,7 @@ det Q(λ, E/N) = 0 for λ at each voltage V ∈ [V*, F·V*].  See
 """
 
 import functools
+import time
 import os
 
 import numpy as np
@@ -18,11 +19,11 @@ import matplotlib.pyplot as plt
 
 from incept1d.constants import kB as _kB
 from incept1d.fields import add_field_argument, parse_field_spec
-from incept1d.growth import compute_lambda_curve
+from incept1d.growth import solve_voltage, voltage_sweep
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.output import write_metadata_header
-from incept1d.parallel import physical_cores
+from incept1d.parallel import parallel_map, physical_cores
 from incept1d.solver import (
     DX_N_MAX_DEFAULT,
     DX_N_MIN_DEFAULT,
@@ -38,10 +39,13 @@ from incept1d.solver import (
 _POLARITIES = (("positive", True), ("negative", False))
 
 
-def _progress(i, n, row, seconds):
-    """Print one voltage of the sweep as soon as it is solved."""
+def _progress(label, i, n, row, seconds):
+    """Print one voltage of one curve as soon as it is solved."""
     V_kV, V_ratio, EN_ref, lam, tau_ns, nu_ion, status = row
-    head = f"  [{i + 1:{len(str(n))}d}/{n}]  V = {V_kV:10.4f} kV ({V_ratio:.3f}×V*)"
+    head = (
+        f"  [{label}] [{i + 1:{len(str(n))}d}/{n}]  "
+        f"V = {V_kV:10.4f} kV ({V_ratio:.3f}×V*)"
+    )
     tag = f"  [{status}]" if status != "ok" else ""
     if i == 0:
         body = "λ = 0  (inception)"
@@ -250,75 +254,128 @@ def run(args, parser):
 
     raw_dicts = read_json_configs(args.configs) if args.configs else [{}]
 
-    # ── Find inception and compute λ curve for each config and polarity ────
-    # list of (label, config_label, polarity, rows)
-    # where label names the curve and rows = compute_lambda_curve(...)
-    curve_records = []
-
+    # ── The curves: one per configuration and polarity ─────────────────────
+    # A symmetric gap with identical electrodes solves positive polarity only
+    # and mirrors it for negative.
+    curves = []
     for cfg_dict in raw_dicts:
         mod = load_mechanism(args.mechanism, cfg_dict)
         label = mod.label or "Baseline"
         same = polarities_equivalent(mod, _field_dist)
-        positive_rows = None
-
         for polarity, positive in _POLARITIES:
-            pol_label = f"{label} ({_field_dist.polarity_label(polarity)})"
-            if not positive and same:
-                # Symmetric gap, identical electrodes: negative mirrors positive.
-                if positive_rows is not None:
-                    curve_records.append((pol_label, label, polarity, positive_rows))
-                continue
-
-            # Build det_fn for the inception solve (λ=0).
-            det_fn = functools.partial(
-                CRITERIA[args.criterion],
-                field_dist=_field_dist,
-                N_min=_N_min,
-                N_max=_N_max,
-                tol=_tol,
-                lam=0.0,
-                positive_polarity=positive,
-                propagator=_propagator,
+            curves.append(
+                dict(
+                    label=f"{label} ({_field_dist.polarity_label(polarity)})",
+                    config=label,
+                    polarity=polarity,
+                    positive=positive,
+                    mod=mod,
+                    mirror=(not positive and same),
+                )
             )
+    solved = [c for c in curves if not c["mirror"]]
 
-            print(
-                f"\nFinding inception voltage: {pol_label}  "
-                f"(p = {args.pressure:g} bar, d = {args.distance:g} mm, "
-                f"pd = {pd_mm:.6g} bar·mm)"
-            )
-            roots = find_all_breakdown_EN(
-                pd_m, mod, args.pressure, args.T, first_only=True, det_fn=det_fn
-            )
-            if not roots:
-                print(f"  [{pol_label}] No inception found — skipping.")
-                continue
+    def criterion_for(c):
+        return functools.partial(
+            CRITERIA[args.criterion],
+            field_dist=_field_dist,
+            N_min=_N_min,
+            N_max=_N_max,
+            tol=_tol,
+            positive_polarity=c["positive"],
+            propagator=_propagator,
+        )
 
-            EN_star = roots[0]
-            V_star = EN_star * pd_m * 1e-16 / (_kB * args.T)
-            print(f"  V* = {V_star * 1e-3:.4f} kV   EN* = {EN_star:.2f} Td")
-            print(f"\nComputing λ(V) from V* to {args.v_max_factor:.2g}×V*:")
+    # ── Phase 1: the inception voltage of every curve, in parallel ─────────
+    print(
+        f"\nFinding the inception voltages (p = {args.pressure:g} bar, "
+        f"d = {args.distance:g} mm, pd = {pd_mm:.6g} bar·mm):"
+    )
 
-            rows = compute_lambda_curve(
-                EN_star,
-                pd_m,
-                mod,
-                args.pressure,
-                args.T,
-                _field_dist,
-                _N_min,
-                _N_max,
-                _tol,
-                _propagator,
-                args.n_voltages,
-                args.v_max_factor,
-                positive_polarity=positive,
-                criterion=CRITERIA[args.criterion],
-                progress=_progress,
-                jobs=args.jobs,
+    def find_star(k, previous=None):
+        t_start = time.perf_counter()
+        roots = find_all_breakdown_EN(
+            pd_m,
+            solved[k]["mod"],
+            args.pressure,
+            args.T,
+            first_only=True,
+            det_fn=criterion_for(solved[k]),
+        )
+        return (roots[0] if roots else None), time.perf_counter() - t_start
+
+    def report_star(k, result):
+        EN_star, seconds = result
+        if EN_star is None:
+            print(f"  [{solved[k]['label']}]  no inception found  ({seconds:.1f} s)")
+            return
+        V_star = EN_star * pd_m * 1e-16 / (_kB * args.T)
+        print(
+            f"  [{solved[k]['label']}]  V* = {V_star * 1e-3:.4f} kV   "
+            f"E/N* = {EN_star:.2f} Td   ({seconds:.1f} s)",
+            flush=True,
+        )
+
+    stars = parallel_map(find_star, len(solved), args.jobs, on_result=report_star)
+
+    # ── Phase 2: every (curve, voltage) in one pool ─────────────────────────
+    sweeps = {}
+    for k, (EN_star, _) in enumerate(stars):
+        if EN_star is not None:
+            sweeps[k] = voltage_sweep(
+                EN_star, pd_m, args.T, args.n_voltages, args.v_max_factor
             )
-            curve_records.append((pol_label, label, polarity, rows))
-            if positive:
-                positive_rows = rows
+    tasks = [(k, i) for k in sweeps for i in range(args.n_voltages)]
+    print(
+        f"\nComputing λ(V) from V* to {args.v_max_factor:.2g}×V* "
+        f"({len(tasks)} voltages on {min(args.jobs, max(len(tasks), 1))} workers):"
+    )
+
+    def solve_task(t, previous=None):
+        k, i = tasks[t]
+        V_star, voltages = sweeps[k]
+        c = solved[k]
+        return solve_voltage(
+            voltages[i],
+            V_star,
+            pd_m,
+            c["mod"],
+            args.pressure,
+            args.T,
+            _field_dist,
+            _N_min,
+            _N_max,
+            _tol,
+            _propagator,
+            positive_polarity=c["positive"],
+            criterion=CRITERIA[args.criterion],
+            at_inception=(i == 0),
+        )
+
+    def report_task(t, result):
+        k, i = tasks[t]
+        _progress(solved[k]["label"], i, args.n_voltages, *result)
+
+    results = parallel_map(solve_task, len(tasks), args.jobs, on_result=report_task)
+    rows_of = {k: [None] * args.n_voltages for k in sweeps}
+    for (k, i), (row, _) in zip(tasks, results):
+        rows_of[k][i] = row
+
+    # list of (label, config_label, polarity, rows), in curve order; a mirrored
+    # negative polarity takes the rows of its configuration's positive one.
+    curve_records = []
+    positive_rows = {}
+    k = 0
+    for c in curves:
+        if c["mirror"]:
+            rows = positive_rows.get(c["config"])
+        else:
+            rows = rows_of.get(k)
+            if c["positive"]:
+                positive_rows[c["config"]] = rows
+            k += 1
+        if rows is not None:
+            curve_records.append((c["label"], c["config"], c["polarity"], rows))
 
     if not curve_records:
         print("\nNo curves computed.")

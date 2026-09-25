@@ -440,7 +440,7 @@ class TestPolarity:
         """V* is found per polarity, so the voltage columns must differ."""
         col = self._growth(tmp_path, str(overridden_config))
         out = capsys.readouterr().out
-        assert "Finding inception voltage: Overridden (negative)" in out
+        assert "[Overridden (negative)]  V* =" in out
         V_pos = col["V_kV[Overridden (positive)]"]
         V_neg = col["V_kV[Overridden (negative)]"]
         assert np.all(V_neg > V_pos)

@@ -217,6 +217,69 @@ def find_lambda_for_voltage(
     return lam_star, "ok"
 
 
+def voltage_sweep(EN_star, pd, T, n_voltages, v_max_factor):
+    """
+    The voltages of a growth-rate sweep: V* and log-spaced values above it.
+
+    Returns ``(V_star, voltages)`` in volts, with ``voltages[0] = V_star``
+    and ``voltages[-1] = v_max_factor · V_star``.
+    """
+    V_star = EN_star * pd * 1e-16 / (_kB * T)  # inception voltage in V
+    return V_star, np.geomspace(V_star, v_max_factor * V_star, n_voltages)
+
+
+def solve_voltage(
+    V,
+    V_star,
+    pd,
+    mod,
+    p,
+    T,
+    field_dist,
+    N_min,
+    N_max,
+    tol,
+    propagator,
+    positive_polarity=True,
+    criterion=None,
+    at_inception=False,
+):
+    """
+    The growth rate at one voltage, as one row of a growth-rate sweep.
+
+    Self-contained, so any number of sweeps can share one pool of workers.
+    Returns ``(row, seconds)`` with ``row = (V_kV, V_ratio, EN_ref,
+    lam_star, tau_ns, nu_ion, status)`` as in :func:`compute_lambda_curve`;
+    ``at_inception`` marks V = V*, where λ* = 0 by definition.
+    """
+    t_start = time.perf_counter()
+    EN_ref = V * _kB * T / (pd * 1e-16)  # Townsend
+    nu_ion = peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist)
+    if at_inception:
+        lam_star, status = 0.0, "ok"
+    else:
+        lam_star, status = find_lambda_for_voltage(
+            EN_ref,
+            pd,
+            mod,
+            p,
+            T,
+            field_dist,
+            N_min,
+            N_max,
+            tol,
+            propagator,
+            lam_scale=nu_ion,
+            positive_polarity=positive_polarity,
+            criterion=criterion,
+        )
+    tau_ns = (
+        1e9 / lam_star if (np.isfinite(lam_star) and lam_star > 0.0) else float("nan")
+    )
+    row = (V * 1e-3, V / V_star, EN_ref, lam_star, tau_ns, nu_ion, status)
+    return row, time.perf_counter() - t_start
+
+
 def compute_lambda_curve(
     EN_star,
     pd,
@@ -280,42 +343,27 @@ def compute_lambda_curve(
         peak-field ionization frequency (:func:`peak_ionization_frequency`)
         in s⁻¹, and the per-point status.
     """
-    V_star = EN_star * pd * 1e-16 / (_kB * T)  # inception voltage in V
-    voltages_V = np.geomspace(V_star, v_max_factor * V_star, n_voltages)
+    V_star, voltages_V = voltage_sweep(EN_star, pd, T, n_voltages, v_max_factor)
 
     def solve(i, previous=None):
         # The voltages are independent: *previous* (see parallel_map) is not
         # needed, since each lambda search brackets from its own upper bound.
-        t_start = time.perf_counter()
-        V = voltages_V[i]
-        EN_ref = V * _kB * T / (pd * 1e-16)  # Townsend
-        nu_ion = peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist)
-        if i == 0:
-            # V = V* by construction; λ* = 0 by definition.
-            lam_star, status = 0.0, "ok"
-        else:
-            lam_star, status = find_lambda_for_voltage(
-                EN_ref,
-                pd,
-                mod,
-                p,
-                T,
-                field_dist,
-                N_min,
-                N_max,
-                tol,
-                propagator,
-                lam_scale=nu_ion,
-                positive_polarity=positive_polarity,
-                criterion=criterion,
-            )
-        tau_ns = (
-            1e9 / lam_star
-            if (np.isfinite(lam_star) and lam_star > 0.0)
-            else float("nan")
+        return solve_voltage(
+            voltages_V[i],
+            V_star,
+            pd,
+            mod,
+            p,
+            T,
+            field_dist,
+            N_min,
+            N_max,
+            tol,
+            propagator,
+            positive_polarity=positive_polarity,
+            criterion=criterion,
+            at_inception=(i == 0),
         )
-        row = (V * 1e-3, V / V_star, EN_ref, lam_star, tau_ns, nu_ion, status)
-        return row, time.perf_counter() - t_start
 
     def report(i, result):
         if progress is not None:
