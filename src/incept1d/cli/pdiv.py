@@ -45,8 +45,15 @@ from incept1d.solver import (
     polarities_equivalent,
 )
 from incept1d.inception import compute_inception_curve
+from incept1d.ionization import aed_integral
 from incept1d.output import write_metadata_header
-from incept1d.parallel import physical_cores
+from incept1d.parallel import parallel_map, physical_cores
+
+#: Quadrature points for the ionization integral (overlay and streamer
+#: criterion).  For a field that falls off from the electrode they are placed
+#: in the active layer only, which a handful of points over the whole gap
+#: would straddle.
+_AED_N = 200
 
 #: Relative distance from a root at which det Q is checked for a sign change.
 #: Not smaller: the adaptive grid is chosen per E/N, so det Q's root on the
@@ -465,26 +472,8 @@ def run(args, parser):
     )
 
     def _aed_integral(EN_ref, p_val, d_val, _mod):
-        """Compute ∫max(α−η,0)dx respecting the actual field profile."""
-        if _field_dist.field_type == "uniform":
-            return (
-                max(
-                    0.0,
-                    _mod.alpha(EN_ref, p_val, args.T) - _mod.eta(EN_ref, p_val, args.T),
-                )
-                * d_val
-            )
-        f = _field_dist.build(d_val)
-        xis = (np.arange(_N_min) + 0.5) / _N_min
-        EN_arr = EN_ref * np.array([f(xi) for xi in xis])
-        ds = d_val / _N_min
-        diff = np.array(
-            [
-                _mod.alpha(en, p_val, args.T) - _mod.eta(en, p_val, args.T)
-                for en in EN_arr
-            ]
-        )
-        return float(np.sum(np.maximum(0.0, diff)) * ds)
+        """∫max(α−η,0)dx along the field line (:func:`incept1d.ionization.aed_integral`)."""
+        return aed_integral(EN_ref, p_val, d_val, _mod, args.T, _field_dist, _AED_N)
 
     def _progress(i, n, pd_i, p_i, roots, seconds, check):
         """Print one pd point of the sweep as soon as it is solved."""
@@ -887,37 +876,60 @@ def run(args, parser):
 
     if args.streamer_criterion is not None:
         _C = args.streamer_criterion
-        _EN_sc = np.logspace(1.0, np.log10(3e5), 200)
+        # From 0.1 Td, like the inception search: a strongly non-uniform gap
+        # puts its gap-averaged field far below 10 Td at large pd.  The scan
+        # only brackets the first crossing for a cold start; brentq refines.
+        _EN_sc = np.logspace(-1.0, np.log10(3e5), 30)
+
+        def _streamer_root(p_i, d_i, mod_i, hint):
+            """E/N (Td) where the ionization integral reaches C, or NaN.
+
+            Starts from *hint* (the root at the neighbouring pd) when given:
+            the bracket is widened geometrically around it, a handful of
+            integrals instead of a scan of the whole E/N range.
+            """
+
+            def g(en):
+                return _aed_integral(en, p_i, d_i, mod_i) - _C
+
+            lo = hi = None
+            if hint is not None and np.isfinite(hint):
+                a, b = hint / 1.1, hint * 1.1
+                fa, fb = g(a), g(b)
+                for _ in range(40):
+                    if not (np.isfinite(fa) and np.isfinite(fb)):
+                        break
+                    if fa < 0.0 < fb:
+                        lo, hi = a, b
+                        break
+                    if fa >= 0.0:
+                        a /= 2.0
+                        fa = g(a)
+                    if fb <= 0.0:
+                        b *= 2.0
+                        fb = g(b)
+            if lo is None:
+                fvals = np.array([g(en) for en in _EN_sc])
+                idx = np.where(fvals[:-1] * fvals[1:] < 0)[0]
+                if idx.size == 0:
+                    return float("nan")
+                lo, hi = _EN_sc[idx[0]], _EN_sc[idx[0] + 1]
+            try:
+                return scipy.optimize.brentq(g, lo, hi, xtol=1e-6, rtol=1e-10)
+            except ValueError:
+                return float("nan")
 
         for _cs_label, _p_arr_cs, _d_arr_cs, _mod_cs in curve_specs:
             _s_label = f"Streamer (C={_C}), {_cs_label}"
-            _EN_s = np.full_like(pd_arr, np.nan)
-            _V_s = np.full_like(pd_arr, np.nan)
-
             print(f"\nSolving streamer criterion: {_s_label}")
-            for _i, (_pd_i, _p_i, _d_i) in enumerate(zip(pd_arr, _p_arr_cs, _d_arr_cs)):
-                _fvals = np.array(
-                    [_aed_integral(_en, _p_i, _d_i, _mod_cs) - _C for _en in _EN_sc]
-                )
-                _idx = np.where(_fvals[:-1] * _fvals[1:] < 0)[0]
-                if _idx.size == 0:
-                    continue
-                _k = _idx[0]
-                try:
-                    _root = scipy.optimize.brentq(
-                        lambda _en, __p=_p_i, __d=_d_i, __m=_mod_cs: _aed_integral(
-                            _en, __p, __d, __m
-                        )
-                        - _C,
-                        _EN_sc[_k],
-                        _EN_sc[_k + 1],
-                        xtol=1e-6,
-                        rtol=1e-10,
-                    )
-                    _EN_s[_i] = _root
-                    _V_s[_i] = _root * _pd_i * 1e-21 / (_kB * args.T) * 1e5
-                except ValueError:
-                    pass
+
+            def _streamer_task(i, previous, _p=_p_arr_cs, _d=_d_arr_cs, _m=_mod_cs):
+                return _streamer_root(_p[i], _d[i], _m, previous)
+
+            _EN_s = np.array(
+                parallel_map(_streamer_task, len(pd_arr), args.jobs), dtype=float
+            )
+            _V_s = _EN_s * pd_arr * 1e-21 / (_kB * args.T) * 1e5
 
             _streamer_records.append((_s_label, _p_arr_cs, _d_arr_cs, _EN_s, _V_s))
 
@@ -938,6 +950,36 @@ def run(args, parser):
                 )
                 ax1.loglog(_x(pd_arr[_smask]), _V_s[_smask] / 1000, **_sm_kw)
                 ax2.loglog(_x(pd_arr[_smask]), _EN_s[_smask], **_sm_kw)
+                if ax1b is not None and args.verify:
+                    # The ionization integral along the streamer curve, for
+                    # verification: it must be flat at C.
+                    _aed_s = np.array(
+                        [
+                            _aed_integral(
+                                _EN_s[_j], _p_arr_cs[_j], _d_arr_cs[_j], _mod_cs
+                            )
+                            for _j in np.where(_smask)[0]
+                        ]
+                    )
+                    ax1b.plot(
+                        _x(pd_arr[_smask]),
+                        _aed_s,
+                        color="k",
+                        ls="-.",
+                        lw=1.5,
+                        alpha=_AED_ALPHA,
+                        zorder=1,
+                    )
+                    # A legend entry for it: the twin axis has no legend.
+                    ax1.plot(
+                        [],
+                        [],
+                        color="k",
+                        ls="-.",
+                        lw=1.5,
+                        alpha=_AED_ALPHA,
+                        label=f"∫max(α−η,0)dx along the streamer curve (= {_C:g})",
+                    )
 
             print(
                 f"\n  {_x_head:>14}"

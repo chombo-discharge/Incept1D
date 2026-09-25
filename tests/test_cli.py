@@ -447,6 +447,54 @@ class TestPolarity:
         assert np.allclose(V_neg / V_neg[0], col["V_ratio"])
 
 
+class TestStreamerCriterion:
+    def test_streamer_curve_has_the_requested_integral(self, tmp_path, capsys):
+        """
+        Every point of the streamer curve satisfies I_alpha = C, recomputed
+        independently with the same quadrature the overlay uses.  A non-uniform
+        gap exercises the quadrature over the ionizing layer.
+        """
+        from incept1d.fields import FieldDistribution
+        from incept1d.ionization import aed_integral
+        from incept1d.mechanism import load_mechanism
+
+        out = tmp_path / "streamer.dat"
+        C = 5.0
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "sphere-plane",
+            "5",
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "100",
+            "--pd-num",
+            "4",
+            "--streamer-criterion",
+            str(C),
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        col = _columns(out)
+        EN = [c for n, c in col.items() if n.startswith("EN_Td[Streamer")][0]
+        pd = col["pd_bar_mm"]
+        toy = load_mechanism(TOY, {})
+        fd = FieldDistribution("sphere-plane", 5e-3)
+        solved = np.isfinite(EN)
+        assert solved.sum() >= 3
+        for en, pd_mm in zip(EN[solved], pd[solved]):
+            got = aed_integral(en, 1.0, pd_mm * 1e-3, toy, 293.0, fd, 200)
+            assert got == pytest.approx(C, rel=1e-4)
+
+
 class TestJobs:
     def test_parallel_sweep_writes_the_same_file(self, tmp_path, capsys):
         outs = []

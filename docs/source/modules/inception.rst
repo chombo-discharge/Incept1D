@@ -108,11 +108,15 @@ Inputs
    * - ``--plot-separate-branches``
      - Give each branch its own line style and legend entry.
    * - ``--plot-ionization-integral``
-     - Overlay :math:`I_\alpha` along the solution on a second axis.
-       Requires ``alpha``/``eta`` in the mechanism.
+     - Overlay :math:`I_\alpha = \int\max(\alpha-\eta,0)\,dx` along the
+       solution on a second axis, computed as ``incept1d ionization`` does
+       (:func:`incept1d.ionization.aed_integral`, with its quadrature points
+       in the ionizing layer).  Requires ``alpha``/``eta`` in the mechanism.
    * - ``--streamer-criterion C``
      - Also solve :math:`I_\alpha = C` (streamer criterion) and plot/write
-       that curve.
+       that curve.  With ``--plot-ionization-integral`` and ``--verify`` the
+       overlay also shows :math:`I_\alpha` along the streamer curve, which must be flat
+       at :math:`C` — a check of the streamer solve.
    * - ``--write-to-file FILE``
      - Tab-separated output with a metadata header.
    * - ``--save-subplots``
