@@ -133,9 +133,15 @@ Inception curve with the growth-rate contour :math:`\lambda = 10^{8}` s\ :sup:`-
 Outputs
 -------
 
+While the sweep runs, every :math:`pd` point is printed as soon as it is
+solved — its index, :math:`pd`, :math:`p`, the lowest :math:`(E/N)^*`, the
+inception voltage :math:`U^*` and the time it took — so a long sweep shows
+its progress.  A point without inception in the scan range says so.
+
 Unless ``--no-plot`` is given, a two-panel figure is shown: the inception
 voltage :math:`U^*(pd)` and the reduced field :math:`(E/N)^*(pd)`, one curve
-per configuration and polarity.  The same numbers are printed as a table.
+per configuration and polarity.  The same numbers are printed as a table
+once each curve is complete.
 
 ``--write-to-file`` writes one row per :math:`pd` point.  The header records
 the date, git commit, full command line, mechanism, temperature, pressures,

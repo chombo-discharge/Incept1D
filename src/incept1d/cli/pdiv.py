@@ -438,6 +438,23 @@ def run(args, parser):
         )
         return float(np.sum(np.maximum(0.0, diff)) * ds)
 
+    def _progress(i, n, pd_i, p_i, roots, seconds):
+        """Print one pd point of the sweep as soon as it is solved."""
+        head = f"  [{i + 1:{len(str(n))}d}/{n}]  pd = {pd_i * 1e3:10.4g} bar·mm  p = {p_i:6.4g} bar"
+        if not roots:
+            print(
+                f"{head}   no inception in the scan range   ({seconds:.1f} s)",
+                flush=True,
+            )
+            return
+        EN = roots[0]
+        U_kV = EN * pd_i * 1e-21 / (_kB * args.T) * 1e5 * 1e-3
+        more = f"  (+{len(roots) - 1} higher)" if len(roots) > 1 else ""
+        print(
+            f"{head}   E/N* = {EN:10.4f} Td   U* = {U_kV:10.4g} kV{more}   ({seconds:.1f} s)",
+            flush=True,
+        )
+
     def _branch0_grids(branches):
         V_g = np.full_like(pd_arr, np.nan)
         EN_g = np.full_like(pd_arr, np.nan)
@@ -628,6 +645,7 @@ def run(args, parser):
             det_fn=det_pos,
             fast_det_fn=fast_det_pos,
             med_det_fn=med_det_pos,
+            progress=_progress,
         )
         if same_polarity:
             branches_neg = branches_pos  # symmetric; reuse same object
@@ -644,6 +662,7 @@ def run(args, parser):
                 det_fn=det_neg,
                 fast_det_fn=fast_det_neg,
                 med_det_fn=med_det_neg,
+                progress=_progress,
             )
 
         if not branches_pos and not branches_neg:

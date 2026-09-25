@@ -921,6 +921,13 @@ def _discretise(
         return exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug
 
 
+# Largest condition number of one Riccati substep's propagator.  The linear
+# fractional map tolerates more than the compound route: on the verification
+# cases 1e12 leaves every root unchanged to 1e-9, 1e16 moves one by 2.5e-7
+# and 1e24 by 0.4 %; 1e12 needs 1.5x fewer substeps than 1e8.
+_RICCATI_STEP_COND = 1e12
+
+
 def _riccati_g(exponents, Q0, S):
     """
     The inception criterion by the Riccati (reflection) method.
@@ -935,11 +942,12 @@ def _riccati_g(exponents, Q0, S):
 
     Integrated from the anode, every component travels in its own direction,
     so the modes that make the propagator M useless — e^{+κx} for backward
-    photons, e^{+λx/|v₊|} for ions — decay instead of growing.  On a step
-    with constant A the equation is solved exactly by the linear fractional
-    map
+    photons, e^{+λx/|v₊|} for ions — decay instead of growing.  Each step
+    with constant A is described by its reflection and transmission matrices
+    (:func:`_slab_scattering`), built by adding–doubling from thin, well
+    conditioned substeps, and P is carried across it exactly by
 
-        P ← (E_bf + E_bb P)(E_ff + E_fb P)⁻¹,   E = exp(−Ω),
+        P ← R_l + T_b P (I − R_r P)⁻¹ T_f,
 
     so the result is the same discrete problem det Q solves on the same
     grid.  At the cathode the conditions Q0 θ = 0 with θ_b = P θ_f give
@@ -953,10 +961,8 @@ def _riccati_g(exponents, Q0, S):
 
     P stays finite below inception: it can only blow up where a sub-slab
     [x, d] is self-sustaining without the cathode, which makes the whole gap
-    supercritical.  The map passes through such a pole within one step
-    without failing, so a pole is detected instead as a sign change of
-    det(E_ff + E_fb P), whose product over the steps is the determinant of
-    the forward block of the propagated basis.  Returns −1 there.
+    supercritical.  That shows as a sign change of det(I − R_r P) (or of
+    det(I − R_r^A R_l^B) inside a step), and returns −1.
     """
     n = Q0.shape[1]
     b = [int(np.argmax(row)) for row in S]
@@ -966,38 +972,99 @@ def _riccati_g(exponents, Q0, S):
             f"Q0 has {Q0.shape[0]} rows for {len(fw)} forward components: every "
             "species must be selected by exactly one of Pi_e, Pi_plus, Pi_minus"
         )
-    P = np.zeros((len(b), len(fw)))
+    nf = len(fw)
+    P = np.zeros((len(b), nf))
     for Omega in reversed(exponents):
-        # Substeps with a well-conditioned propagator, as in the compound
-        # route; splitting is exact, exp(−Ω) = exp(−Ω/m)^m.
-        mu = np.real(np.linalg.eigvals(Omega))
-        m = max(1, math.ceil((mu.max() - mu.min()) / math.log(_MAX_STEP_COND)))
-        E = _expm_shifted(-Omega / m)  # the dropped shift cancels in the map
-        while np.linalg.cond(E) > _MAX_STEP_COND and m < 2**20:
-            m *= 2
-            E = _expm_shifted(-Omega / m)
-        E_bf, E_bb = E[np.ix_(b, fw)], E[np.ix_(b, b)]
-        E_ff, E_fb = E[np.ix_(fw, fw)], E[np.ix_(fw, b)]
-        for step in range(m):
-            X = E_ff + E_fb @ P
-            if np.linalg.slogdet(X)[0] <= 0:
-                return -1.0
-            P_new = np.linalg.solve(X.T, (E_bf + E_bb @ P).T).T
-            if not np.all(np.isfinite(P_new)):
-                return -1.0
-            # A fixed point of the constant map: the remaining substeps are
-            # exact no-ops.  Relative test, entry by entry, for the reason
-            # given in _propagate_compound.
-            nz = P != 0.0
-            converged = (
-                step < m - 1
-                and not np.any(P_new[~nz])
-                and np.max(np.abs(P_new[nz] / P[nz] - 1.0), initial=0.0) < 1e-13
-            )
-            P = P_new
-            if converged:
-                break
+        slab = _slab_scattering(Omega, b, fw)
+        if slab is None:
+            return -1.0
+        R_l, R_r, T_f, T_b = slab
+        # Riccati update across the step: with b = P f at its anode side,
+        # P ← R_l + T_b P (I − R_r P)⁻¹ T_f.  I − R_r P turns singular exactly
+        # where P passes through a pole (det X of the substep form, divided
+        # by det E_ff > 0), so a sign change there means above inception.
+        K = np.eye(nf) - R_r @ P
+        if np.linalg.slogdet(K)[0] <= 0:
+            return -1.0
+        P = R_l + T_b @ P @ np.linalg.solve(K, T_f)
+        if not np.all(np.isfinite(P)):
+            return -1.0
     return float(np.linalg.det(Q0[:, fw] + Q0[:, b] @ P))
+
+
+def _slab_scattering(Omega, b, fw):
+    """
+    Reflection and transmission of one step with exponent Ω.
+
+    For a slab whose ends are related by θ_left = E θ_right, E = exp(−Ω),
+    the fluxes leaving it are given by the fluxes entering it:
+
+        f_right = T_f f_left + R_r b_right,
+        b_left  = R_l f_left + T_b b_right,
+
+    with T_f = E_ff⁻¹, R_r = −E_ff⁻¹ E_fb, R_l = E_bf E_ff⁻¹ and
+    T_b = E_bb − E_bf E_ff⁻¹ E_fb.  A thin substep, small enough for its
+    propagator to be well conditioned, is formed directly; the step is then
+    built from m such substeps by repeated squaring with the Redheffer star
+    product (the adding–doubling method), in log₂ m combinations instead of
+    m.  For a system whose couplings are all non-negative sources these
+    matrices are non-negative too, so composing them involves no
+    cancellation.
+
+    Returns ``(R_l, R_r, T_f, T_b)``, or None if part of the step is already
+    self-sustaining on its own (above inception).
+    """
+    mu = np.real(np.linalg.eigvals(Omega))
+    m = max(1, math.ceil((mu.max() - mu.min()) / math.log(_RICCATI_STEP_COND)))
+    E = _expm_shifted(-Omega / m)
+    while np.linalg.cond(E) > _RICCATI_STEP_COND and m < 2**40:
+        m *= 2
+        E = _expm_shifted(-Omega / m)
+    # _expm_shifted dropped the factor e^shift from E; restore it in the
+    # transmissions (the reflections are ratios and do not see it).
+    shift = max(0.0, float(np.max(np.real(np.linalg.eigvals(-Omega / m)))))
+    E_ff_inv = np.linalg.inv(E[np.ix_(fw, fw)])
+    E_fb, E_bf, E_bb = E[np.ix_(fw, b)], E[np.ix_(b, fw)], E[np.ix_(b, b)]
+    R_l = E_bf @ E_ff_inv
+    R_r = -E_ff_inv @ E_fb
+    T_f = E_ff_inv * math.exp(-shift)
+    T_b = (E_bb - R_l @ E_fb) * math.exp(shift)
+    unit = (R_l, R_r, T_f, T_b)
+
+    result = None
+    while m:
+        if m & 1:
+            result = unit if result is None else _star(result, unit)
+            if result is None:
+                return None
+        m >>= 1
+        if m:
+            unit = _star(unit, unit)
+            if unit is None:
+                return None
+    return result
+
+
+def _star(A, B):
+    """
+    Redheffer star product: slab A (cathode side) followed by slab B.
+
+    Returns None if the pair is self-sustaining, i.e. I − R_r^A R_l^B has
+    turned singular (its determinant changed sign).
+    """
+    Rl_a, Rr_a, Tf_a, Tb_a = A
+    Rl_b, Rr_b, Tf_b, Tb_b = B
+    K = np.eye(Tf_a.shape[0]) - Rr_a @ Rl_b
+    if np.linalg.slogdet(K)[0] <= 0:
+        return None
+    K_Tf = np.linalg.solve(K, Tf_a)
+    K_Rr = np.linalg.solve(K, Rr_a)
+    return (
+        Rl_a + Tb_a @ Rl_b @ K_Tf,
+        Rr_b + Tf_b @ K_Rr @ Tb_b,
+        Tf_b @ K_Tf,
+        Tb_a @ (Tb_b + Rl_b @ K_Rr @ Tb_b),
+    )
 
 
 def riccati_criterion(

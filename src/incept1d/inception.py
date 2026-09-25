@@ -15,6 +15,7 @@ as det Q.
 """
 
 import math
+import time
 
 import numpy as np
 import scipy.optimize
@@ -90,6 +91,14 @@ def _accept_root(root, EN_a, EN_b, fa, fb, pd, det_fn, mod, p, T):
 #: bracket is declared unconfirmed.  A uniform-field proxy misplaces a root of
 #: a strongly non-uniform field by up to ~30 %, so this leaves margin on top.
 _CONFIRM_FACTOR = 1.6
+
+#: Lowest E/N (Td) searched when the criterion shows inception below EN_lo.
+_EN_FLOOR = 0.1
+
+
+def _has_physical_sign(det_fn):
+    """True when *det_fn* is (a partial of) the Riccati criterion."""
+    return getattr(det_fn, "func", det_fn) is riccati_criterion
 
 
 def find_all_breakdown_EN(
@@ -245,6 +254,25 @@ def find_all_breakdown_EN(
         # Warm start incomplete, or a lower root exists — fall through to the
         # full scan, which is authoritative.
 
+    # A criterion whose sign is physical (Riccati: g > 0 below inception for
+    # every mechanism) tells at a single point whether the lowest root lies
+    # below the scan range.  Then no scan above EN_lo can find it; search
+    # down instead, where a strongly non-uniform gap puts its gap-averaged
+    # inception field.
+    if first_only and _has_physical_sign(det_fn):
+        f_lo = f_brentq(EN_lo)
+        if f_lo < 0.0:
+            EN_b = EN_lo
+            while EN_b > _EN_FLOOR:
+                EN_a = max(EN_b / 2.0, _EN_FLOOR)
+                if f_brentq(EN_a) > 0.0:
+                    root = scipy.optimize.brentq(
+                        f_brentq, EN_a, EN_b, xtol=1e-8, rtol=1e-14
+                    )
+                    return [float(root)]
+                EN_b = EN_a
+            return []
+
     EN_scan = np.logspace(np.log10(EN_lo), np.log10(EN_hi), n_scan)
 
     def _scan_with(sfn):
@@ -260,10 +288,14 @@ def find_all_breakdown_EN(
             val = sfn(EN, pd, mod, p, T)
             return val if np.isfinite(val) else 0.0
 
-        D = np.array([f_s(en) for en in EN_scan])
+        # Evaluated lazily, bottom up: in first_only mode the scan stops at the
+        # first confirmed root instead of paying for every point above it,
+        # which matters when sfn is the full criterion.
+        D = [f_s(EN_scan[0])]
         local_roots = []
         unconfirmed = False
         for i in range(len(EN_scan) - 1):
+            D.append(f_s(EN_scan[i + 1]))
             if D[i] * D[i + 1] < 0.0:
                 EN_a, EN_b = EN_scan[i], EN_scan[i + 1]
                 fa, fb = f_brentq(EN_a), f_brentq(EN_b)
@@ -355,6 +387,7 @@ def compute_inception_curve(
     det_fn=None,
     fast_det_fn=None,
     med_det_fn=None,
+    progress=None,
 ):
     """
     Compute inception-curve branches across a p·d sweep.
@@ -376,6 +409,11 @@ def compute_inception_curve(
     all_branches : bool
         If False (default), only the lowest-E/N root (branch 0) is kept at
         each pd point.  If True, all roots are collected.
+    progress : callable or None
+        Called after each pd point as
+        ``progress(i, n, pd, p, roots, seconds)``, with the E/N roots found
+        there (ascending, possibly empty) and the time it took, so a caller
+        can report the sweep as it runs.
 
     Returns
     -------
@@ -397,6 +435,7 @@ def compute_inception_curve(
     prev_roots_EN = []  # roots found at the previous pd point (warm-start hints)
 
     for i, (pd_i, p_i) in enumerate(zip(pd_arr, p_arr)):
+        t_start = time.perf_counter()
         roots = find_all_breakdown_EN(
             pd_i,
             mod,
@@ -409,6 +448,10 @@ def compute_inception_curve(
             EN_hints=prev_roots_EN,
         )
         prev_roots_EN = list(roots)
+        if progress is not None:
+            progress(
+                i, len(pd_arr), pd_i, p_i, sorted(roots), time.perf_counter() - t_start
+            )
         if not roots:
             continue
         d_i = pd_i / p_i

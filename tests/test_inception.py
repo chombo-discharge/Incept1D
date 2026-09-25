@@ -187,12 +187,15 @@ class TestRootFinding:
             assert every == sorted(every)
             assert first[0] == pytest.approx(min(every), rel=1e-8)
 
-    def test_warm_start_still_saves_work(self, toy, counting_det):
+    def test_lowest_root_does_not_pay_for_the_whole_scan(self, toy, counting_det):
         """
-        I8: the guard must not silently disable the warm start.
+        I8: finding the lowest root costs far fewer evaluations than the scan.
 
-        A valid hint should still cost markedly fewer determinant evaluations
-        than the full logarithmic scan.
+        The scan is evaluated bottom up and stops at the first confirmed root,
+        so neither a cold search nor a warm-started one pays for the points
+        above it.  (The warm start used to be what saved this work; the lazy
+        scan now does, and the warm start's lower-root guard scans the same
+        points, so it no longer beats a cold search.)
         """
         fn, counter = counting_det
         p, T, pd = 1.0, 293.0, 20e-3
@@ -201,11 +204,14 @@ class TestRootFinding:
         find_all_breakdown_EN(pd, toy, p, T, first_only=True, det_fn=fn)
         cold = counter["n"]
         counter["n"] = 0
-        find_all_breakdown_EN(
+        warm_root = find_all_breakdown_EN(
             pd, toy, p, T, first_only=True, det_fn=fn, EN_hints=[truth * 1.05]
         )
         warm = counter["n"]
-        assert warm < cold, f"warm start saved nothing (warm={warm}, cold={cold})"
+        assert warm_root[0] == pytest.approx(truth, rel=1e-9)
+        assert (
+            cold < 100 and warm < 100
+        ), f"cold={cold}, warm={warm} of a 200-point scan"
 
     def test_accept_root_rejects_the_nan_sentinel_artefact(self, toy):
         """I9: a root bracketed by a NaN sentinel is discarded, not reported."""
