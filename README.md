@@ -44,7 +44,7 @@ addition to the paper.
 |  | |
 |---|---|
 | **Any gas** | The chemistry lives in a *mechanism file* outside the package, so a new gas is a new file rather than a patch to the solver. Dry air ships with the code. |
-| **Any gap** | Uniform, sphere-plane, sphere-sphere and coaxial gaps are analytic. A **tabulated field line** from any electrostatic solver can be used directly, curvature included. |
+| **Any gap** | Uniform, sphere-plane, sphere-sphere, hyperboloid-plane (point-plane) and coaxial gaps are analytic. A **tabulated field line** from any electrostatic solver can be used directly, curvature included. |
 | **Sensitivity in one run** | JSON configuration files overlay variants — cross-section databases, cathode yields, individual reactions scaled or switched off — side by side in one figure. |
 | **Beyond the threshold** | Above the inception voltage, the temporal growth rate $\lambda$ says how *fast* the discharge grows, not merely that it does. |
 | **Checked against algebra** | A reduced limit of the model has a closed-form solution, and the test suite asserts the solver reproduces it to a relative error below $10^{-9}$. |

@@ -75,6 +75,7 @@ Inputs
      - Gas temperature in K (default 293).
    * - ``--field SPEC``
      - Geometry: ``uniform`` | ``sphere-plane R_mm`` | ``sphere-sphere R_mm``
+       | ``hyperboloid-plane R_mm`` | ``coaxial A_mm B_mm``
        | ``fieldline FILE [UNIT]``.  See :ref:`Chap:FieldDistributions`.
    * - ``--dx N_min [N_max [tol]]``
      - Adaptive integration grid (defaults 5, 200, 0.03).  See
