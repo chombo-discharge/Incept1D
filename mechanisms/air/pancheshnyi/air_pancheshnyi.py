@@ -69,7 +69,7 @@ _PQ_BAR = globals().get("_PQ_BAR", 30.0 / 750.064)  # Quenching pressure: 30 Tor
 # Ion secondary-emission coefficients — configurable via globals().get() injection
 _GAMMA0 = globals().get("_GAMMA0", 1e-3)  # base SEE yield (N2+, O2+)
 _GAMMA1 = globals().get("_GAMMA1", 0.0)  # exponential prefactor
-_EREF = globals().get("_EREF", 170e7)  # reference field [V/m]
+_EREF = globals().get("_EREF", 170e6)  # reference field [V/m]
 _BETA = globals().get("_BETA", 1.0)  # field scaling exponent
 
 # Mutable module state — set by init_photoionization() at import time
