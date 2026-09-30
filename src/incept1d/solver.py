@@ -30,7 +30,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from incept1d.constants import kB as _kB, c_light as _C_LIGHT  # noqa: F401
-from incept1d.fields import FieldDistribution, field_following_edges  # noqa: F401
+from incept1d.fields import FieldDistribution  # noqa: F401
 
 
 def _build_A_aug(EN, d, mod, p, T, lam=0.0):
@@ -895,7 +895,9 @@ def _discretise(
     f = field_dist.build(d)
     # Initial segments that follow the field, in code coordinates (0 at the
     # cathode); the adaptive halving then refines within each of them.
-    xi_edges = field_following_edges(f, N_min, nodes=field_dist.nodes(d))
+    # Capped at N_max segments, so that a noisy table or a field that falls
+    # to zero cannot take the cost past what --dx allows.
+    xi_edges = field_dist.grid_edges(d, N_min, max_edges=max(N_min, N_max) + 1)
     x_edges = np.sort(d * ((1.0 - xi_edges) if positive_polarity else xi_edges))
     n_seg = len(x_edges) - 1
     max_depth = max(0, int(math.log2(max(1, N_max // n_seg))))

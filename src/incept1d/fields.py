@@ -21,6 +21,7 @@ The standalone field plotter is ``incept1d field`` (:mod:`incept1d.cli.field`).
 
 import argparse
 import dataclasses
+import heapq
 import math
 import os
 import sys
@@ -273,8 +274,14 @@ def load_fieldline(path, length_unit="m"):
 #: Largest relative change of the field across one initial segment.
 FIELD_STEP_REL = 0.2
 
+#: Field (in units of the mean) below which a change is judged absolutely
+#: rather than relative to the field itself.
+FIELD_STEP_FLOOR = 1e-3
 
-def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097, nodes=None):
+
+def field_following_edges(
+    f, n_min, rel=FIELD_STEP_REL, max_edges=4097, nodes=None, floor=FIELD_STEP_FLOOR
+):
     """
     Initial segment edges in ξ ∈ [0, 1], refined where the field changes.
 
@@ -296,35 +303,64 @@ def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097, nodes=No
 
     Shared by the solver's grid and the ionization integrals of
     :mod:`incept1d.ionization`, which use the edges as quadrature panels.
+
+    Parameters
+    ----------
+    f : callable
+        The normalised profile f(ξ), of mean 1.
+    n_min : int
+        Number of equal segments to start from.
+    rel : float
+        Largest change of f across one segment, relative to the larger of
+        its values there.
+    max_edges : int
+        Largest number of edges returned.  Where more segments would need
+        splitting than that leaves room for, those across which f changes
+        most are split first, so a noisy table or a field that falls to zero
+        cannot run away with the cost.
+    nodes : array_like or None
+        Positions in (0, 1) where f is tabulated, if it is.
+    floor : float
+        A change is judged relative to at least this value, so that a field
+        falling to zero does not ask for ever finer segments next to it.
+
+    Returns
+    -------
+    ndarray
+        Increasing edges from 0 to 1.
     """
-    if nodes is None:
-        nodes = np.empty(0)
-    nodes = np.sort(np.asarray(nodes, dtype=float))
+    nodes = np.sort(np.asarray([] if nodes is None else nodes, dtype=float))
     node_values = np.array([f(x) for x in nodes])
 
-    def varies(a, b, fa, fb):
+    def variation(a, b, fa, fb):
         i0 = np.searchsorted(nodes, a, side="right")
         i1 = np.searchsorted(nodes, b, side="left")
         vals = [fa, fb, *node_values[i0:i1]]
         hi, lo = max(vals), min(vals)
-        return hi - lo > rel * max(abs(hi), abs(lo))
+        return (hi - lo) / max(abs(hi), abs(lo), floor)
 
-    edges = list(np.linspace(0.0, 1.0, n_min + 1))
-    values = [f(x) for x in edges]
-    changed = True
-    while changed and len(edges) < max_edges:
-        changed = False
-        new_edges, new_values = [edges[0]], [values[0]]
-        for a, b, fa, fb in zip(edges, edges[1:], values, values[1:]):
-            if varies(a, b, fa, fb):
-                mid = 0.5 * (a + b)
-                new_edges.append(mid)
-                new_values.append(f(mid))
-                changed = True
-            new_edges.append(b)
-            new_values.append(fb)
-        edges, values = new_edges, new_values
-    return np.array(edges)
+    # Split the segment across which f changes most, one at a time, so that
+    # the cap, if reached, has been spent where the field changes most.
+    # Without the cap the result does not depend on the order: a segment is
+    # split exactly when it varies by more than rel.
+    xs = np.linspace(0.0, 1.0, n_min + 1)
+    fs = [f(x) for x in xs]
+    edges = set(xs)
+    heap = [
+        (-variation(a, b, fa, fb), a, b, fa, fb)
+        for a, b, fa, fb in zip(xs, xs[1:], fs, fs[1:])
+    ]
+    heapq.heapify(heap)
+    while heap and len(edges) < max_edges:
+        neg, a, b, fa, fb = heapq.heappop(heap)
+        if -neg <= rel:
+            break
+        mid = 0.5 * (a + b)
+        fm = f(mid)
+        edges.add(mid)
+        heapq.heappush(heap, (-variation(a, mid, fa, fm), a, mid, fa, fm))
+        heapq.heappush(heap, (-variation(mid, b, fm, fb), mid, b, fm, fb))
+    return np.array(sorted(edges))
 
 
 # ── Field distribution class ──────────────────────────────────────────────────
@@ -621,10 +657,53 @@ class FieldDistribution:
             return self._background(d)
         # The normalisation is a quadrature, and the solvers build the same
         # gap many times over a root search.
-        cache = self.__dict__.setdefault("_build_cache", {})
-        if d not in cache:
-            cache[d] = self._build_protruded(d)
-        return cache[d]
+        return self._cached(("build", d), lambda: self._build_protruded(d))
+
+    def grid_edges(self, d: float, n_min: int, max_edges: int = 4097) -> np.ndarray:
+        """
+        :func:`field_following_edges` of :meth:`build` for the gap *d*, cached.
+
+        The edges depend on the profile alone, not on the field strength, so
+        a root search over E/N at one gap computes them once.
+
+        Parameters
+        ----------
+        d : float
+            Gap length in metres.
+        n_min : int
+            Number of equal segments to start from.
+        max_edges : int
+            Largest number of edges.
+
+        Returns
+        -------
+        ndarray
+            Increasing edges in ξ from 0 to 1.
+        """
+        return self._cached(
+            ("edges", d, n_min, max_edges),
+            lambda: field_following_edges(
+                self.build(d), n_min, max_edges=max_edges, nodes=self.nodes(d)
+            ),
+        )
+
+    def _cached(self, key, compute):
+        """*compute()*, remembered under *key* and the current geometry."""
+        geometry = (
+            self.field_type,
+            self.sphere_R,
+            self.tip_R,
+            self.coax_a,
+            self.coax_b,
+            id(self.fieldline_f),
+            self.reversed,
+            self.protrusion,
+        )
+        cache = self.__dict__.setdefault("_cache", {})
+        full = (geometry, *key)
+        if full not in cache:
+            cache[full] = compute()
+        return cache[full]
 
     def _build_protruded(self, d: float) -> Callable[[float], float]:
         """:meth:`build` with a protrusion, uncached."""
@@ -651,11 +730,28 @@ class FieldDistribution:
             }
             | set(self.nodes(d) if self.field_type == "fieldline" else ())
         )
-        edges = [0.0, *breaks, 1.0]
-        norm = sum(
-            quad(raw, a0, a1, epsabs=0.0, epsrel=1e-11, limit=500)[0]
-            for a0, a1 in zip(edges[:-1], edges[1:])
-        )
+        edges = np.array([0.0, *breaks, 1.0])
+        # A panel much narrower than its distance from the tip sees a smooth
+        # enhancement and, on a tabulated background, a linear field:
+        # Simpson's rule is exact enough there and costs two evaluations,
+        # which keeps a table of thousands of points cheap.  Near the tip,
+        # adaptive quadrature.
+        widths = np.diff(edges) * d
+        smooth = widths < 0.02 * (edges[:-1] * d + rho)
+        at_edges = {}
+
+        def raw_at(x):
+            if x not in at_edges:
+                at_edges[x] = raw(x)
+            return at_edges[x]
+
+        norm = 0.0
+        for a0, a1, easy in zip(edges[:-1], edges[1:], smooth):
+            if easy:
+                mid = raw(0.5 * (a0 + a1))
+                norm += (a1 - a0) * (raw_at(a0) + 4.0 * mid + raw_at(a1)) / 6.0
+            else:
+                norm += quad(raw, a0, a1, epsabs=0.0, epsrel=1e-11, limit=500)[0]
 
         def f_pr(xi, _norm=norm):
             return raw(xi) / _norm

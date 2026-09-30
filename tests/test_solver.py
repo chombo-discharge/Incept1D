@@ -531,6 +531,41 @@ class TestFieldFollowingStart:
         expected = (s_tab - 1e-3) / d
         assert np.allclose(pr.nodes(d), expected[(expected > 0) & (expected < 1)])
 
+    def test_a_field_falling_to_zero_stays_bounded(self):
+        """
+        A purely relative test never converges next to f = 0; the floor
+        judges changes there absolutely.
+        """
+        from incept1d.fields import field_following_edges
+
+        edges = field_following_edges(lambda x: 2.0 * (1.0 - x), 5)
+        assert len(edges) < 100
+
+    def test_the_cap_splits_the_largest_changes_first(self):
+        """A noisy profile is held to max_edges, with the worst segments split."""
+        from incept1d.fields import field_following_edges
+
+        rng = np.random.default_rng(1)
+        xs = np.linspace(0.0, 1.0, 2001)
+        ys = 1.0 + 0.3 * rng.uniform(-1.0, 1.0, xs.size)
+        ys[1000] = 10.0  # one real peak among the noise
+        f = lambda x: float(np.interp(x, xs, ys))  # noqa: E731
+        edges = field_following_edges(f, 5, max_edges=41, nodes=xs[1:-1])
+        assert len(edges) == 41
+        assert np.sum(np.abs(edges - 0.5) < 0.01) >= 5
+
+    def test_grid_edges_are_cached_and_follow_the_geometry(self):
+        """The cache is keyed on the geometry, not on d alone."""
+        from incept1d.protrusions import Spheroid
+
+        fd = FieldDistribution("uniform", protrusion=Spheroid(1e-3, base_radius=1e-3))
+        a = fd.grid_edges(10e-3, 5)
+        assert fd.grid_edges(10e-3, 5) is a
+        f0 = fd.build(10e-3)(0.0)
+        fd.protrusion = Spheroid(1e-3, base_radius=1e-4)
+        assert fd.build(10e-3)(0.0) > 10 * f0
+        assert fd.grid_edges(10e-3, 5) is not a
+
     def test_uniform_field_keeps_equal_segments(self):
         from incept1d.fields import field_following_edges
 
