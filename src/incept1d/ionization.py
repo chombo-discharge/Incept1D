@@ -25,7 +25,7 @@ from incept1d.fields import FieldDistribution, field_following_edges
 _GL_X, _GL_W = np.polynomial.legendre.leggauss(4)
 
 
-def _gap_integral(rate, f, xi_hi, N):
+def _gap_integral(rate, f, xi_hi, N, nodes=None):
     """
     ∫₀^xi_hi max(rate(ξ), 0) dξ on panels that follow the field.
 
@@ -33,9 +33,14 @@ def _gap_integral(rate, f, xi_hi, N):
     more than 20 % across one (:func:`incept1d.fields.field_following_edges`),
     so a thin high-field layer — the tip of a protrusion in a wide gap —
     gets panels however small it is against the gap.  Each panel is
-    integrated with 4-point Gauss–Legendre.
+    integrated with 4-point Gauss–Legendre.  *nodes* are the tabulated
+    points of the profile (:meth:`FieldDistribution.nodes`), if any.
     """
-    edges = xi_hi * field_following_edges(lambda t: f(xi_hi * t), N)
+    t_nodes = None
+    if nodes is not None:
+        t_nodes = np.asarray(nodes) / xi_hi
+        t_nodes = t_nodes[t_nodes < 1.0]
+    edges = xi_hi * field_following_edges(lambda t: f(xi_hi * t), N, nodes=t_nodes)
     half = 0.5 * np.diff(edges)
     nodes = (0.5 * (edges[1:] + edges[:-1]))[:, None] + half[:, None] * _GL_X
     vals = np.array([rate(x) for x in nodes.ravel()]).reshape(nodes.shape)
@@ -75,7 +80,7 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
             # General profile (sphere-sphere, tabulated field line, reversed):
             # the active region need not start at xi = 0 nor be a single
             # interval, so integrate max(α−η, 0) over the whole gap.
-            result = _gap_integral(_net, f, 1.0, N) * d_val
+            result = _gap_integral(_net, f, 1.0, N, field_dist.nodes(d_val)) * d_val
             return result if np.isfinite(result) else float("nan")
 
         # If there is no net ionisation even at the sphere surface, return 0 immediately.
@@ -100,7 +105,7 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
             xi_cross = 0.5 * (lo + hi)
 
         # Quadrature over [0, xi_cross·d], all of it in the active region.
-        result = _gap_integral(_net, f, xi_cross, N) * d_val
+        result = _gap_integral(_net, f, xi_cross, N, field_dist.nodes(d_val)) * d_val
 
     except (OverflowError, ValueError):
         return float("nan")
@@ -202,7 +207,7 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
 
         if not field_dist.is_monotone_decreasing:
             # General profile: see aed_integral.
-            result = _gap_integral(_lmax, f, 1.0, N) * d_val
+            result = _gap_integral(_lmax, f, 1.0, N, field_dist.nodes(d_val)) * d_val
             return result if np.isfinite(result) else float("nan")
 
         if _lmax(0.0) <= 0.0:
@@ -220,7 +225,7 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
                     hi = mid
             xi_cross = 0.5 * (lo + hi)
 
-        result = _gap_integral(_lmax, f, xi_cross, N) * d_val
+        result = _gap_integral(_lmax, f, xi_cross, N, field_dist.nodes(d_val)) * d_val
 
     except (OverflowError, ValueError, np.linalg.LinAlgError):
         return float("nan")

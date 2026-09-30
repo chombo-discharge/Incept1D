@@ -105,7 +105,12 @@ segments are therefore first split until the field changes by at most
 20 % across each (:func:`incept1d.fields.field_following_edges`), which
 for a wire of radius :math:`a` in a gap of :math:`100\,a` adds a couple of
 dozen short segments at the wire; a uniform or gently varying field keeps
-its :math:`N_{\min}` equal segments.  With that start the defaults keep
+its :math:`N_{\min}` equal segments.  Comparing the ends of a segment
+cannot see a feature *inside* it, such as a narrow peak halfway along a
+tabulated field line; where the profile is tabulated, the tabulated values
+inside a segment count as well, so such a peak is split like any other
+change.  The same segments serve as the quadrature panels of the
+ionization integrals.  With that start the defaults keep
 the inception field within about 0.1–0.2 % of its converged value on
 sphere-plane and thin-wire coaxial gaps; ``--dx 5 1000 1e-3`` brings that
 to about 0.01 % at three to seven times the cost.

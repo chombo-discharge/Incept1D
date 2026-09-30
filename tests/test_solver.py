@@ -484,6 +484,53 @@ class TestFieldFollowingStart:
         # The wire is at xi = 0 (the field decreases away from it).
         assert edges[1] < 0.02
 
+    @staticmethod
+    def _bump_line(tmp_path):
+        """20 mm, gently falling, with a x3 bump 0.05 mm wide at 7.3 mm."""
+        s = np.union1d(np.linspace(0, 20, 401), np.linspace(7.0, 7.6, 601))
+        E = 1.0 - 0.02 * s + 2.0 * np.exp(-(((s - 7.3) / 0.05) ** 2))
+        path = tmp_path / "bump.dat"
+        np.savetxt(path, np.c_[s, E])
+        return str(path)
+
+    def test_a_peak_inside_a_tabulated_line_is_resolved(self, tmp_path):
+        """
+        A peak between the first sample points is invisible to the ends of a
+        segment; the tabulated values inside it are not.  Without them the
+        default grid put no edge near the bump, and the inception field of
+        the air mechanism came out 7 % high.
+        """
+        from incept1d.fields import field_following_edges, parse_field_spec
+
+        fd = parse_field_spec(["fieldline", self._bump_line(tmp_path), "mm"])
+        f = fd.build(20e-3)
+        near = lambda e: np.sum(np.abs(e - 7.3 / 20) < 0.01)  # noqa: E731
+        assert near(field_following_edges(f, 5)) == 0
+        edges = field_following_edges(f, 5, nodes=fd.nodes(20e-3))
+        assert near(edges) >= 8
+        # Between edges the tabulated field changes by at most 20 %.
+        nodes = fd.nodes(20e-3)
+        for a, b in zip(edges, edges[1:]):
+            vals = [f(a), f(b), *[f(x) for x in nodes[(nodes > a) & (nodes < b)]]]
+            assert max(vals) - min(vals) <= 0.2 * max(vals) + 1e-12
+
+    def test_nodes_follow_reversal_and_protrusion(self, tmp_path):
+        """The tabulated points, in the xi of build(), after both mappings."""
+        from incept1d.fields import parse_field_spec
+
+        path = self._bump_line(tmp_path)
+        fwd = parse_field_spec(["fieldline", path, "mm"])
+        assert FieldDistribution("sphere-plane", 5e-3).nodes(1e-2) is None
+        rev = parse_field_spec(["fieldline", path, "mm"], reverse=True)
+        assert np.allclose(np.sort(1.0 - rev.nodes(20e-3)), fwd.nodes(20e-3))
+        pr = parse_field_spec(
+            ["fieldline", path, "mm"], protrusion=["spheroid", "1", "1"]
+        )
+        d = pr.fixed_gap_length
+        s_tab = fwd.nodes(20e-3) * 20e-3
+        expected = (s_tab - 1e-3) / d
+        assert np.allclose(pr.nodes(d), expected[(expected > 0) & (expected < 1)])
+
     def test_uniform_field_keeps_equal_segments(self):
         from incept1d.fields import field_following_edges
 

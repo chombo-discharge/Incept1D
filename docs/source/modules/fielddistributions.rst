@@ -519,10 +519,14 @@ than refused.
 Resolution
 ~~~~~~~~~~
 
-The profile is linearly interpolated between tabulated points.  Export
-enough points to resolve the field near the high-field electrode; the
-adaptive integration grid (``--dx``) refines the propagator, not the
-profile.  Check the imported profile visually first:
+The profile is linearly interpolated between tabulated points.  The
+integration grid follows the table: it is refined wherever the tabulated
+field changes by more than 20 % across a segment, including at a narrow
+peak between the electrodes, so a feature the table resolves is resolved
+by the solve too, and a protrusion added with ``--protrusion`` is refined
+in the same way.  What the grid cannot do is add detail the table lacks:
+export enough points to resolve the field near the high-field electrode
+and at any local peak.  Check the imported profile visually first:
 
 .. code-block:: bash
 

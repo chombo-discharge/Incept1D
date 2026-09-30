@@ -572,6 +572,49 @@ class TestHyperboloidPlane:
             assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
 
 
+class TestTabulatedPeak:
+    def test_default_grid_converges_on_a_peaked_line(self, tmp_path, capsys):
+        """
+        A narrow peak halfway along a tabulated line: the default --dx must
+        agree with a much finer grid, which it did not when the grid saw only
+        the ends of its segments.
+        """
+        s = np.union1d(np.linspace(0, 20, 401), np.linspace(7.0, 7.6, 601))
+        E = 1.0 - 0.02 * s + 2.0 * np.exp(-(((s - 7.3) / 0.05) ** 2))
+        line = tmp_path / "bump.dat"
+        np.savetxt(line, np.c_[s, E])
+
+        def EN(*dx):
+            out = tmp_path / f"b{len(dx)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--field",
+                "fieldline",
+                str(line),
+                "mm",
+                *dx,
+                "--pd-min",
+                "20",
+                "--pd-max",
+                "20",
+                "--pd-num",
+                "1",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return np.array(
+                [c[0] for n, c in _columns(out).items() if n.startswith("EN_Td")]
+            )
+
+        coarse, fine = EN(), EN("--dx", "200", "20000", "0.001")
+        capsys.readouterr()
+        np.testing.assert_allclose(coarse, fine, rtol=3e-3)
+
+
 class TestProtrusion:
     @pytest.mark.parametrize(
         "spec, label",

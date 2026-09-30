@@ -895,7 +895,7 @@ def _discretise(
     f = field_dist.build(d)
     # Initial segments that follow the field, in code coordinates (0 at the
     # cathode); the adaptive halving then refines within each of them.
-    xi_edges = field_following_edges(f, N_min)
+    xi_edges = field_following_edges(f, N_min, nodes=field_dist.nodes(d))
     x_edges = np.sort(d * ((1.0 - xi_edges) if positive_polarity else xi_edges))
     n_seg = len(x_edges) - 1
     max_depth = max(0, int(math.log2(max(1, N_max // n_seg))))

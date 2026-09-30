@@ -147,7 +147,8 @@ def run(args, parser):
     # Evenly spaced samples, plus field-following ones so that a thin
     # high-field layer (a protrusion tip) is drawn rather than stepped over.
     xi_plot = np.union1d(
-        np.linspace(0.0, 1.0, 2000), field_following_edges(f, 200, rel=0.02)
+        np.linspace(0.0, 1.0, 2000),
+        field_following_edges(f, 200, rel=0.02, nodes=fd.nodes(d)),
     )
     f_plot = np.array([f(xi) for xi in xi_plot])
     x_plot = xi_plot * d_mm

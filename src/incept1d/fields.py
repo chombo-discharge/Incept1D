@@ -274,7 +274,7 @@ def load_fieldline(path, length_unit="m"):
 FIELD_STEP_REL = 0.2
 
 
-def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097):
+def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097, nodes=None):
     """
     Initial segment edges in ξ ∈ [0, 1], refined where the field changes.
 
@@ -288,9 +288,27 @@ def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097):
     following start places sample points in that layer.  For a uniform or
     gently varying field it returns the *n_min* equal segments unchanged.
 
+    Comparing the ends of a segment cannot see a feature *inside* it — a
+    narrow peak halfway along a tabulated field line.  Where f is known at
+    *nodes* (the tabulated points, :meth:`FieldDistribution.nodes`), the
+    values at the nodes inside a segment are compared as well, so such a
+    peak is refined like any other change.
+
     Shared by the solver's grid and the ionization integrals of
     :mod:`incept1d.ionization`, which use the edges as quadrature panels.
     """
+    if nodes is None:
+        nodes = np.empty(0)
+    nodes = np.sort(np.asarray(nodes, dtype=float))
+    node_values = np.array([f(x) for x in nodes])
+
+    def varies(a, b, fa, fb):
+        i0 = np.searchsorted(nodes, a, side="right")
+        i1 = np.searchsorted(nodes, b, side="left")
+        vals = [fa, fb, *node_values[i0:i1]]
+        hi, lo = max(vals), min(vals)
+        return hi - lo > rel * max(abs(hi), abs(lo))
+
     edges = list(np.linspace(0.0, 1.0, n_min + 1))
     values = [f(x) for x in edges]
     changed = True
@@ -298,7 +316,7 @@ def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097):
         changed = False
         new_edges, new_values = [edges[0]], [values[0]]
         for a, b, fa, fb in zip(edges, edges[1:], values, values[1:]):
-            if abs(fa - fb) > rel * max(abs(fa), abs(fb)):
+            if varies(a, b, fa, fb):
                 mid = 0.5 * (a + b)
                 new_edges.append(mid)
                 new_values.append(f(mid))
@@ -420,6 +438,26 @@ class FieldDistribution:
             fieldline_field_unit=field_unit,
             fieldline_path=path,
         )
+
+    def nodes(self, d: float) -> Optional[np.ndarray]:
+        """
+        Where a tabulated profile has its data points, in the ξ of :meth:`build`.
+
+        The positions inside (0, 1) of the tabulated points of a field line,
+        after reversal and after the shift to the tip of a protrusion; None
+        for an analytic profile.  Between them f is linear, so they are what
+        a grid or a quadrature must not step over
+        (:func:`field_following_edges`).
+        """
+        if self.field_type != "fieldline":
+            return None
+        xi = self.fieldline_xi
+        if self.reversed:
+            xi = 1.0 - xi[::-1]
+        if self.protrusion is not None:
+            h = self.protrusion.height
+            xi = (xi * (d + h) - h) / d
+        return xi[(xi > 0.0) & (xi < 1.0)]
 
     @property
     def fieldline_line_voltage(self) -> Optional[float]:
@@ -581,7 +619,15 @@ class FieldDistribution:
         """
         if self.protrusion is None:
             return self._background(d)
+        # The normalisation is a quadrature, and the solvers build the same
+        # gap many times over a root search.
+        cache = self.__dict__.setdefault("_build_cache", {})
+        if d not in cache:
+            cache[d] = self._build_protruded(d)
+        return cache[d]
 
+    def _build_protruded(self, d: float) -> Callable[[float], float]:
+        """:meth:`build` with a protrusion, uncached."""
         pr = self.protrusion
         h = pr.height
         D = d + h
@@ -593,7 +639,8 @@ class FieldDistribution:
             return f_bg((_h + s) / _D) * g(s)
 
         # The enhancement varies on the tip radius of curvature and on h;
-        # break the quadrature at a few multiples of each.
+        # break the quadrature at a few multiples of each, and at the kinks
+        # of a tabulated background.
         rho = pr.tip_radius
         breaks = sorted(
             {
@@ -602,6 +649,7 @@ class FieldDistribution:
                 for x in (0.1 * L, L, 10.0 * L, 100.0 * L)
                 if 0.0 < x < d
             }
+            | set(self.nodes(d) if self.field_type == "fieldline" else ())
         )
         edges = [0.0, *breaks, 1.0]
         norm = sum(
