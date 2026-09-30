@@ -56,8 +56,11 @@ Inputs
        points instead of sweeping.  Columns are selected by name or 0-based
        index.
    * - ``--N N``
-     - Number of midpoint-rule quadrature steps across the gap for
-       non-uniform fields (default 200).
+     - Number of equal quadrature panels across the gap for non-uniform
+       fields (default 50).  Panels are then halved wherever the field
+       changes by more than 20 % across one, so a thin high-field layer —
+       the tip of a protrusion in a wide gap — is resolved however small it
+       is, and each panel is integrated with 4-point Gauss–Legendre.
    * - ``--field SPEC``
      - Geometry, as for ``incept1d pdiv``.
 

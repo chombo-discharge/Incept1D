@@ -102,7 +102,7 @@ half steps, and cannot see a feature that falls between those sample
 points: a thin high-field layer at a small electrode can be missed
 altogether, and with it the avalanche.  The :math:`N_{\min}` initial
 segments are therefore first split until the field changes by at most
-20 % across each (:func:`incept1d.solver._field_following_edges`), which
+20 % across each (:func:`incept1d.fields.field_following_edges`), which
 for a wire of radius :math:`a` in a gap of :math:`100\,a` adds a couple of
 dozen short segments at the wire; a uniform or gently varying field keeps
 its :math:`N_{\min}` equal segments.  With that start the defaults keep

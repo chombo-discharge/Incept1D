@@ -50,11 +50,10 @@ from incept1d.ionization import aed_integral, streamer_EN
 from incept1d.output import write_metadata_header
 from incept1d.parallel import parallel_map, physical_cores
 
-#: Quadrature points for the ionization integral (overlay and streamer
-#: criterion).  For a field that falls off from the electrode they are placed
-#: in the active layer only, which a handful of points over the whole gap
-#: would straddle.
-_AED_N = 200
+#: Initial quadrature panels for the ionization integral (overlay and
+#: streamer criterion), refined to follow the field; see
+#: :func:`incept1d.ionization.aed_integral`.
+_AED_N = 50
 
 #: Relative distance from a root at which det Q is checked for a sign change.
 #: Not smaller: the adaptive grid is chosen per E/N, so det Q's root on the
@@ -215,8 +214,8 @@ def add_arguments(parser):
         help=(
             "Temporal growth rate λ in s⁻¹ for the generalised inception criterion "
             "det Q(λ) = 0 (default: 0.0 = standard inception threshold).  "
-            "λ > 0 → growing discharge (lower breakdown voltage); "
-            "λ < 0 → decaying discharge (higher breakdown voltage)."
+            "λ > 0 → growing discharge (lower inception voltage); "
+            "λ < 0 → decaying discharge (higher inception voltage)."
         ),
     )
     parser.add_argument(
@@ -1222,7 +1221,7 @@ def run(args, parser):
 
         ax1.set_xlabel(_x_label)
         ax1.set_ylabel("U  (kV)")
-        ax1.set_title("Breakdown voltage")
+        ax1.set_title("Inception voltage")
         ax1.legend(loc="upper left", framealpha=1.0)
         ax1.grid(True, which="both", ls="--", alpha=0.4)
 

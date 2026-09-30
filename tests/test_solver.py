@@ -472,11 +472,11 @@ class TestFieldFollowingStart:
         20 % change of the field, so sample points land in the ionizing
         layer at the wire, which equal segments of ~5 mm would straddle.
         """
-        from incept1d.solver import _field_following_edges
+        from incept1d.fields import field_following_edges
 
         fd = FieldDistribution("coaxial", coax_a=0.25e-3, coax_b=25e-3)
         f = fd.build(24.75e-3)
-        edges = _field_following_edges(f, 5)
+        edges = field_following_edges(f, 5)
         values = np.array([f(x) for x in edges])
         change = np.abs(np.diff(values)) / np.maximum(values[:-1], values[1:])
         assert change.max() <= 0.2 + 1e-12
@@ -485,7 +485,7 @@ class TestFieldFollowingStart:
         assert edges[1] < 0.02
 
     def test_uniform_field_keeps_equal_segments(self):
-        from incept1d.solver import _field_following_edges
+        from incept1d.fields import field_following_edges
 
         f = FieldDistribution("uniform").build(1e-2)
-        assert np.allclose(_field_following_edges(f, 5), np.linspace(0.0, 1.0, 6))
+        assert np.allclose(field_following_edges(f, 5), np.linspace(0.0, 1.0, 6))

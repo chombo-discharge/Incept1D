@@ -268,6 +268,47 @@ def load_fieldline(path, length_unit="m"):
     return s, E, reading
 
 
+# ── Field-following panels ─────────────────────────────────────────────────
+
+#: Largest relative change of the field across one initial segment.
+FIELD_STEP_REL = 0.2
+
+
+def field_following_edges(f, n_min, rel=FIELD_STEP_REL, max_edges=4097):
+    """
+    Initial segment edges in ξ ∈ [0, 1], refined where the field changes.
+
+    Starts from *n_min* equal segments and halves every segment across
+    which f changes by more than *rel* relative to its larger end, until
+    none does.  The adaptive step halving that follows judges a segment by
+    comparing one midpoint step with two half steps, and cannot see a
+    feature that falls between those sample points: a thin high-field layer
+    at a small electrode (a wire of radius a in a gap of 100 a, say) can
+    then be missed altogether, and with it the avalanche.  A field
+    following start places sample points in that layer.  For a uniform or
+    gently varying field it returns the *n_min* equal segments unchanged.
+
+    Shared by the solver's grid and the ionization integrals of
+    :mod:`incept1d.ionization`, which use the edges as quadrature panels.
+    """
+    edges = list(np.linspace(0.0, 1.0, n_min + 1))
+    values = [f(x) for x in edges]
+    changed = True
+    while changed and len(edges) < max_edges:
+        changed = False
+        new_edges, new_values = [edges[0]], [values[0]]
+        for a, b, fa, fb in zip(edges, edges[1:], values, values[1:]):
+            if abs(fa - fb) > rel * max(abs(fa), abs(fb)):
+                mid = 0.5 * (a + b)
+                new_edges.append(mid)
+                new_values.append(f(mid))
+                changed = True
+            new_edges.append(b)
+            new_values.append(fb)
+        edges, values = new_edges, new_values
+    return np.array(edges)
+
+
 # ── Field distribution class ──────────────────────────────────────────────────
 
 

@@ -198,11 +198,13 @@ def add_arguments(parser):
     parser.add_argument(
         "--N",
         type=int,
-        default=200,
+        default=50,
         metavar="N",
         help=(
-            "Number of midpoint-rule quadrature steps across the gap for "
-            "non-uniform fields (default: 200)."
+            "Number of equal quadrature panels across the gap for non-uniform "
+            "fields, before they are refined wherever the field changes by "
+            "more than 20%% across one; 4-point Gauss-Legendre on each "
+            "(default: 50)."
         ),
     )
 

@@ -30,7 +30,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from incept1d.constants import kB as _kB, c_light as _C_LIGHT  # noqa: F401
-from incept1d.fields import FieldDistribution  # noqa: F401
+from incept1d.fields import FieldDistribution, field_following_edges  # noqa: F401
 
 
 def _build_A_aug(EN, d, mod, p, T, lam=0.0):
@@ -155,7 +155,7 @@ def _expm_shifted(M):
 
 
 DX_N_MIN_DEFAULT = 5
-# With the field-following initial segments (_field_following_edges) these
+# With the field-following initial segments (fields.field_following_edges) these
 # keep the inception field within ~0.1-0.2 % of its converged value on
 # sphere-plane and thin-wire coaxial gaps; 1000 / 1e-3 gives ~0.01 % at
 # 3-7x the cost.
@@ -826,42 +826,6 @@ def inception_det(
         )
 
 
-#: Largest relative change of the field across one initial segment.
-_FIELD_STEP_REL = 0.2
-
-
-def _field_following_edges(f, n_min, rel=_FIELD_STEP_REL, max_edges=4097):
-    """
-    Initial segment edges in ξ ∈ [0, 1], refined where the field changes.
-
-    Starts from *n_min* equal segments and halves every segment across
-    which f changes by more than *rel* relative to its larger end, until
-    none does.  The adaptive step halving that follows judges a segment by
-    comparing one midpoint step with two half steps, and cannot see a
-    feature that falls between those sample points: a thin high-field layer
-    at a small electrode (a wire of radius a in a gap of 100 a, say) can
-    then be missed altogether, and with it the avalanche.  A field
-    following start places sample points in that layer.  For a uniform or
-    gently varying field it returns the *n_min* equal segments unchanged.
-    """
-    edges = list(np.linspace(0.0, 1.0, n_min + 1))
-    values = [f(x) for x in edges]
-    changed = True
-    while changed and len(edges) < max_edges:
-        changed = False
-        new_edges, new_values = [edges[0]], [values[0]]
-        for a, b, fa, fb in zip(edges, edges[1:], values, values[1:]):
-            if abs(fa - fb) > rel * max(abs(fa), abs(fb)):
-                mid = 0.5 * (a + b)
-                new_edges.append(mid)
-                new_values.append(f(mid))
-                changed = True
-            new_edges.append(b)
-            new_values.append(fb)
-        edges, values = new_edges, new_values
-    return np.array(edges)
-
-
 def _discretise(
     EN_ref,
     pd,
@@ -931,7 +895,7 @@ def _discretise(
     f = field_dist.build(d)
     # Initial segments that follow the field, in code coordinates (0 at the
     # cathode); the adaptive halving then refines within each of them.
-    xi_edges = _field_following_edges(f, N_min)
+    xi_edges = field_following_edges(f, N_min)
     x_edges = np.sort(d * ((1.0 - xi_edges) if positive_polarity else xi_edges))
     n_seg = len(x_edges) - 1
     max_depth = max(0, int(math.log2(max(1, N_max // n_seg))))
