@@ -842,7 +842,18 @@ class TestFieldUnit:
         assert parse_field_unit(text) == pytest.approx(value, rel=1e-15)
 
     @pytest.mark.parametrize(
-        "text", ["kV", "kV/ft", "kv/mm", "x*V/m", "-1*V/m", "V/m/s", "0*V/m"]
+        "text",
+        [
+            "kV",
+            "kV/ft",
+            "kv/mm",
+            "x*V/m",
+            "-1*V/m",
+            "V/m/s",
+            "0*V/m",
+            "*V/m",
+            "1e400*V/m",
+        ],
     )
     def test_rejected(self, text):
         """F71."""
@@ -896,3 +907,60 @@ class TestFieldUnit:
         path = self._line(tmp_path, 1e6)
         with pytest.raises(ValueError):
             parse_field_spec(["fieldline", path, *extra])
+
+
+class TestAuditFixes:
+    @pytest.mark.parametrize(
+        "spec",
+        [["uniform", "kV/mm"], ["sphere-plane", "5", "x"], ["sphere-plane", "-1"]],
+    )
+    def test_extra_or_bad_tokens_are_refused(self, spec):
+        """F80: tokens an analytic geometry has no use for are not dropped."""
+        with pytest.raises(ValueError):
+            parse_field_spec(spec)
+
+    def test_a_wide_protrusion_is_noted(self, capsys):
+        """F81: the footprint, not only the height, must be small."""
+        parse_field_spec(["sphere-plane", "5"], protrusion=["spheroid", "0.2", "4"])
+        assert "base radius" in capsys.readouterr().err
+
+    def test_sphere_sphere_names_the_protrusion(self):
+        """F82: 'sphere=' would not say which sphere."""
+        fd = parse_field_spec(["sphere-sphere", "50"], protrusion=["rod", "1", "0.1"])
+        assert fd.polarity_label("negative") == "protrusion=negative"
+
+    def test_fixed_gap_wording(self, tmp_path):
+        """F83: with a protrusion the fixed gap is L - h, and scaling says so."""
+        from incept1d.fields import describe_fixed_gap, fixed_gap_warning
+
+        s = np.linspace(0.0, 20.0, 21)
+        path = _write_line(tmp_path / "l.dat", zip(s, 2.0 - 0.05 * s))
+        fd = parse_field_spec(
+            ["fieldline", path, "mm"], protrusion=["spheroid", "1", "1"]
+        )
+        assert "d = L - h = 20 - 1 = 19 mm" in describe_fixed_gap(fd)
+        assert fixed_gap_warning(fd, [19.0]) is None
+        assert "protrusion at its given size" in fixed_gap_warning(fd, [20.0])
+        assert describe_fixed_gap(FieldDistribution("uniform")) is None
+
+    def test_header_lines(self, tmp_path):
+        """F84: one set of geometry lines for every command's results file."""
+        from incept1d.fields import field_header_lines
+
+        s = np.linspace(0.0, 20.0, 21)
+        path = _write_line(tmp_path / "l.dat", zip(s, 2.0 - 0.05 * s))
+        fd = parse_field_spec(
+            ["fieldline", path, "mm", "kV/mm"],
+            reverse=True,
+            protrusion=["rod", "1", "0.05"],
+        )
+        keys = [line.split(":")[0] for line in field_header_lines(fd)]
+        assert keys == [
+            "Protrusion",
+            "Reversed",
+            "Polarity",
+            "Field line",
+            "Arc length",
+            "∫|E| ds",
+            "U_applied",
+        ]

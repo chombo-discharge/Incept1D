@@ -83,10 +83,15 @@ def _spheroid_axial_field(s, h, b):
     if abs(tau) <= 0.25:
         D, _ = _spheroid_series(tau)
     else:
-        x0 = 1.0 / math.sqrt(abs(tau))
         if tau > 0.0:
-            D = (x0 * math.atanh(1.0 / x0) - 1.0) / tau
+            # artanh(1/x0) from x0 - 1 = b²/(c(h + c)): 1/x0 = √τ rounds to 1
+            # for a slender needle, where atanh would lose every digit.
+            c = math.sqrt((h - b) * (h + b))
+            x0 = h / c
+            atanh0 = 0.5 * math.log1p(2.0 * c * (h + c) / (b * b))
+            D = (x0 * atanh0 - 1.0) / tau
         else:
+            x0 = 1.0 / math.sqrt(-tau)
             D = (1.0 - x0 * math.atan2(1.0, x0)) / -tau
     r = tau * w * w
     if abs(r) <= 0.25:
@@ -319,6 +324,11 @@ class Protrusion:
         raise NotImplementedError
 
     @property
+    def base_radius(self) -> float:
+        """Radius of the footprint on the electrode, in metres."""
+        raise NotImplementedError
+
+    @property
     def beta(self) -> float:
         """Field-enhancement factor at the tip, E(tip)/E₀."""
         return self.enhancement(0.0)
@@ -389,6 +399,10 @@ class Rod(_SimulatedProtrusion):
     def tip_radius(self):
         return self.radius
 
+    @property
+    def base_radius(self):
+        return self.radius
+
     def _meridian(self):
         h = self.height / self.radius
         return _Meridian(
@@ -456,6 +470,7 @@ SHAPES = {
 }
 
 #: Limits of the range the shapes are validated over.
+SPHEROID_MAX_ASPECT = 1e6
 ROD_MAX_ASPECT = 1000.0
 CONE_MAX_ASPECT = 1e5
 CONE_ANGLE_RANGE = (5.0, 80.0)
@@ -486,10 +501,15 @@ def parse_protrusion_spec(tokens) -> Protrusion:
         vals = [float(t) for t in tokens[1:]]
     except ValueError:
         raise ValueError(f"{shape}: values must be numbers, got {tokens[1:]}")
-    if not all(v > 0.0 for v in vals):
-        raise ValueError(f"{shape}: {what} must be positive")
+    if not all(v > 0.0 and math.isfinite(v) for v in vals):
+        raise ValueError(f"{shape}: {what} must be positive and finite")
     h, r = vals[0] * 1e-3, vals[1] * 1e-3
     if shape == "spheroid":
+        if h / r > SPHEROID_MAX_ASPECT:
+            raise ValueError(
+                f"spheroid: h/b above {SPHEROID_MAX_ASPECT:g} is outside the "
+                f"validated range"
+            )
         return Spheroid(h, base_radius=r)
     if shape == "rod":
         if h < r:

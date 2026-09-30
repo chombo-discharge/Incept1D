@@ -29,7 +29,10 @@ from incept1d.constants import kB as _kB
 from incept1d.fields import (
     FieldDistribution,
     add_field_argument,
+    describe_fixed_gap,
+    fixed_gap_warning,
     field_from_args,
+    field_header_lines,
     print_protrusion_notes,
 )
 from incept1d.mechanism import load_mechanism, read_json_configs
@@ -316,31 +319,16 @@ def run(args, parser):
     # are one geometry at one size: the geometry fixes the gap, and the
     # sweep is in pressure alone.
     _fixed_d = _field_dist.fixed_gap_length
-    if _field_dist.field_type == "fieldline":
-        _L_what = (
-            f"the arc length L = {{L:.4g}} mm of "
-            f"{os.path.basename(_field_dist.fieldline_path)}"
-        )
-    else:
-        _L_what = "L = b - a = {L:.4g} mm"
+    _gap = describe_fixed_gap(_field_dist)
+    if _fixed_d is not None:
+        _L_mm = _fixed_d * 1e3
     if not args.p and not args.d:
         if _fixed_d is not None:
-            args.d = [float(f"{_fixed_d * 1e3:.6g}")]
-            _why = (
-                "arc length of the tabulated line"
-                if _field_dist.field_type == "fieldline"
-                else "outer minus inner radius"
-            )
-            if _field_dist.protrusion is not None:
-                _why += ", less the protrusion height"
-            print(
-                f"--field {_field_dist.field_type}: no --p/--d given, using "
-                f"d = L = {args.d[0]:.4g} mm ({_why})."
-            )
+            args.d = [float(f"{_L_mm:.6g}")]
+            print(f"--field {_field_dist.field_type}: no --p/--d given, using {_gap}.")
         else:
             args.p = [1.0]
     elif _fixed_d is not None:
-        _L_mm = _fixed_d * 1e3
         if args.p:
             # Fixing the pressure makes the gap the swept variable, so every
             # point of the sweep is a differently sized copy of the
@@ -349,22 +337,17 @@ def run(args, parser):
             _pd = args.p[0] * _L_mm
             parser.error(
                 f"--p cannot be used with --field {_field_dist.field_type}: it "
-                f"would sweep the gap length, and every d \u2260 L = "
-                f"{_L_mm:.4g} mm is the electrode arrangement at a different "
-                f"size.  Omit --p for a pressure sweep at d = L, or for the "
-                f"single point p = {args.p[0]:.4g} bar use --pd-min {_pd:.6g} "
-                f"--pd-max {_pd:.6g} --pd-num 1."
+                f"would sweep the gap length, and the geometry fixes it at "
+                f"{_gap}; any other d is the electrode arrangement at a "
+                f"different size.  Omit --p for a pressure sweep at that d, or "
+                f"for the single point p = {args.p[0]:.4g} bar use --pd-min "
+                f"{_pd:.6g} --pd-max {_pd:.6g} --pd-num 1."
             )
         # An explicit --d other than L rescales the arrangement too, but it
         # does so once and on purpose, so it is reported rather than refused.
-        _off = [d for d in args.d or [] if abs(d / _L_mm - 1.0) > 1e-6]
-        if _off:
-            print(
-                f"Warning: --d {', '.join(f'{d:g}' for d in _off)} mm differs "
-                f"from {_L_what.format(L=_L_mm)}; the arrangement is solved "
-                f"scaled by d/L.  Omit --d to use d = L.",
-                file=sys.stderr,
-            )
+        _warn = fixed_gap_warning(_field_dist, args.d or [])
+        if _warn:
+            print(f"Warning: {_warn}", file=sys.stderr)
     _N_min, _N_max, _dx_tol = parse_dx_spec(args.dx, parser)
 
     _propagator = (
@@ -1088,63 +1071,8 @@ def run(args, parser):
             fh.write(
                 f"# Stepping:    N_min={_N_min}, N_max={_N_max}, tol={_dx_tol:.3g}\n"
             )
-            if _field_dist.protrusion is not None:
-                fh.write(
-                    f"# Protrusion:  {_field_dist.protrusion.label}, on the "
-                    f"xi = 0 electrode; beta = {_field_dist.protrusion.beta:.6g}; "
-                    f"d is measured from its tip\n"
-                )
-            if _field_dist.reversed:
-                fh.write(
-                    f"# Reversed:    xi = 0 is the {_field_dist.electrode_name} "
-                    f"(--reverse-field)\n"
-                )
-            if _field_dist.sphere_R is not None:
-                fh.write(f"# Sphere R:    {_field_dist.sphere_R*1e3:.4g} mm\n")
-            if _field_dist.field_type == "hyperboloid-plane":
-                fh.write(f"# Tip R:       {_field_dist.tip_R*1e3:.4g} mm\n")
-            if _field_dist.field_type == "coaxial":
-                fh.write(
-                    f"# Radii:       a = {_field_dist.coax_a*1e3:.6g} mm, "
-                    f"b = {_field_dist.coax_b*1e3:.6g} mm\n"
-                )
-            if not _field_dist.is_symmetric:
-                _el = _field_dist.electrode_name
-                _what = {
-                    "inner": "inner conductor",
-                    "outer": "outer conductor",
-                    "start": "first tabulated point",
-                    "end": "last tabulated point",
-                    "protrusion": "electrode with the protrusion",
-                }.get(_el, _el)
-                fh.write(
-                    f"# Polarity:    {_el}=positive → {_what} is anode (+),  "
-                    f"{_el}=negative → {_what} is cathode (−)\n"
-                )
-            if _field_dist.field_type == "fieldline":
-                fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
-                fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
-                _uline = _field_dist.fieldline_line_voltage
-                if _uline is not None:
-                    fh.write(
-                        f"# ∫|E| ds:     {_uline/1e3:.6g} kV (|E| in "
-                        f"{_field_dist.fieldline_field_unit})\n"
-                    )
-                else:
-                    fh.write(
-                        f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "
-                        f"(field units of the file × m; a voltage only if the "
-                        f"file tabulates |E| in V/m)\n"
-                    )
-                if _field_dist.fieldline_applied_voltage is not None:
-                    fh.write(
-                        f"# U_applied:   "
-                        f"{_field_dist.fieldline_applied_voltage/1e3:.6g} kV "
-                        f"({_field_dist.fieldline_voltage_source}; only the "
-                        f"shape of the profile enters the solve, so "
-                        f"U*/U_applied is the factor the excitation must be "
-                        f"scaled by to reach inception)\n"
-                    )
+            for _line in field_header_lines(_field_dist):
+                fh.write(f"# {_line}\n")
             if _streamer_records:
                 fh.write(f"# Streamer C:  {args.streamer_criterion}\n")
             fh.write("#\n")

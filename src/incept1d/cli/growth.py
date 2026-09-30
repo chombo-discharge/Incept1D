@@ -24,6 +24,7 @@ from incept1d.constants import kB as _kB
 from incept1d.fields import (
     add_field_argument,
     field_from_args,
+    field_header_lines,
     print_protrusion_notes,
 )
 from incept1d.growth import solve_voltage, voltage_sweep
@@ -158,6 +159,8 @@ def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_di
             fh.write("# Cases:       every pressure with every distance (see labels)\n")
         fh.write(f"# Temperature: {args.T} K\n")
         fh.write(f"# Field type:  {field_dist.label}\n")
+        for line in field_header_lines(field_dist):
+            fh.write(f"# {line}\n")
         fh.write(f"# V_max_factor:{args.v_max_factor}\n")
         fh.write(f"# n_voltages:  {args.n_voltages}\n")
         fh.write(
@@ -472,9 +475,13 @@ def run(args, parser):
             print(f"  [{solved[k]['label']}]  no inception found  ({seconds:.1f} s)")
             return
         V_star = EN_star * solved[k]["pd_m"] * 1e-16 / (_kB * args.T)
+        # Against a declared excitation (a tabulated line with a field unit
+        # or --fieldline-voltage): the factor it must be scaled by.
+        u_app = _field_dist.fieldline_applied_voltage
+        ratio = f"   V*/U_applied = {V_star / u_app:.4f}" if u_app else ""
         print(
             f"  [{solved[k]['label']}]  V* = {V_star * 1e-3:.4f} kV   "
-            f"E/N* = {EN_star:.2f} Td   ({seconds:.1f} s){_verdict(check)}",
+            f"E/N* = {EN_star:.2f} Td{ratio}   ({seconds:.1f} s){_verdict(check)}",
             flush=True,
         )
 

@@ -214,3 +214,33 @@ class TestParsing:
         """P10."""
         with pytest.raises(ValueError, match=match):
             parse_protrusion_spec(spec)
+
+
+class TestSlenderSpheroid:
+    @pytest.mark.parametrize("aspect", [1e4, 1e6, 1e8, 1e12])
+    def test_needle_keeps_its_digits(self, aspect):
+        """
+        P11: β of a slender needle, from x0 − 1 = b²/(c(h + c)) and
+        artanh(1/x0) = ½ log1p(2/(x0 − 1)); atanh(1/x0) lost every digit.
+        """
+        from incept1d.protrusions import spheroid_enhancement
+
+        h, b = aspect, 1.0
+        c = math.sqrt((h - b) * (h + b))
+        xm1 = b * b / (c * (h + c))
+        x0 = 1.0 + xm1
+        beta = 1.0 / (xm1 * (x0 + 1.0) * (x0 * 0.5 * math.log1p(2.0 / xm1) - 1.0))
+        assert spheroid_enhancement(h, b) == pytest.approx(beta, rel=1e-12)
+
+    @pytest.mark.parametrize(
+        "spec, match",
+        [
+            (["spheroid", "inf", "1"], "finite"),
+            (["rod", "1", "nan"], "finite"),
+            (["spheroid", "1e7", "1"], "validated range"),
+        ],
+    )
+    def test_unphysical_sizes_are_refused(self, spec, match):
+        """P12."""
+        with pytest.raises(ValueError, match=match):
+            parse_protrusion_spec(spec)

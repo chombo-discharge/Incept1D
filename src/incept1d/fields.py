@@ -134,7 +134,7 @@ def parse_field_unit(text):
     ValueError
         If *text* is not of that form.
     """
-    mult, _, unit = text.rpartition("*")
+    mult, star, unit = text.rpartition("*")
     volt, sep, length = unit.partition("/")
     if not sep or volt not in _VOLTAGE_UNITS or length not in _LENGTH_UNITS:
         raise ValueError(
@@ -142,10 +142,12 @@ def parse_field_unit(text):
             f"{', '.join(_VOLTAGE_UNITS)} and LENGTH one of m, cm, mm, um"
         )
     try:
-        factor = float(mult) if mult else 1.0
+        factor = float(mult) if star else 1.0
     except ValueError:
         raise ValueError(f"field unit {text!r}: multiplier {mult!r} is not a number")
-    if not (factor > 0.0 and math.isfinite(factor)):
+    if not math.isfinite(factor):
+        raise ValueError(f"field unit {text!r}: the multiplier must be finite")
+    if not factor > 0.0:
         raise ValueError(f"field unit {text!r}: the multiplier must be positive")
     return factor * _VOLTAGE_UNITS[volt] / _LENGTH_UNITS[length]
 
@@ -533,10 +535,12 @@ class FieldDistribution:
         Says which electrode, the one at ξ = 0, is the anode in positive
         polarity: the sphere, the hyperboloid tip, the inner conductor, the
         first tabulated point, or, reversed, the plane, the outer conductor
-        or the last point; on a uniform field, the electrode with the
+        or the last point; on a uniform or sphere-sphere gap, the electrode with the
         protrusion.
         """
-        if self.field_type == "uniform" and self.protrusion is not None:
+        # Where both electrodes would carry the same name, the protrusion
+        # tells them apart.
+        if self.field_type in ("uniform", "sphere-sphere") and self.protrusion:
             return f"protrusion={polarity}"
         if self.field_type == "uniform":
             return polarity
@@ -929,6 +933,133 @@ def _fieldline_scale(fd):
     return float(f[0] / abs(slope))
 
 
+def describe_fixed_gap(fd) -> Optional[str]:
+    """
+    The gap a fixed-size geometry imposes, in words, for the commands.
+
+    For a coaxial arrangement or a tabulated field line, ``"d = L = 20 mm
+    (the arc length of line.csv)"``, or with a protrusion ``"d = L - h =
+    20 - 1 = 19 mm (... less the protrusion height, measured from its
+    tip)"``; None where the gap is free.
+    """
+    if fd.fixed_gap_length is None:
+        return None
+    h_mm = fd.protrusion.height * 1e3 if fd.protrusion else 0.0
+    L_mm = fd.fixed_gap_length * 1e3
+    what = (
+        f"the arc length of {os.path.basename(fd.fieldline_path)}"
+        if fd.field_type == "fieldline"
+        else "b - a"
+    )
+    if h_mm:
+        return (
+            f"d = L - h = {L_mm + h_mm:.4g} - {h_mm:.4g} = {L_mm:.4g} mm "
+            f"({what} less the protrusion height, measured from its tip)"
+        )
+    return f"d = L = {L_mm:.4g} mm ({what})"
+
+
+def fixed_gap_warning(fd, d_mm) -> Optional[str]:
+    """
+    Say how gaps *d_mm* (mm) other than the one a fixed geometry imposes are
+    solved, or None if they all match it (or the gap is free).
+
+    Such a d solves the arrangement scaled so that its gap is d: the whole
+    arrangement by d/L, or, with a protrusion, the electrodes by (d + h)/L
+    and the protrusion at its given size.
+    """
+    if fd.fixed_gap_length is None:
+        return None
+    L_mm = fd.fixed_gap_length * 1e3
+    off = [d for d in d_mm if abs(d / L_mm - 1.0) > 1e-6]
+    if not off:
+        return None
+    scaled = (
+        "the electrodes are solved scaled by (d + h)/L, and the protrusion at "
+        "its given size"
+        if fd.protrusion
+        else "the arrangement is solved scaled by d/L"
+    )
+    return (
+        f"--d {', '.join(f'{d:g}' for d in off)} mm differs from "
+        f"{describe_fixed_gap(fd)}; {scaled}.  Use d = {L_mm:.4g} mm for the "
+        f"geometry as given."
+    )
+
+
+def field_header_lines(fd) -> list:
+    """
+    The geometry lines of a ``--write-to-file`` header, without ``# ``.
+
+    Protrusion, reversal, electrode dimensions, the polarity convention, and
+    for a tabulated line its source, arc length, line integral and the
+    applied voltage, so that a results file says what it was computed for.
+    Shared by the commands that write results.
+
+    Parameters
+    ----------
+    fd : FieldDistribution
+
+    Returns
+    -------
+    list of str
+        One header line each, in the ``Key:  value`` layout of the headers.
+    """
+    lines = []
+    if fd.protrusion is not None:
+        lines.append(
+            f"Protrusion:  {fd.protrusion.label}, on the xi = 0 electrode; "
+            f"beta on a uniform field = {fd.protrusion.beta:.6g}; d is measured "
+            f"from its tip"
+        )
+    if fd.reversed:
+        lines.append(
+            f"Reversed:    xi = 0 is the {fd.electrode_name} (--reverse-field)"
+        )
+    if fd.sphere_R is not None:
+        lines.append(f"Sphere R:    {fd.sphere_R * 1e3:.4g} mm")
+    if fd.field_type == "hyperboloid-plane":
+        lines.append(f"Tip R:       {fd.tip_R * 1e3:.4g} mm")
+    if fd.field_type == "coaxial":
+        lines.append(
+            f"Radii:       a = {fd.coax_a * 1e3:.6g} mm, b = {fd.coax_b * 1e3:.6g} mm"
+        )
+    if not fd.is_symmetric:
+        el = fd.electrode_name
+        what = {
+            "inner": "inner conductor",
+            "outer": "outer conductor",
+            "start": "first tabulated point",
+            "end": "last tabulated point",
+            "protrusion": "electrode with the protrusion",
+        }.get(el, el)
+        lines.append(
+            f"Polarity:    {el}=positive → {what} is anode (+),  "
+            f"{el}=negative → {what} is cathode (−)"
+        )
+    if fd.field_type == "fieldline":
+        lines.append(f"Field line:  {fd.fieldline_path}")
+        lines.append(f"Arc length:  {fd.fieldline_length * 1e3:.6g} mm")
+        u_line = fd.fieldline_line_voltage
+        if u_line is not None:
+            lines.append(
+                f"∫|E| ds:     {u_line / 1e3:.6g} kV (|E| in {fd.fieldline_field_unit})"
+            )
+        else:
+            lines.append(
+                f"∫|E| ds:     {fd.fieldline_integral:.6g} (field units of the file "
+                f"× m; a voltage only if the file tabulates |E| in V/m)"
+            )
+        if fd.fieldline_applied_voltage is not None:
+            lines.append(
+                f"U_applied:   {fd.fieldline_applied_voltage / 1e3:.6g} kV "
+                f"({fd.fieldline_voltage_source}; only the shape of the profile "
+                f"enters the solve, so U*/U_applied is the factor the excitation "
+                f"must be scaled by to reach inception)"
+            )
+    return lines
+
+
 def protrusion_notes(fd, d_min=None) -> list:
     """
     Say where a protrusion is outside the validity of its model.
@@ -979,12 +1110,17 @@ def protrusion_notes(fd, d_min=None) -> list:
                 "where the protrusion sits; --reverse-field puts the other "
                 "end at xi = 0 if the protrusion belongs there"
             )
-    if scale is not None and h > PROTRUSION_SCALE_LIMIT * scale:
+    # Both the height and the footprint must be small against the scale:
+    # a flat bump as wide as the sphere is no local perturbation either.
+    base = fd.protrusion.base_radius
+    size, size_what = (h, "height h") if h >= base else (base, "base radius")
+    if scale is not None and size > PROTRUSION_SCALE_LIMIT * scale:
         notes.append(
-            f"protrusion height h = {h * 1e3:.4g} mm is {h / scale:.3g} of "
-            f"{what} = {scale * 1e3:.4g} mm; the enhancement is superposed on "
-            f"the background field, which is accurate only for h/scale below "
-            f"about {PROTRUSION_SCALE_LIMIT:g}"
+            f"protrusion {size_what} = {size * 1e3:.4g} mm is "
+            f"{size / scale:.3g} of {what} = {scale * 1e3:.4g} mm; the "
+            f"enhancement is superposed on the background field, which is "
+            f"accurate only while the protrusion is below about "
+            f"{PROTRUSION_SCALE_LIMIT:g} of it"
         )
     if d_min is not None and h > PROTRUSION_SCALE_LIMIT * d_min:
         notes.append(
@@ -1089,12 +1225,19 @@ def _parse_background(spec, _err, applied_voltage_kv):
             "every other geometry the voltage is a result, not an input"
         )
     if field_type == "uniform":
+        if len(spec) != 1:
+            _err(f"--field uniform takes no values, got {spec[1:]}")
         return FieldDistribution(field_type="uniform")
 
     if field_type in ("sphere-plane", "sphere-sphere"):
-        if len(spec) < 2:
+        if len(spec) != 2:
             _err(f"--field {field_type} requires a sphere radius in mm")
-        sphere_R = float(spec[1]) * 1e-3  # mm → m
+        try:
+            sphere_R = float(spec[1]) * 1e-3  # mm → m
+        except ValueError:
+            _err(f"--field {field_type}: radius must be a number, got {spec[1]!r}")
+        if not (sphere_R > 0.0 and math.isfinite(sphere_R)):
+            _err(f"--field {field_type}: radius must be positive")
         return FieldDistribution(field_type=field_type, sphere_R=sphere_R)
 
     if field_type == "hyperboloid-plane":

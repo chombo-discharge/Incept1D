@@ -12,6 +12,7 @@ read (pressure, voltage) pairs from an experimental data file.  See
 """
 
 import os
+import sys
 
 import numpy as np
 
@@ -20,6 +21,8 @@ from incept1d.fields import (
     FieldDistribution,
     add_field_argument,
     field_from_args,
+    field_header_lines,
+    fixed_gap_warning,
     print_protrusion_notes,
 )
 from incept1d.ionization import aed_integral, eig_integral
@@ -229,6 +232,9 @@ def run(args, parser):
     _field_dist = field_from_args(args, parser)
     if args.d:
         print_protrusion_notes(_field_dist, min(args.d) * 1e-3, gap_only=True)
+        _warn = fixed_gap_warning(_field_dist, args.d)
+        if _warn:
+            print(f"Warning: {_warn}", file=sys.stderr)
     _N = args.N
     _field_str = _field_dist.label
 
@@ -642,20 +648,10 @@ def _write_results(
             f"# Configs:     {', '.join(d.get('label', 'Baseline') for d in raw_dicts)}\n"
         )
         fh.write(f"# Field type:  {field_dist.label}\n")
-        if field_dist.sphere_R is not None:
-            fh.write(f"# Sphere R:    {field_dist.sphere_R*1e3:.4g} mm,  N = {N}\n")
-        if field_dist.tip_R is not None:
-            fh.write(f"# Tip R:       {field_dist.tip_R*1e3:.4g} mm,  N = {N}\n")
-        if field_dist.field_type == "coaxial":
-            fh.write(
-                f"# Radii:       a = {field_dist.coax_a*1e3:.6g} mm, "
-                f"b = {field_dist.coax_b*1e3:.6g} mm,  N = {N}\n"
-            )
-        if field_dist.field_type == "fieldline":
-            fh.write(
-                f"# Field line:  {field_dist.fieldline_path},  "
-                f"L = {field_dist.fieldline_length*1e3:.6g} mm,  N = {N}\n"
-            )
+        for line in field_header_lines(field_dist):
+            fh.write(f"# {line}\n")
+        if not field_dist.is_uniform:
+            fh.write(f"# Quadrature:  N = {N} initial panels, field-following\n")
         fh.write("#\n")
         for i, h in enumerate(col_headers, start=1):
             fh.write(f"# Column {i}: {h}\n")
