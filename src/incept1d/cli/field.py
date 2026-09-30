@@ -10,7 +10,11 @@ quadrature grid for a gap geometry (see :mod:`incept1d.fields`).
 import numpy as np
 import matplotlib.pyplot as plt
 
-from incept1d.fields import add_field_argument, parse_field_spec
+from incept1d.fields import (
+    add_field_argument,
+    field_from_args,
+    print_protrusion_notes,
+)
 
 HELP = "Plot the normalised field profile f(ξ) of a gap geometry."
 DESCRIPTION = (
@@ -82,7 +86,7 @@ def _implied_field_unit(fd):
 
 def run(args, parser):
     """Run the command with parsed *args*; *parser* is used for ``parser.error``."""
-    fd = parse_field_spec(args.field, parser, applied_voltage_kv=args.fieldline_voltage)
+    fd = field_from_args(args, parser)
     N = args.N
     if args.d is None:
         if fd.fixed_gap_length is None:
@@ -90,6 +94,7 @@ def run(args, parser):
         args.d = fd.fixed_gap_length * 1e3
     d_mm = args.d
     d = d_mm * 1e-3
+    print_protrusion_notes(fd, d, gap_only=True)
     f = fd.build(d)
     color = "tab:blue"
 
@@ -100,6 +105,12 @@ def run(args, parser):
         geom_str += f"  (d/r = {d/fd.tip_R:.3f})"
 
     print(f"Geometry:  {geom_str}")
+    if fd.protrusion is not None:
+        pr = fd.protrusion
+        print(
+            f"Protrusion: beta = {pr.beta:.4g} on a uniform field, tip radius "
+            f"of curvature {pr.tip_radius * 1e3:.4g} mm, d measured from the tip"
+        )
     if fd.field_type == "fieldline":
         print(
             f"Arc length = {fd.fieldline_length*1e3:.6g} mm"

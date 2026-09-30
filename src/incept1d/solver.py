@@ -903,7 +903,7 @@ def _discretise(
     # whichever propagator was requested.  The compound route still splits
     # the single exponent A_aug·d into substeps, but that split is exact
     # (exp(Ω) = exp(Ω/m)^m), not a quadrature.
-    if field_dist.field_type == "uniform":
+    if field_dist.is_uniform:
         A_aug, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
             EN_ref, d, eff, p, T, lam=lam
         )

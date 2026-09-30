@@ -4,10 +4,13 @@
 
 """Gap geometry: normalisation, symmetry, and the tabulated field-line loader."""
 
+import dataclasses
+
 import numpy as np
 import pytest
 
 from incept1d.fields import FieldDistribution, load_fieldline, parse_field_spec
+from incept1d.protrusions import Cone, Rod, Spheroid
 
 _trapz = getattr(np, "trapezoid", None) or np.trapz
 
@@ -577,3 +580,194 @@ class TestPolarityLabel:
         assert field.polarity_label("negative") == expected.replace(
             "positive", "negative"
         )
+
+
+# ── Protrusions ──────────────────────────────────────────────────────────────
+
+
+def _with_protrusion(fd, h, b):
+    fd.protrusion = Spheroid(h, base_radius=b)
+    return fd
+
+
+def _quad_integral(f):
+    from scipy.integrate import quad
+
+    edges = [0.0, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]
+    return sum(
+        quad(f, a, b, epsabs=0.0, epsrel=1e-10, limit=500)[0]
+        for a, b in zip(edges[:-1], edges[1:])
+    )
+
+
+class TestProtrusion:
+    H = 0.5e-3
+
+    def test_hemisphere_on_a_uniform_field(self):
+        """F47: f = (1 + 2h³/z³)·d / (D − h³/D²), z = h + ξd, D = d + h."""
+        h, d = self.H, 10e-3
+        D = d + h
+        f = _with_protrusion(FieldDistribution("uniform"), h, h).build(d)
+        for x in np.linspace(0.0, 1.0, 11):
+            z = h + x * d
+            exact = (1 + 2 * h**3 / z**3) * d / (D - h**3 / D**2)
+            assert f(x) == pytest.approx(exact, rel=1e-9)
+
+    @pytest.mark.parametrize(
+        "fd",
+        [
+            FieldDistribution("uniform"),
+            FieldDistribution("sphere-plane", 50e-3),
+            FieldDistribution("sphere-sphere", 50e-3),
+            FieldDistribution("hyperboloid-plane", tip_R=5e-3),
+            FieldDistribution("coaxial", coax_a=5e-3, coax_b=20e-3),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "pr",
+        [
+            Spheroid(0.5e-3, base_radius=0.5e-3),
+            Spheroid(1e-3, base_radius=0.05e-3),
+            Spheroid(0.2e-3, base_radius=1e-3),
+            Cone(1e-3, radius=0.02e-3, half_angle=20.0),
+            Rod(1e-3, radius=0.05e-3),
+        ],
+        ids=["hemisphere", "needle", "bump", "cone", "rod"],
+    )
+    def test_normalised_and_decreasing(self, fd, pr):
+        """F48: ∫f = 1 (the voltage is kept), and f falls away from the tip."""
+        fd = dataclasses.replace(fd, protrusion=pr)
+        f = fd.build(fd.fixed_gap_length or 10e-3)
+        assert _quad_integral(f) == pytest.approx(1.0, rel=1e-8)
+        if fd.field_type != "sphere-sphere":
+            assert fd.is_monotone_decreasing
+            v = np.array([f(x) for x in np.linspace(0.0, 1.0, 400)])
+            assert np.all(np.diff(v) < 0.0)
+
+    @pytest.mark.parametrize(
+        "fd",
+        [
+            FieldDistribution("uniform"),
+            FieldDistribution("sphere-plane", 50e-3),
+            FieldDistribution("hyperboloid-plane", tip_R=5e-3),
+        ],
+    )
+    def test_a_vanishing_protrusion_leaves_the_background(self, fd):
+        """
+        F49: h → 0 gives back the electrodes alone, away from the tip.
+
+        At the tip itself the enhancement is β however small the protrusion
+        is; it is the region it covers that shrinks.
+        """
+        d = 10e-3
+        ref = fd.build(d)
+        f = _with_protrusion(dataclasses.replace(fd), 1e-9, 1e-9).build(d)
+        for x in np.linspace(0.01, 1.0, 11):
+            assert f(x) == pytest.approx(ref(x), rel=1e-6)
+
+    def test_gap_is_measured_from_the_tip(self):
+        """F50: fixed geometries lose h; the background is read from the tip."""
+        a, b, h = 5e-3, 20e-3, self.H
+        fd = _with_protrusion(FieldDistribution("coaxial", coax_a=a, coax_b=b), h, h)
+        assert fd.fixed_gap_length == pytest.approx(b - a - h)
+        # Far from the tip the enhancement is gone, so f follows 1/r.
+        f = fd.build(fd.fixed_gap_length)
+        r = lambda x: a + h + x * (b - a - h)  # noqa: E731
+        assert f(0.9) / f(1.0) == pytest.approx(r(1.0) / r(0.9), rel=1e-4)
+
+    def test_flags_and_labels(self):
+        """F51: a protrusion breaks the symmetry and is named in the labels."""
+        fd = _with_protrusion(FieldDistribution("uniform"), self.H, self.H)
+        assert not fd.is_symmetric
+        assert fd.polarity_label("negative") == "protrusion=negative"
+        assert "spheroid protrusion h = 0.5 mm" in fd.label
+        sp = _with_protrusion(FieldDistribution("sphere-plane", 5e-3), self.H, self.H)
+        assert sp.polarity_label("positive") == "sphere=positive"
+
+
+class TestProtrusionParsing:
+    def test_spec_is_parsed_in_mm(self):
+        """F52."""
+        fd = parse_field_spec(["uniform"], protrusion=["spheroid", "1", "0.2"])
+        pr = fd.protrusion
+        assert (pr.height, pr.base_radius) == pytest.approx((1e-3, 0.2e-3))
+
+    @pytest.mark.parametrize(
+        "spec, match",
+        [
+            (["pyramid", "1", "1"], "unknown shape"),
+            (["spheroid", "1"], "height and base radius"),
+            (["spheroid", "1", "x"], "must be numbers"),
+            (["rod", "1", "2"], "at least the radius"),
+            (["cone", "1", "0.1", "85"], "half-angle"),
+            (["cone", "1", "0.1"], "tip radius, half-angle"),
+            (["spheroid", "0", "1"], "positive"),
+        ],
+    )
+    def test_bad_specs_are_rejected(self, spec, match):
+        """F53."""
+        with pytest.raises(ValueError, match=match):
+            parse_field_spec(["uniform"], protrusion=spec)
+
+    def test_a_protrusion_filling_the_gap_is_rejected(self):
+        """F54: coaxial b − a = 1 mm cannot hold a 2 mm protrusion."""
+        with pytest.raises(ValueError, match="leaves no gap"):
+            parse_field_spec(["coaxial", "1", "2"], protrusion=["spheroid", "2", "1"])
+
+    def test_notes_on_scale(self, capsys):
+        """F55: h against the electrode radius is reported, not refused."""
+        parse_field_spec(["sphere-plane", "1"], protrusion=["spheroid", "0.5", "0.5"])
+        assert "of the sphere radius" in capsys.readouterr().err
+        parse_field_spec(["sphere-plane", "100"], protrusion=["spheroid", "0.5", "0.5"])
+        assert capsys.readouterr().err == ""
+
+    def test_gap_note(self):
+        """F56: the gap check needs the gap, and is last in the list."""
+        from incept1d.fields import protrusion_notes
+
+        fd = _with_protrusion(FieldDistribution("uniform"), 1e-3, 1e-3)
+        assert protrusion_notes(fd) == []
+        assert "smallest gap" in protrusion_notes(fd, 2e-3)[-1]
+        assert protrusion_notes(fd, 1.0) == []
+
+
+class TestFieldLineReverse:
+    @staticmethod
+    def _line(tmp_path):
+        s = np.linspace(0.0, 10.0, 11)
+        return _write_line(tmp_path / "up.dat", zip(s, 1.0 + 0.3 * s)), s
+
+    def test_reversed_profile_is_the_mirror_image(self, tmp_path):
+        """F57: f_rev(ξ) = f(1 − ξ), same arc length."""
+        path, _ = self._line(tmp_path)
+        fwd = FieldDistribution.from_fieldline(path)
+        rev = FieldDistribution.from_fieldline(path, reverse=True)
+        assert rev.fieldline_length == fwd.fieldline_length
+        f, g = fwd.build(fwd.fieldline_length), rev.build(rev.fieldline_length)
+        for x in np.linspace(0.0, 1.0, 21):
+            assert g(x) == pytest.approx(f(1.0 - x), rel=1e-12)
+        assert "(reversed)" in rev.label
+
+    def test_reverse_applies_to_field_lines_only(self):
+        """F58."""
+        with pytest.raises(ValueError, match="only to"):
+            parse_field_spec(["uniform"], fieldline_reverse=True)
+
+    def test_protrusion_at_the_weak_end_is_pointed_out(self, tmp_path, capsys):
+        """F59: a line rising towards ξ = 1 suggests --fieldline-reverse."""
+        path, _ = self._line(tmp_path)
+        parse_field_spec(["fieldline", path], protrusion=["spheroid", "1", "1"])
+        assert "--fieldline-reverse" in capsys.readouterr().err
+        parse_field_spec(
+            ["fieldline", path],
+            fieldline_reverse=True,
+            protrusion=["spheroid", "1", "1"],
+        )
+        assert "--fieldline-reverse" not in capsys.readouterr().err
+
+
+def test_a_protrusion_on_a_plate_is_not_uniform():
+    """F60: the constant-field shortcut must not swallow the protrusion."""
+    assert FieldDistribution("uniform").is_uniform
+    fd = _with_protrusion(FieldDistribution("uniform"), 1e-3, 1e-3)
+    assert fd.field_type == "uniform" and not fd.is_uniform

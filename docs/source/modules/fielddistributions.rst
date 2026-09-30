@@ -20,7 +20,9 @@ so that the "reference" reduced field :math:`E_\mathrm{ref}/N` used on the
 axes of every plot and output file is always the *mean* field
 :math:`U/d`, whatever the geometry.  :math:`\xi = 0` is the high-field
 electrode (sphere surface, hyperboloid tip, inner conductor, or either plate
-for a uniform field) and :math:`\xi = 1` the low-field side.
+for a uniform field) and :math:`\xi = 1` the low-field side.  Any of these
+electrodes can carry a protrusion (``--protrusion``, see `Protrusions`_) on
+the :math:`\xi = 0` side.
 
 Geometries
 ----------
@@ -146,12 +148,187 @@ and reports against :math:`p`, ``--p`` is refused, and a ``--d`` other than
 :math:`b - a` solves the arrangement scaled by :math:`d/(b-a)` and says so.
 :ref:`Chap:Examples:Coaxial` works through a wire in a cylinder.
 
+Protrusions
+-----------
+
+A surface defect — a burr, a particle, a scratch edge — enhances the field
+locally and can move inception well below the value for a smooth
+electrode.  ``--protrusion`` puts a conducting, axisymmetric protrusion
+of height :math:`h` on the :math:`\xi = 0` electrode of any ``--field``
+geometry, on the axis.  Three shapes are available (lengths in mm):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - ``--protrusion``
+     - Shape
+   * - ``spheroid H B``
+     - Half-spheroid of base radius :math:`b`: a needle (:math:`h > b`),
+       a hemispherical boss (:math:`h = b`) or a flat bump
+       (:math:`h < b`).  Closed form, see `Spheroid`_.
+   * - ``cone H R ANGLE``
+     - Cone of half-angle :math:`\theta` (degrees, 5 to 80) whose apex
+       is rounded by a sphere of radius :math:`r` tangent to it: a burr or
+       a sharp asperity.  See `Cone and rod`_.
+   * - ``rod H R``
+     - Cylinder of radius :math:`R` with a hemispherical cap
+       (:math:`h \ge R`): a whisker, a fibre or a wire end.  See
+       `Cone and rod`_.
+
+Near its tip every smooth protrusion looks like a paraboloid of the tip
+radius of curvature, and the field falls from :math:`\beta E_0` over a
+distance of that order whatever the shape.  The shapes differ in how far
+the enhancement reaches beyond that, out to distances of order :math:`h`
+— and since the criterion integrates the ionization along the gap, that
+tail can matter as much as :math:`\beta`.  A spheroid is the natural
+choice when the tip radius and height are what is known; a cone when the
+opening angle is; a rod for a slender body of constant thickness.
+
+Spheroid
+........
+
+A half-spheroid on a grounded plane in a uniform field :math:`E_0` is,
+with its mirror image, a whole spheroid in a uniform field, and the
+potential is known in closed form in spheroidal coordinates with focal
+distance :math:`c = \sqrt{|h^2 - b^2|}`.  On the axis, at height
+:math:`z \ge h` above the plane,
+
+.. math::
+   :label: eq_spheroid_axial
+
+   \frac{E(z)}{E_0} = 1 + \frac{N(z)}{D}, \qquad
+   D = \sum_{k \ge 1} \frac{\tau^{k-1}}{2k + 1}, \qquad
+   N = w^3 \sum_{k \ge 1} \frac{2k}{2k + 1}\,(\tau w^2)^{k-1},
+
+with :math:`\tau = (h^2 - b^2)/h^2` and :math:`w = h/z`.  The one expression
+holds for prolate (:math:`\tau > 0`), spherical (:math:`\tau = 0`) and
+oblate (:math:`\tau < 0`) shapes; where the series converge slowly they are
+summed in closed form through the Legendre function of the second kind,
+:math:`Q_1(x) = x \operatorname{artanh}(1/x) - 1` (prolate) or
+:math:`1 - x \operatorname{arccot} x` (oblate).  At the tip this is the
+field-enhancement factor,
+
+.. math::
+
+   \beta = \frac{1}{(\xi_0^2 - 1)\,\big(\xi_0 \operatorname{artanh}(1/\xi_0) - 1\big)},
+   \qquad \xi_0 = \frac{h}{c},
+
+which is :math:`3` for a hemisphere — where :eq:`eq_spheroid_axial` is
+:math:`1 + 2h^3/z^3` —, grows as :math:`(h/b)^2 / (\ln(2h/b) - 1)` for a
+needle, and tends to :math:`1` for a flat disc.  The enhancement is
+confined to a few tip radii of curvature :math:`b^2/h` and a few heights
+:math:`h` from the tip.  ``incept1d field`` prints :math:`\beta` and
+the tip radius :math:`b^2/h` for every shape.
+
+Cone and rod
+............
+
+Neither shape has a closed form, so its enhancement is computed once, when
+the options are read, with the charge simulation method
+[Singer1974]_.  Ring charges :math:`q_j` of radius :math:`a_j` at height
+:math:`z_j` are placed just inside the surface, each with its negative
+image in the plane; a ring of unit charge has the potential
+
+.. math::
+
+   \Phi(\rho, z; a, z_j) = \frac{2}{\pi}\,
+   \frac{K(m)}{\sqrt{(\rho + a)^2 + (z - z_j)^2}}, \qquad
+   m = \frac{4 a \rho}{(\rho + a)^2 + (z - z_j)^2},
+
+in units where :math:`4\pi\varepsilon_0 = 1`, with :math:`K` the complete
+elliptic integral of the first kind (a point charge at the apex, where
+:math:`a = 0`).  The strengths make the surface an equipotential at one
+collocation point per charge,
+
+.. math::
+
+   \sum_j q_j \big[\Phi(\rho_i, z_i; a_j, z_j) - \Phi(\rho_i, z_i; a_j, -z_j)\big]
+   = E_0 z_i,
+
+which cancels the applied potential :math:`-E_0 z` there, and the axial
+field follows from the charges in closed form.  The collocation points are
+spaced by a fraction of the local length scale — the tip radius at the
+apex, the body radius along the flank, the height above the plane near
+the base, where the protrusion meets its image — so that the number of
+charges grows only logarithmically with :math:`h` for a cone and linearly
+with :math:`h/R` for a rod.
+
+The solution is checked halfway between collocation points, where it is
+least accurate: a surface potential above :math:`2\times10^{-3}` of the
+applied one is an error, not a result.  Over the accepted range —
+half-angles from 5° to 80° and :math:`h/r \le 10^5` for a cone,
+:math:`h/R \le 1000` for a rod — halving the spacing changes the axial
+field by less than :math:`10^{-3}`, and the method reproduces what is known
+in closed form:
+
+* A rod of height :math:`R` is a hemisphere, and matches
+  :math:`1 + 2R^3/z^3`;
+* Between the tip radius and the height, the field of a cone falls as
+  :math:`s^{\nu - 1}`, with :math:`\nu` the root of
+  :math:`P_\nu(-\cos\theta) = 0` that describes the field near the
+  apex of a sharp cone;
+* The rod's :math:`\beta` agrees with the fit
+  :math:`1.2\,(h/R + 2.15)^{0.9}` of [EdgcombeValdre2001]_ within its
+  few-percent accuracy.
+
+The gap and the voltage
+.......................
+
+With a protrusion, :math:`d` is the gap **from its tip** to the other
+electrode, so the electrode surface is at :math:`D = d + h`.  The profile
+is the background profile of the electrodes alone, built for :math:`D` and
+read from the tip onwards, times the enhancement
+:eq:`eq_spheroid_axial`, and normalised again over the tip-to-electrode
+path,
+
+.. math::
+
+   f(\xi) = \frac{f_\mathrm{bg}\big((h + \xi d)/D\big)\,
+   E(h + \xi d)/E_0}{\int_0^1 f_\mathrm{bg}\big((h + \xi' d)/D\big)\,
+   E(h + \xi' d)/E_0 \, d\xi'} .
+
+The renormalisation is what keeps :math:`\int E\,dx = U`: the protrusion
+concentrates the same voltage into a stronger field at its tip and a
+slightly weaker one elsewhere, and the reference field :math:`U/d` of every
+output stays the mean field along the tip-to-electrode path.  Where the
+geometry fixes the gap (coaxial cylinders, a tabulated field line), the gap
+is that length less :math:`h`.
+
+Validity
+........
+
+The profile is exact for a protrusion on a plate in a uniform field (to
+the accuracy of the charge simulation for a cone or a rod), but for one
+thing: the closed form assumes nothing above the protrusion, so
+the other electrode is an equipotential only up to the protrusion's
+dipole field, a relative error of order :math:`(h/d)^3`.  On a curved
+electrode the enhancement is superposed on the background, which needs
+:math:`h` small against the length over which the background varies: the
+sphere radius :math:`R`, the tip radius :math:`r`, the inner radius
+:math:`a`, or, for a tabulated line, :math:`f/|df/ds|` near its start.
+The commands print a ``note:`` on stderr when :math:`h` exceeds a tenth of
+any of these (the gap check uses the smallest gap of the sweep), and
+compute anyway.
+
+A protrusion is also where the 1-D model is most stretched.  The ionization
+region shrinks towards the size of the tip, over which the real field lines
+fan out and photons escape sideways; both are neglected (see
+`Limitations`_), and increasingly so as :math:`h/b` grows.
+
+For a tabulated field line, the protrusion sits on the first point.  If the
+line is stronger at its last point, the command says so and suggests
+``--fieldline-reverse`` (see `Polarity`_).  A line exported from a model
+that already contains the protrusion must not be given ``--protrusion``
+too: that counts the enhancement twice.
+
 The ``FieldDistribution`` class
 -------------------------------
 
 :class:`~incept1d.fields.FieldDistribution` is a small dataclass holding the
 geometry type and, where applicable, the sphere radius or the tabulated
-profile.  :meth:`~incept1d.fields.FieldDistribution.build` turns that static
+profile, and the protrusion if there is one.
+:meth:`~incept1d.fields.FieldDistribution.build` turns that static
 description into the callable :math:`f(\xi)` for a specific gap length.
 
 
@@ -252,8 +429,11 @@ Polarity
 The file does not say which end is the anode.  ``incept1d pdiv`` and
 ``incept1d growth`` evaluate both polarities and labels them ``start=positive`` (the first tabulated
 point is the anode) and ``start=negative`` (the first point is the
-cathode).  Use the one that matches your electrode arrangement, or export
-the line in the direction that makes ``start`` the electrode of interest.
+cathode).  Use the one that matches your electrode arrangement.
+
+``--fieldline-reverse`` reads the rows last to first, which makes the last
+tabulated point :math:`\xi = 0` and ``start`` without editing the file.
+That matters for ``--protrusion``, which always sits at :math:`\xi = 0`.
 
 Sweeps
 ~~~~~~
@@ -324,6 +504,8 @@ field-line file before using it in a solve.
    incept1d field --field hyperboloid-plane 0.1 --d 20
    incept1d field --field coaxial 1 10
    incept1d field --field fieldline line.csv mm
+   incept1d field --field uniform --d 10 --protrusion spheroid 0.5 0.1
+   incept1d field --field uniform --d 10 --protrusion cone 0.5 0.01 20
 
 API reference
 -------------
@@ -333,3 +515,7 @@ API reference
    :undoc-members:
    :private-members: _sphere_sphere_axial_field, _hyperboloid_plane_field,
       _coaxial_field
+
+.. automodule:: incept1d.protrusions
+   :members:
+   :private-members: _spheroid_axial_field, _csm_solve, _ring_potential

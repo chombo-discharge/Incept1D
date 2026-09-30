@@ -8,7 +8,9 @@ Gap geometry: the normalised field profile f(ξ) on ξ ∈ [0, 1].
 Everything downstream of this module sees a gap only through f, normalised
 so that ∫f dξ = 1, so the geometry — uniform, sphere-plane, sphere-sphere,
 hyperboloid-plane, coaxial cylinders, or a tabulated field line — is
-invisible to the solvers.
+invisible to the solvers.  A protrusion on the ξ = 0 electrode
+(``--protrusion``) multiplies the profile by its on-axis enhancement and
+normalises it again, so the applied voltage is unchanged.
 :class:`FieldDistribution` is the geometry itself, independent of gap
 length; :meth:`FieldDistribution.build` turns it into f for a specific
 gap.  :func:`add_field_argument` and :func:`parse_field_spec` implement
@@ -21,9 +23,13 @@ import argparse
 import dataclasses
 import math
 import os
+import sys
 from typing import Callable, Optional
 
 import numpy as np
+from scipy.integrate import quad
+
+from incept1d.protrusions import Protrusion, parse_protrusion_spec
 
 # ── Bispherical image-charge series ──────────────────────────────────────────
 
@@ -98,6 +104,14 @@ def _hyperboloid_plane_field(xi, k):
         return 1.0
     u = k * (1.0 - xi)
     return k / ((1.0 - u * u) * math.atanh(k))
+
+
+# ── Protrusions ──────────────────────────────────────────────────────────────
+
+#: A protrusion taller than this fraction of a length scale of the gap it sits
+#: in (electrode radius, gap length, ...) is outside the validity of the
+#: superposition in :meth:`FieldDistribution.build`; the commands say so.
+PROTRUSION_SCALE_LIMIT = 0.1
 
 
 # ── Tabulated field line ──────────────────────────────────────────────────────
@@ -267,6 +281,12 @@ class FieldDistribution:
         inception voltage is reported relative to.
     fieldline_path : str or None
         For 'fieldline': source file (for labels / output headers).
+    fieldline_reversed : bool
+        For 'fieldline': the rows were read last to first, so that ξ = 0 is
+        the last tabulated point.
+    protrusion : Protrusion or None
+        A protrusion on the ξ = 0 electrode (:mod:`incept1d.protrusions`),
+        or None for a smooth electrode.
     """
 
     field_type: str
@@ -281,9 +301,11 @@ class FieldDistribution:
     fieldline_integral: Optional[float] = None
     fieldline_applied_voltage: Optional[float] = None
     fieldline_path: Optional[str] = None
+    fieldline_reversed: bool = False
+    protrusion: Optional[Protrusion] = None
 
     @classmethod
-    def from_fieldline(cls, path, length_unit="m"):
+    def from_fieldline(cls, path, length_unit="m", reverse=False):
         """
         Build a 'fieldline' distribution from a tabulated ``|E|(s)`` file.
 
@@ -293,10 +315,16 @@ class FieldDistribution:
         absolute scale of the tabulated field therefore drops out: the same
         line exported at 100 kV and at 200 kV gives identical results.
 
+        With *reverse* the rows are read last to first, so that ξ = 0 is the
+        last tabulated point: the way to put the electrode of interest at
+        ξ = 0 without editing the file.
+
         See :func:`load_fieldline` for the accepted file layouts.
         """
         s, E, reading = load_fieldline(path, length_unit)
         L = float(s[-1])
+        if reverse:
+            s, E = L - s[::-1], E[::-1]
         xi = s / L
         _trapz = getattr(np, "trapezoid", None) or np.trapz  # numpy ≥2.0 / <2.0
         mean_E = float(_trapz(E, xi))
@@ -309,7 +337,19 @@ class FieldDistribution:
             # ∫|E| ds = L ∫|E| dξ = L ⟨|E|⟩, in the field units of the file.
             fieldline_integral=mean_E * L,
             fieldline_path=path,
+            fieldline_reversed=reverse,
         )
+
+    @property
+    def is_uniform(self) -> bool:
+        """
+        True when f ≡ 1: a uniform gap without a protrusion.
+
+        The solvers take a constant-field shortcut on this, so test it
+        rather than ``field_type == 'uniform'``, which a protrusion on a
+        plate also has.
+        """
+        return self.field_type == "uniform" and self.protrusion is None
 
     @property
     def is_symmetric(self) -> bool:
@@ -320,6 +360,8 @@ class FieldDistribution:
         polarities give the same answer also depends on the electrode
         surfaces; see :func:`incept1d.solver.polarities_equivalent`.
         """
+        if self.protrusion is not None:
+            return False
         return self.field_type in ("uniform", "sphere-sphere")
 
     def polarity_label(self, polarity: str) -> str:
@@ -327,9 +369,11 @@ class FieldDistribution:
         Name *polarity* (``"positive"`` or ``"negative"``) for this geometry.
 
         Says which electrode is the anode in positive polarity: the sphere,
-        the hyperboloid tip, the inner conductor, or the first tabulated
-        point.
+        the hyperboloid tip, the inner conductor, the first tabulated
+        point, or, on a uniform field, the electrode with the protrusion.
         """
+        if self.field_type == "uniform" and self.protrusion is not None:
+            return f"protrusion={polarity}"
         if self.field_type == "uniform":
             return polarity
         if self.field_type == "fieldline":
@@ -348,8 +392,9 @@ class FieldDistribution:
         Sphere-plane, hyperboloid-plane, coaxial (and trivially uniform)
         profiles have this property;
         sphere-sphere has maxima at both ends, and a tabulated field line may
-        have any shape.  Used by quadrature helpers that would otherwise
-        assume a single active region starting at ξ = 0.
+        have any shape.  A protrusion keeps it, since its enhancement also
+        falls monotonically away from the tip.  Used by quadrature helpers
+        that would otherwise assume a single active region starting at ξ = 0.
         """
         return self.field_type in (
             "uniform",
@@ -365,22 +410,33 @@ class FieldDistribution:
 
         A tabulated field line is pinned at its arc length, and a coaxial
         arrangement at ``b − a``.  For these a pd sweep is a pressure sweep,
-        since any other d is the arrangement at a different size.
+        since any other d is the arrangement at a different size.  A
+        protrusion shortens the gap by its height, since d is measured from
+        its tip.
         """
         if self.field_type == "fieldline":
-            return self.fieldline_length
-        if self.field_type == "coaxial":
-            return self.coax_b - self.coax_a
-        return None
+            D = self.fieldline_length
+        elif self.field_type == "coaxial":
+            D = self.coax_b - self.coax_a
+        else:
+            return None
+        return D - (self.protrusion.height if self.protrusion else 0.0)
 
     @property
     def label(self) -> str:
         """Human-readable description for plot titles and file headers."""
+        if self.protrusion is None:
+            return self._background_label
+        return f"{self._background_label}, {self.protrusion.label}"
+
+    @property
+    def _background_label(self) -> str:
         if self.field_type == "uniform":
             return "uniform field"
         if self.field_type == "fieldline":
+            rev = " (reversed)" if self.fieldline_reversed else ""
             return (
-                f"field line {os.path.basename(self.fieldline_path)}, "
+                f"field line {os.path.basename(self.fieldline_path)}{rev}, "
                 f"L = {self.fieldline_length * 1e3:.4g} mm"
             )
         if self.field_type == "coaxial":
@@ -400,7 +456,8 @@ class FieldDistribution:
         Parameters
         ----------
         d : float
-            Gap length in metres.
+            Gap length in metres: from the ξ = 0 electrode, or from the tip
+            of its protrusion, to the other electrode.
 
         Returns
         -------
@@ -410,7 +467,54 @@ class FieldDistribution:
             linearly interpolated and, like the coaxial profile, does not
             depend on d, since f is invariant under a geometric rescaling
             of the arrangement.
+
+        Notes
+        -----
+        With a protrusion of height h the electrode surface is at
+        D = d + h from the other electrode.  The profile is the background
+        built for D, read from the tip onwards, times the protrusion's
+        on-axis enhancement :meth:`Protrusion.enhancement`, and normalised
+        again over the tip-to-electrode path — which keeps ∫E dx equal to
+        the applied voltage.  That is exact on a uniform background and a
+        local approximation on a curved one.
         """
+        if self.protrusion is None:
+            return self._background(d)
+
+        pr = self.protrusion
+        h = pr.height
+        D = d + h
+        f_bg = self._background(D)
+        g = pr.enhancement
+
+        def raw(xi, _d=d, _h=h, _D=D):
+            s = xi * _d
+            return f_bg((_h + s) / _D) * g(s)
+
+        # The enhancement varies on the tip radius of curvature and on h;
+        # break the quadrature at a few multiples of each.
+        rho = pr.tip_radius
+        breaks = sorted(
+            {
+                x / d
+                for L in (rho, h)
+                for x in (0.1 * L, L, 10.0 * L, 100.0 * L)
+                if 0.0 < x < d
+            }
+        )
+        edges = [0.0, *breaks, 1.0]
+        norm = sum(
+            quad(raw, a0, a1, epsabs=0.0, epsrel=1e-11, limit=500)[0]
+            for a0, a1 in zip(edges[:-1], edges[1:])
+        )
+
+        def f_pr(xi, _norm=norm):
+            return raw(xi) / _norm
+
+        return f_pr
+
+    def _background(self, d: float) -> Callable[[float], float]:
+        """The profile of the electrodes alone, normalised over the gap d."""
         if self.field_type == "uniform":
             return lambda xi: 1.0
 
@@ -496,10 +600,148 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
             "field units of the file are unknown."
         ),
     )
+    parser.add_argument(
+        "--fieldline-reverse",
+        action="store_true",
+        default=False,
+        help=(
+            "Read a tabulated field line last row first, so that xi = 0 (the "
+            "electrode a --protrusion sits on, and 'start' in the polarity "
+            "labels) is the last tabulated point."
+        ),
+    )
+    parser.add_argument(
+        "--protrusion",
+        nargs="+",
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Protrusion on the xi = 0 electrode.  'spheroid H_mm B_mm': a "
+            "half-spheroid of height H_mm and base radius B_mm (needle for "
+            "H > B, hemisphere for H = B, flat bump for H < B).  "
+            "'cone H_mm R_mm ANGLE_deg': a cone of half-angle ANGLE_deg "
+            "with its apex rounded to radius R_mm.  'rod H_mm R_mm': a "
+            "cylinder of radius R_mm with a hemispherical cap.  The gap d "
+            "is then measured from its tip, and the profile is renormalised "
+            "so that the voltage is unchanged.  Exact on a uniform field; "
+            "on a curved electrode it needs H small against the radius, "
+            "which the command checks."
+        ),
+    )
+
+
+def field_from_args(args, parser=None) -> "FieldDistribution":
+    """
+    The :class:`FieldDistribution` described by the options that
+    :func:`add_field_argument` registers, with its notes printed.
+    """
+    return parse_field_spec(
+        args.field,
+        parser,
+        applied_voltage_kv=args.fieldline_voltage,
+        fieldline_reverse=args.fieldline_reverse,
+        protrusion=args.protrusion,
+    )
+
+
+def _fieldline_scale(fd):
+    """
+    Length over which a tabulated profile changes near ξ = 0, f/|df/ds|.
+
+    The slope is a least-squares fit through the first few points, so a
+    single noisy sample does not decide it.  Infinite for a flat start.
+    """
+    n = min(5, len(fd.fieldline_xi))
+    s = fd.fieldline_xi[:n] * fd.fieldline_length
+    slope = np.polyfit(s, fd.fieldline_f[:n], 1)[0]
+    if slope == 0.0:
+        return math.inf
+    return float(fd.fieldline_f[0] / abs(slope))
+
+
+def protrusion_notes(fd, d_min=None) -> list:
+    """
+    Say where a protrusion is outside the validity of its model.
+
+    The superposition in :meth:`FieldDistribution.build` needs the
+    protrusion small against the length scale of the electrode it sits on
+    (sphere radius, tip radius, inner radius, or the scale over which a
+    tabulated field changes) and against the gap, since the closed form
+    leaves the other electrode an equipotential only to O((h/d)³).  A field
+    line that is stronger at its far end probably has the protrusion on the
+    wrong electrode.
+
+    Parameters
+    ----------
+    fd : FieldDistribution
+    d_min : float or None
+        Smallest gap length (m) the run uses; None skips the gap check.
+
+    Returns
+    -------
+    list of str
+        One sentence per concern; empty when there is none or no protrusion.
+    """
+    if fd.protrusion is None:
+        return []
+    h = fd.protrusion.height
+    notes = []
+    scale = None
+    if fd.field_type in ("sphere-plane", "sphere-sphere"):
+        scale, what = fd.sphere_R, "the sphere radius R"
+    elif fd.field_type == "hyperboloid-plane":
+        scale, what = fd.tip_R, "the tip radius r"
+    elif fd.field_type == "coaxial":
+        scale, what = fd.coax_a, "the inner radius a"
+    elif fd.field_type == "fieldline":
+        scale = _fieldline_scale(fd)
+        what = "the length f/|df/ds| over which the tabulated field changes"
+        if fd.fieldline_f[-1] > fd.fieldline_f[0]:
+            notes.append(
+                "the field line is stronger at its last point than at its "
+                "first, but the protrusion sits on the first (xi = 0); pass "
+                "--fieldline-reverse if it belongs on the other electrode"
+            )
+    if scale is not None and h > PROTRUSION_SCALE_LIMIT * scale:
+        notes.append(
+            f"protrusion height h = {h * 1e3:.4g} mm is {h / scale:.3g} of "
+            f"{what} = {scale * 1e3:.4g} mm; the enhancement is superposed on "
+            f"the background field, which is accurate only for h/scale below "
+            f"about {PROTRUSION_SCALE_LIMIT:g}"
+        )
+    if d_min is not None and h > PROTRUSION_SCALE_LIMIT * d_min:
+        notes.append(
+            f"protrusion height h = {h * 1e3:.4g} mm is {h / d_min:.3g} of the "
+            f"smallest gap d = {d_min * 1e3:.4g} mm; the closed form leaves the "
+            f"other electrode an equipotential only to O((h/d)^3), accurate "
+            f"for h/d below about {PROTRUSION_SCALE_LIMIT:g}"
+        )
+    return notes
+
+
+def print_protrusion_notes(fd, d_min=None, gap_only=False) -> None:
+    """
+    Print :func:`protrusion_notes` to stderr, one ``note:`` line each.
+
+    :func:`parse_field_spec` prints the notes on the geometry, and on the gap
+    where the geometry fixes it; a command that chooses the gap itself calls
+    this with its smallest gap and *gap_only* once it knows it.
+    """
+    if gap_only and (fd.protrusion is None or fd.fixed_gap_length):
+        return
+    notes = protrusion_notes(fd, d_min)
+    if gap_only:  # the gap note comes last, after the geometry ones
+        notes = notes[len(protrusion_notes(fd)) :]
+    for note in notes:
+        print(f"note: {note}.", file=sys.stderr)
 
 
 def parse_field_spec(
-    spec: list, parser=None, applied_voltage_kv=None
+    spec: list,
+    parser=None,
+    applied_voltage_kv=None,
+    fieldline_reverse=False,
+    protrusion=None,
 ) -> "FieldDistribution":
     """
     Parse a --field token list into a FieldDistribution.
@@ -515,6 +757,13 @@ def parse_field_spec(
         Value of ``--fieldline-voltage``.  Meaningful only for a tabulated
         field line; supplying it for any other geometry is an error, since
         there the voltage is an output rather than a property of the input.
+    fieldline_reverse : bool
+        Value of ``--fieldline-reverse``; a tabulated field line only.
+    protrusion : list of str or None
+        The raw ``--protrusion`` tokens (e.g. ['spheroid', '0.5', '0.1']).
+        Where the geometry fixes the gap, the notes of
+        :func:`protrusion_notes` are printed here; elsewhere the gap is not
+        known yet and the caller prints them with its smallest gap.
 
     Returns
     -------
@@ -526,12 +775,35 @@ def parse_field_spec(
             parser.error(msg)
         raise ValueError(msg)
 
+    fd = _parse_background(spec, _err, applied_voltage_kv, fieldline_reverse)
+    if protrusion is None:
+        return fd
+
+    try:
+        fd.protrusion = parse_protrusion_spec(protrusion)
+    except ValueError as exc:
+        _err(f"--protrusion: {exc}")
+    h = fd.protrusion.height
+    fixed = fd.fixed_gap_length
+    if fixed is not None and fixed <= 0.0:
+        _err(
+            f"--protrusion: height {h * 1e3:.4g} mm leaves no gap in the "
+            f"{fd.field_type} geometry ({(fixed + h) * 1e3:.4g} mm)"
+        )
+    print_protrusion_notes(fd, fixed)
+    return fd
+
+
+def _parse_background(spec, _err, applied_voltage_kv, fieldline_reverse):
+    """The electrodes alone, from the ``--field`` tokens."""
     field_type = spec[0]
     if applied_voltage_kv is not None and field_type != "fieldline":
         _err(
             "--fieldline-voltage applies only to '--field fieldline'; for "
             "every other geometry the voltage is a result, not an input"
         )
+    if fieldline_reverse and field_type != "fieldline":
+        _err("--fieldline-reverse applies only to '--field fieldline'")
     if field_type == "uniform":
         return FieldDistribution(field_type="uniform")
 
@@ -570,7 +842,7 @@ def parse_field_spec(
             _err("--field fieldline requires a data file path")
         unit = spec[2] if len(spec) > 2 else "m"
         try:
-            fd = FieldDistribution.from_fieldline(spec[1], unit)
+            fd = FieldDistribution.from_fieldline(spec[1], unit, fieldline_reverse)
         except (OSError, ValueError) as exc:
             _err(f"--field fieldline: {exc}")
         if applied_voltage_kv is not None:

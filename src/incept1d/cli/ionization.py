@@ -16,7 +16,12 @@ import os
 import numpy as np
 
 from incept1d.constants import kB as _kB
-from incept1d.fields import FieldDistribution, add_field_argument, parse_field_spec
+from incept1d.fields import (
+    FieldDistribution,
+    add_field_argument,
+    field_from_args,
+    print_protrusion_notes,
+)
 from incept1d.ionization import aed_integral, eig_integral
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.output import write_metadata_header
@@ -219,9 +224,9 @@ def run(args, parser):
             parser.error("--voltage-hi must be greater than --voltage-lo.")
 
     # ---- Field specification --------------------------------------------
-    _field_dist = parse_field_spec(
-        args.field, parser, applied_voltage_kv=args.fieldline_voltage
-    )
+    _field_dist = field_from_args(args, parser)
+    if args.d:
+        print_protrusion_notes(_field_dist, min(args.d) * 1e-3, gap_only=True)
     _N = args.N
     _field_str = _field_dist.label
 
@@ -634,7 +639,7 @@ def _write_results(
         fh.write(
             f"# Configs:     {', '.join(d.get('label', 'Baseline') for d in raw_dicts)}\n"
         )
-        fh.write(f"# Field type:  {field_dist.field_type}\n")
+        fh.write(f"# Field type:  {field_dist.label}\n")
         if field_dist.sphere_R is not None:
             fh.write(f"# Sphere R:    {field_dist.sphere_R*1e3:.4g} mm,  N = {N}\n")
         if field_dist.tip_R is not None:

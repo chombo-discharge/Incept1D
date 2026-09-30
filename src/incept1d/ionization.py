@@ -39,7 +39,7 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
         Number of midpoint-rule integration steps.
     """
     try:
-        if field_dist.field_type == "uniform":
+        if field_dist.is_uniform:
             val = (mod.alpha(EN_ref, p_val, T) - mod.eta(EN_ref, p_val, T)) * d_val
             result = max(0.0, float(val))
             return result if np.isfinite(result) else float("nan")
@@ -177,7 +177,7 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
         Number of midpoint-rule integration steps.
     """
     try:
-        if field_dist.field_type == "uniform":
+        if field_dist.is_uniform:
             val = _max_real_eigenvalue(mod, EN_ref, p_val, T) * d_val
             result = max(0.0, float(val))
             return result if np.isfinite(result) else float("nan")

@@ -21,7 +21,11 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
 from incept1d.constants import kB as _kB
-from incept1d.fields import add_field_argument, parse_field_spec
+from incept1d.fields import (
+    add_field_argument,
+    field_from_args,
+    print_protrusion_notes,
+)
 from incept1d.growth import solve_voltage, voltage_sweep
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
@@ -321,9 +325,7 @@ def run(args, parser):
     if args.n_voltages < 2:
         parser.error("--n-voltages must be >= 2")
 
-    _field_dist = parse_field_spec(
-        args.field, parser, applied_voltage_kv=args.fieldline_voltage
-    )
+    _field_dist = field_from_args(args, parser)
     _N_min, _N_max, _tol = parse_dx_spec(args.dx, parser)
     _propagator = (
         midpoint_propagator if args.method == "midpoint" else magnus2_propagator
@@ -339,6 +341,8 @@ def run(args, parser):
     fixed = _field_dist.fixed_gap_length
     if fixed is not None:
         why = "b - a" if _field_dist.field_type == "coaxial" else "its arc length"
+        if _field_dist.protrusion is not None:
+            why += ", less the protrusion height"
         given = (
             _parse_values(args.distance, "--distance", parser) if args.distance else []
         )
@@ -354,6 +358,7 @@ def run(args, parser):
         parser.error(f"--distance is required for --field {_field_dist.field_type}")
     else:
         distances = _parse_values(args.distance, "--distance", parser)
+    print_protrusion_notes(_field_dist, min(distances) * 1e-3, gap_only=True)
     # Every pressure with every distance.
     cases = [(p, d) for p in pressures for d in distances]
     args.pressures, args.distances = pressures, distances

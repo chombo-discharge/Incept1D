@@ -29,7 +29,8 @@ from incept1d.constants import kB as _kB
 from incept1d.fields import (
     FieldDistribution,
     add_field_argument,
-    parse_field_spec,
+    field_from_args,
+    print_protrusion_notes,
 )
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.solver import (
@@ -310,9 +311,7 @@ def run(args, parser):
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
-    _field_dist = parse_field_spec(
-        args.field, parser, applied_voltage_kv=args.fieldline_voltage
-    )
+    _field_dist = field_from_args(args, parser)
 
     # A tabulated field line (arc length) and a coaxial arrangement (b - a)
     # are one geometry at one size: the geometry fixes the gap, and the
@@ -333,6 +332,8 @@ def run(args, parser):
                 if _field_dist.field_type == "fieldline"
                 else "outer minus inner radius"
             )
+            if _field_dist.protrusion is not None:
+                _why += ", less the protrusion height"
             print(
                 f"--field {_field_dist.field_type}: no --p/--d given, using "
                 f"d = L = {args.d[0]:.4g} mm ({_why})."
@@ -446,6 +447,11 @@ def run(args, parser):
                     mod,
                 )
             )
+
+    if curve_specs:
+        print_protrusion_notes(
+            _field_dist, min(float(np.min(c[2])) for c in curve_specs), gap_only=True
+        )
 
     # Compute alpha=eta crossover E/N from the first config's module (for annotation).
     _en_cross = {}
@@ -620,7 +626,7 @@ def run(args, parser):
         # A symmetric field with identical electrodes needs one solve; per-
         # polarity overrides make the cathodes differ even in a uniform gap.
         same_polarity = polarities_equivalent(mod, _field_dist)
-        if _field_dist.field_type == "uniform":
+        if _field_dist.is_uniform:
             det_pos, det_neg = (
                 functools.partial(
                     _criterion,
@@ -1083,6 +1089,12 @@ def run(args, parser):
             fh.write(
                 f"# Stepping:    N_min={_N_min}, N_max={_N_max}, tol={_dx_tol:.3g}\n"
             )
+            if _field_dist.protrusion is not None:
+                fh.write(
+                    f"# Protrusion:  {_field_dist.protrusion.label}, on the "
+                    f"xi = 0 electrode; beta = {_field_dist.protrusion.beta:.6g}; "
+                    f"d is measured from its tip\n"
+                )
             if _field_dist.sphere_R is not None:
                 fh.write(f"# Sphere R:    {_field_dist.sphere_R*1e3:.4g} mm\n")
             if _field_dist.field_type == "sphere-plane":
@@ -1106,7 +1118,8 @@ def run(args, parser):
                     "(+),  inner=negative → inner conductor is cathode (−)\n"
                 )
             if _field_dist.field_type == "fieldline":
-                fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
+                _rev = " (read reversed)" if _field_dist.fieldline_reversed else ""
+                fh.write(f"# Field line:  {_field_dist.fieldline_path}{_rev}\n")
                 fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
                 fh.write(
                     f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "

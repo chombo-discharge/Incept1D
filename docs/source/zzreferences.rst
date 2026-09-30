@@ -26,6 +26,10 @@ Works cited in this documentation:
    H. Winkelnkemper, *Breakdown of gases in uniform fields: Paschen curves
    for nitrogen, air and sulfur hexafluoride*, ELECTRA **32**, 61–82 (1974).
 
+.. [EdgcombeValdre2001] C. J. Edgcombe and U. Valdrè, *Microscopy and
+   computational modelling to elucidate the enhancement factor for field
+   electron emitters*, J. Microsc. **203**, 188–194 (2001).
+
 .. [Ferreira2019] N. G. C. Ferreira, D. F. N. Santos, P. G. C. Almeida,
    G. V. Naidis and M. S. Benilov, *Simulation of pre-breakdown discharges
    in high-pressure air. I: The model and its application to corona
@@ -91,6 +95,10 @@ Works cited in this documentation:
    attachment of e- + N2O up to 1300 K*, Phys. Chem. Chem. Phys. **25**
    (2023).
    `doi:10.1039/d3cp03856d <https://doi.org/10.1039/d3cp03856d>`_
+
+.. [Singer1974] H. Singer, H. Steinbigler and P. Weiss, *A charge
+   simulation method for the calculation of high voltage fields*, IEEE
+   Trans. Power App. Syst. **PAS-93**, 1660–1668 (1974).
 
 .. [Zheleznyak1982] M. B. Zheleznyak, A. Kh. Mnatsakanyan and
    S. V. Sizykh, *Photoionization of nitrogen and oxygen mixtures by

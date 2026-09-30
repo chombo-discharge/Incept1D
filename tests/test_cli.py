@@ -529,6 +529,112 @@ class TestHyperboloidPlane:
             assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
 
 
+class TestProtrusion:
+    @pytest.mark.parametrize(
+        "spec, label",
+        [
+            (["spheroid", "0.5", "0.1"], "spheroid protrusion h = 0.5 mm, b = 0.1 mm"),
+            (["cone", "0.5", "0.01", "20"], "cone protrusion h = 0.5 mm, r = 0.01 mm"),
+            (["rod", "0.5", "0.05"], "rod protrusion h = 0.5 mm, R = 0.05 mm"),
+        ],
+    )
+    def test_both_polarities_of_a_protrusion_on_a_plate(
+        self, tmp_path, capsys, spec, label
+    ):
+        """A protrusion makes a uniform gap asymmetric, and reaches the header."""
+        out = tmp_path / "pr.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--protrusion",
+            *spec,
+            "--d",
+            "10",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        assert f"# Protrusion:  {label}" in out.read_text()
+        col = _columns(out)
+        for pol in ("positive", "negative"):
+            EN = [
+                c
+                for n, c in col.items()
+                if n.startswith("EN_Td") and f"protrusion={pol}" in n
+            ]
+            assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
+
+    def test_a_protrusion_changes_inception(self, tmp_path, capsys):
+        """
+        A protrusion on a plate is solved as a non-uniform gap.
+
+        Guards the constant-field shortcut, which once took the plate for a
+        uniform gap and dropped the protrusion without a word.  Whether the
+        protrusion raises or lowers the mean field at inception depends on
+        the mechanism, so only the change is asserted.
+        """
+
+        def EN(*extra):
+            out = tmp_path / f"run{len(extra)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                *extra,
+                "--d",
+                "10",
+                "--pd-min",
+                "10",
+                "--pd-max",
+                "10",
+                "--pd-num",
+                "1",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return [c[0] for n, c in _columns(out).items() if n.startswith("EN_Td")]
+
+        smooth = EN()
+        rough = EN("--protrusion", "spheroid", "1", "0.1")
+        capsys.readouterr()
+        assert np.all(np.isfinite(smooth + rough))
+        assert min(abs(r / s - 1.0) for r in rough for s in smooth) > 1e-3
+
+    def test_a_short_gap_is_pointed_out(self, capsys):
+        """The gap check runs once the command knows its smallest gap."""
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--protrusion",
+            "spheroid",
+            "0.5",
+            "0.5",
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "1",
+            "--pd-num",
+            "1",
+            "--silent",
+            "--no-plot",
+        )
+        assert rc == 0
+        assert "smallest gap d = 1 mm" in capsys.readouterr().err
+
+
 class TestJobs:
     def test_parallel_sweep_writes_the_same_file(self, tmp_path, capsys):
         outs = []
