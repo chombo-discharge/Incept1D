@@ -67,7 +67,9 @@ to scaled copies of the same geometry (sphere radius *and* gap scale
 together), while a sweep at fixed :math:`d` varies only the pressure.  For a
 tabulated field line the arc length fixes :math:`d = L`, and for coaxial
 cylinders the radii fix :math:`d = b - a`, so only fixed-:math:`d` sweeps are
-meaningful there.
+meaningful there.  With a protrusion the gap is measured from its tip, and
+these become :math:`d = L - h` and :math:`d = b - a - h` (see
+`The gap and the voltage`_).
 
 Reversing the profile
 ---------------------
@@ -243,19 +245,27 @@ oblate (:math:`\tau < 0`) shapes; where the series converge slowly they are
 summed in closed form through the Legendre function of the second kind,
 :math:`Q_1(x) = x \operatorname{artanh}(1/x) - 1` (prolate) or
 :math:`1 - x \operatorname{arccot} x` (oblate).  At the tip this is the
-field-enhancement factor,
+field-enhancement factor, for a prolate spheroid (:math:`h > b`)
 
 .. math::
 
    \beta = \frac{1}{(\xi_0^2 - 1)\,\big(\xi_0 \operatorname{artanh}(1/\xi_0) - 1\big)},
    \qquad \xi_0 = \frac{h}{c},
 
-which is :math:`3` for a hemisphere — where :eq:`eq_spheroid_axial` is
+and for an oblate one (:math:`h < b`)
+
+.. math::
+
+   \beta = \frac{1}{(1 + \zeta_0^2)\,\big(1 - \zeta_0 \operatorname{arccot} \zeta_0\big)},
+   \qquad \zeta_0 = \frac{h}{c}.
+
+It is :math:`3` for a hemisphere — where :eq:`eq_spheroid_axial` is
 :math:`1 + 2h^3/z^3` —, grows as :math:`(h/b)^2 / (\ln(2h/b) - 1)` for a
 needle, and tends to :math:`1` for a flat disc.  The enhancement is
 confined to a few tip radii of curvature :math:`b^2/h` and a few heights
-:math:`h` from the tip.  ``incept1d field`` prints :math:`\beta` and
-the tip radius :math:`b^2/h` for every shape.
+:math:`h` from the tip.  Shapes up to :math:`h/b = 10^6` are accepted.
+``incept1d field`` prints :math:`\beta` and the tip radius of curvature
+for every shape (:math:`b^2/h` for a spheroid).
 
 Cone and rod
 ............
@@ -286,17 +296,20 @@ which cancels the applied potential :math:`-E_0 z` there, and the axial
 field follows from the charges in closed form.  The collocation points are
 spaced by a fraction of the local length scale — the tip radius at the
 apex, the body radius along the flank, the height above the plane near
-the base, where the protrusion meets its image — so that the number of
+the base, where the protrusion meets its image, and the distance to the
+joint between cap and flank, where the curvature jumps — so that the number of
 charges grows only logarithmically with :math:`h` for a cone and linearly
 with :math:`h/R` for a rod.
 
 The solution is checked halfway between collocation points, where it is
 least accurate: a surface potential above :math:`2\times10^{-3}` of the
-applied one is an error, not a result.  Over the accepted range —
-half-angles from 5° to 80° and :math:`h/r \le 10^5` for a cone,
-:math:`h/R \le 1000` for a rod — halving the spacing changes the axial
-field by less than :math:`10^{-3}`, and the method reproduces what is known
-in closed form:
+applied one is an error, not a result.  The accepted range is half-angles
+from 5° to 80° and :math:`h/r \le 10^5` for a cone, and
+:math:`h/R \le 1000` for a rod.  On every case tested across it —
+cones from 5° to 80° up to :math:`h/r = 10^5`, rods up to
+:math:`h/R = 500` — halving the spacing changes the axial field by less
+than :math:`10^{-3}`, and the method reproduces what is known in closed
+form:
 
 * A rod of height :math:`R` is a hemisphere, and matches
   :math:`1 + 2R^3/z^3`;
@@ -305,8 +318,8 @@ in closed form:
   :math:`P_\nu(-\cos\theta) = 0` that describes the field near the
   apex of a sharp cone;
 * The rod's :math:`\beta` agrees with the fit
-  :math:`1.2\,(h/R + 2.15)^{0.9}` of [EdgcombeValdre2001]_ within its
-  few-percent accuracy.
+  :math:`1.2\,(h/R + 2.15)^{0.9}` of [EdgcombeValdre2001]_, stated for
+  about :math:`4 < h/R < 3000`, within its few-percent accuracy.
 
 The gap and the voltage
 .......................
@@ -314,9 +327,10 @@ The gap and the voltage
 With a protrusion, :math:`d` is the gap **from its tip** to the other
 electrode, so the electrode surface is at :math:`D = d + h`.  The profile
 is the background profile of the electrodes alone, built for :math:`D` and
-read from the tip onwards, times the enhancement
-:eq:`eq_spheroid_axial`, and normalised again over the tip-to-electrode
-path,
+read from the tip onwards, times the protrusion's on-axis enhancement
+:math:`E/E_0` (:eq:`eq_spheroid_axial` for a spheroid, the charge
+simulation for a cone or a rod), and normalised again over the
+tip-to-electrode path,
 
 .. math::
 
@@ -354,7 +368,8 @@ region shrinks towards the size of the tip, over which the real field lines
 fan out and photons escape sideways; both are neglected (see
 `Limitations`_), and increasingly so as :math:`h/b` grows.
 
-For a tabulated field line, the protrusion sits on the first point.  If the
+For a tabulated field line, the protrusion sits on the first point (the
+last with ``--reverse-field``).  If the
 line is stronger at its far end, the command says so and suggests
 ``--reverse-field`` (see `Reversing the profile`_).  A line exported from a model
 that already contains the protrusion must not be given ``--protrusion``
@@ -414,7 +429,8 @@ export gives when the line was traced from the other electrode.  A column
 that *is* an increasing arc length is unchanged by this.
 
 Rows are used in file order: the **first row defines** :math:`\xi = 0` and
-the last :math:`\xi = 1`, whichever way the coordinate runs.  Only
+the last :math:`\xi = 1`, whichever way the coordinate runs, unless
+``--reverse-field`` reads them the other way.  Only
 :math:`|E|` enters the model, so the direction of the field vector and the
 absolute field units are irrelevant to the solve — the profile is
 normalised.  ``LENGTH`` (``m``, ``cm``, ``mm``, ``um``; default ``m``) is
@@ -468,7 +484,8 @@ How the line is used
 the profile by normalised arc length :math:`\xi = s/L` and normalises it
 so that :math:`\int_0^1 f\,d\xi = 1`.  Consequently
 
-* The gap length is the arc length, :math:`d = L`;
+* The gap length is the arc length, :math:`d = L`, or :math:`L - h` from
+  the tip of a protrusion;
 * The reference field is the mean field along the line, :math:`E_\mathrm{ref}
   = U/L` with :math:`U = \int|E|\,ds` the voltage drop along the line;
 * Every voltage reported by the commands is this line integral.
@@ -489,7 +506,8 @@ Sweeps
 ~~~~~~
 
 A tabulated line describes one geometry at one size.  Its arc length fixes
-the gap, :math:`d = L`, so a :math:`pd` sweep along a field line is a
+the gap, :math:`d = L` (:math:`L - h` with a protrusion), so a :math:`pd`
+sweep along a field line is a
 **pressure sweep**: the geometry is held and :math:`pd` varies through
 :math:`p` alone.  That is what ``incept1d pdiv`` does when neither ``--p``
 nor ``--d`` is given, and it is the only sweep that keeps the imported
@@ -498,7 +516,7 @@ geometry intact.
 ``--p`` is therefore **refused** for a field line: fixing the pressure
 makes the gap the swept variable, so every point of the sweep would be a
 differently sized copy of the imported arrangement.  For a single point at
-one pressure, ask for it directly — :math:`pd = p\,L` with ``--pd-num 1``,
+one pressure, ask for it directly — :math:`pd = p\,d` with ``--pd-num 1``,
 which the error message spells out.
 
 Since :math:`d` is pinned, :math:`pd` is the pressure times a constant and
@@ -512,9 +530,11 @@ changes.  The sweep is still *requested* in :math:`pd` through
 The gap length can still be set explicitly with ``--d``.  That is allowed,
 because :math:`f(\xi)` is invariant under a geometric rescaling, so
 :math:`d \ne L` solves the *same* arrangement scaled by :math:`d/L` — every
-electrode dimension, not only the gap.  It rescales the geometry once and
-on purpose rather than across a sweep, so it is reported on stderr rather
-than refused.
+electrode dimension, not only the gap.  With a protrusion, the electrodes
+are scaled by :math:`(d + h)/L` and the protrusion keeps its given size.
+It rescales the geometry once and on purpose rather than across a sweep,
+so it is reported on stderr rather than refused, by ``incept1d pdiv`` and
+``incept1d ionization`` alike.
 
 Resolution
 ~~~~~~~~~~
@@ -522,8 +542,9 @@ Resolution
 The profile is linearly interpolated between tabulated points.  The
 integration grid follows the table: it is refined wherever the tabulated
 field changes by more than 20 % across a segment, including at a narrow
-peak between the electrodes, so a feature the table resolves is resolved
-by the solve too, and a protrusion added with ``--protrusion`` is refined
+peak between the electrodes, up to the ``--dx`` budget and largest
+changes first, so a feature the table resolves is resolved by the solve
+too, and a protrusion added with ``--protrusion`` is refined
 in the same way.  What the grid cannot do is add detail the table lacks:
 export enough points to resolve the field near the high-field electrode
 and at any local peak.  Check the imported profile visually first:
@@ -548,9 +569,12 @@ Limitations
 Standalone use
 --------------
 
-The module doubles as a diagnostic: it plots the normalised profile and the
-initial integration grid for a geometry, which is a quick way to check a
-field-line file before using it in a solve.
+The module doubles as a diagnostic: ``incept1d field`` plots the
+normalised profile of a geometry, sampled densely enough to show a thin
+high-field layer, over a reference grid of ``--N`` equal cells, which is a
+quick way to check a field-line file before using it in a solve.  The
+solver's own grid follows the field (see :ref:`Chap:Numerics:Propagator`)
+and is not the one drawn.
 
 .. code-block:: bash
 
@@ -573,4 +597,5 @@ API reference
 
 .. automodule:: incept1d.protrusions
    :members:
-   :private-members: _spheroid_axial_field, _csm_solve, _ring_potential
+   :private-members: _spheroid_axial_field, _csm_solve, _ring_potential,
+      _SimulatedProtrusion

@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-``incept1d field`` — plot the normalised field profile f(ξ) and the midpoint
-quadrature grid for a gap geometry (see :mod:`incept1d.fields`).
+``incept1d field`` — plot the normalised field profile f(ξ) of a gap
+geometry over a reference grid of N equal cells (see :mod:`incept1d.fields`).
 """
 
 import numpy as np
@@ -19,8 +19,8 @@ from incept1d.fields import (
 
 HELP = "Plot the normalised field profile f(ξ) of a gap geometry."
 DESCRIPTION = (
-    "Plot the normalised on-axis electric field and midpoint quadrature grid "
-    "for a given gap geometry."
+    "Plot the normalised on-axis electric field of a gap geometry over a "
+    "reference grid of N equal cells."
 )
 
 
@@ -43,7 +43,10 @@ def add_arguments(parser):
         type=int,
         default=25,
         metavar="N",
-        help="Number of grid points to display (default: 25).",
+        help=(
+            "Number of equal reference cells drawn (default: 25); the solver's "
+            "own grid follows the field and is not the one shown."
+        ),
     )
 
 

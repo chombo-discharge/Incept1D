@@ -129,6 +129,16 @@ def parse_field_unit(text):
     optional positive factor for a column in scaled units.  ``"kV/mm"`` is
     1e6, ``"V/cm"`` 100, and ``"1e3*V/m"`` 1e3.
 
+    Parameters
+    ----------
+    text : str
+        The unit as written on the command line.
+
+    Returns
+    -------
+    float
+        One unit of the column, in V/m.
+
     Raises
     ------
     ValueError
@@ -483,9 +493,19 @@ class FieldDistribution:
 
         The positions inside (0, 1) of the tabulated points of a field line,
         after reversal and after the shift to the tip of a protrusion; None
-        for an analytic profile.  Between them f is linear, so they are what
-        a grid or a quadrature must not step over
+        for an analytic profile.  Between them the background is linear, so
+        they are what a grid or a quadrature must not step over
         (:func:`field_following_edges`).
+
+        Parameters
+        ----------
+        d : float
+            Gap length in metres, as passed to :meth:`build`.
+
+        Returns
+        -------
+        ndarray or None
+            Increasing positions in (0, 1), or None.
         """
         if self.field_type != "fieldline":
             return None
@@ -507,7 +527,7 @@ class FieldDistribution:
     @property
     def is_uniform(self) -> bool:
         """
-        True when f ≡ 1: a uniform gap without a protrusion.
+        True when f ≡ 1, that is, for a uniform gap without a protrusion.
 
         The solvers take a constant-field shortcut on this, so test it
         rather than ``field_type == 'uniform'``, which a protrusion on a
@@ -642,17 +662,19 @@ class FieldDistribution:
         -------
         f : callable
             ``f(xi)`` at fractional position ξ ∈ [0, 1], with ∫₀¹ f dξ = 1.
-            ξ = 0 is the high-field electrode.  A tabulated profile is
-            linearly interpolated and, like the coaxial profile, does not
-            depend on d, since f is invariant under a geometric rescaling
-            of the arrangement.
+            ξ = 0 is the electrode the geometry names first (sphere, tip,
+            inner conductor, first tabulated point), or the other one when
+            :attr:`reversed`.  A tabulated profile is linearly interpolated
+            and, like the coaxial profile, does not depend on d without a
+            protrusion, since f is invariant under a geometric rescaling of
+            the arrangement; a protrusion keeps its size as d changes.
 
         Notes
         -----
         With a protrusion of height h the electrode surface is at
         D = d + h from the other electrode.  The profile is the background
         built for D, read from the tip onwards, times the protrusion's
-        on-axis enhancement :meth:`Protrusion.enhancement`, and normalised
+        on-axis enhancement :meth:`incept1d.protrusions.Protrusion.enhancement`, and normalised
         again over the tip-to-electrode path — which keeps ∫E dx equal to
         the applied voltage.  That is exact on a uniform background and a
         local approximation on a curved one.
@@ -900,6 +922,18 @@ def field_from_args(args, parser=None) -> "FieldDistribution":
     """
     The :class:`FieldDistribution` described by the options that
     :func:`add_field_argument` registers, with its notes printed.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments, with ``field``, ``fieldline_voltage``,
+        ``reverse_field`` and ``protrusion``.
+    parser : argparse.ArgumentParser or None
+        If given, errors are routed through ``parser.error()``.
+
+    Returns
+    -------
+    FieldDistribution
     """
     return parse_field_spec(
         args.field,
@@ -941,6 +975,14 @@ def describe_fixed_gap(fd) -> Optional[str]:
     (the arc length of line.csv)"``, or with a protrusion ``"d = L - h =
     20 - 1 = 19 mm (... less the protrusion height, measured from its
     tip)"``; None where the gap is free.
+
+    Parameters
+    ----------
+    fd : FieldDistribution
+
+    Returns
+    -------
+    str or None
     """
     if fd.fixed_gap_length is None:
         return None
@@ -967,6 +1009,17 @@ def fixed_gap_warning(fd, d_mm) -> Optional[str]:
     Such a d solves the arrangement scaled so that its gap is d: the whole
     arrangement by d/L, or, with a protrusion, the electrodes by (d + h)/L
     and the protrusion at its given size.
+
+    Parameters
+    ----------
+    fd : FieldDistribution
+    d_mm : list of float
+        Gap lengths in mm.
+
+    Returns
+    -------
+    str or None
+        One sentence for stderr, or None.
     """
     if fd.fixed_gap_length is None:
         return None
@@ -989,7 +1042,7 @@ def fixed_gap_warning(fd, d_mm) -> Optional[str]:
 
 def field_header_lines(fd) -> list:
     """
-    The geometry lines of a ``--write-to-file`` header, without ``# ``.
+    The geometry lines of a ``--write-to-file`` header, without the leading ``#``.
 
     Protrusion, reversal, electrode dimensions, the polarity convention, and
     for a tabulated line its source, arc length, line integral and the
@@ -1139,6 +1192,15 @@ def print_protrusion_notes(fd, d_min=None, gap_only=False) -> None:
     :func:`parse_field_spec` prints the notes on the geometry, and on the gap
     where the geometry fixes it; a command that chooses the gap itself calls
     this with its smallest gap and *gap_only* once it knows it.
+
+    Parameters
+    ----------
+    fd : FieldDistribution
+    d_min : float or None
+        Smallest gap length in metres, for the gap note.
+    gap_only : bool
+        Print only the gap note, and nothing where the geometry fixes the
+        gap (it was printed when the options were read).
     """
     if gap_only and (fd.protrusion is None or fd.fixed_gap_length):
         return

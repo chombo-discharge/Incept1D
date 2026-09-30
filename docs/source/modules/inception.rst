@@ -48,7 +48,9 @@ Inputs
    incept1d pdiv MECHANISM.py [CONFIG.json ...]
        [--p P [P ...]] [--d D [D ...]] [--T T]
        [--pd-min PD] [--pd-max PD] [--pd-num N]
-       [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
+       [--field SPEC] [--protrusion SHAPE ...] [--reverse-field]
+       [--fieldline-voltage U_KV]
+       [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
        [--criterion {riccati,detq}] [--jobs N] [--verify] [--silent]
        [--lam LAM] [--all-branches] [--plot-separate-branches]
        [--plot-ionization-integral] [--streamer-criterion C]
@@ -67,7 +69,9 @@ Inputs
        line (:ref:`Chap:FieldLines`).
    * - ``--d D [D ...]``
      - Fixed-distance mode: gap distance(s) in mm, with :math:`p` swept.
-       For a field line this is the default, at :math:`d = L`.
+       For a field line or a coaxial gap this is the default, at the gap
+       the geometry fixes (:math:`d = L`, less :math:`h` with a
+       protrusion); any other value is reported on stderr.
    * - ``--pd-min``, ``--pd-max``, ``--pd-num``
      - The :math:`pd` grid in bar·mm (default :math:`10^{-2}`–:math:`10^{3}`,
        50 log-spaced points).
@@ -183,7 +187,10 @@ once each curve is complete.
 ``--write-to-file`` writes one row per :math:`pd` point.  The header records
 the date, git commit, full command line, mechanism, temperature, pressures,
 configuration labels, field type, :math:`\lambda`, propagator and grid
-settings, and then names every column.  For each configuration and polarity
+settings, the geometry (``# Protrusion:``, ``# Reversed:``, the electrode
+dimensions, the ``# Polarity:`` convention, and for a field line its file,
+arc length, line integral and applied voltage), and then names every
+column.  For each configuration and polarity
 there is a group of five columns:
 
 .. code-block:: text

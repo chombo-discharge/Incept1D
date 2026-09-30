@@ -34,7 +34,8 @@ Inputs
    incept1d ionization MECHANISM.py [CONFIG.json ...]
        --d D [D ...] (--p P [P ...] | --data-file FILE [--pressure-column COL] [--voltage-column COL])
        [--voltage-lo V] [--voltage-hi V] [--voltage-num N] [--single-voltage V]
-       [--T T] [--field SPEC] [--N N] [--no-plot] [--write-to-file FILE]
+       [--T T] [--field SPEC] [--protrusion SHAPE ...] [--reverse-field]
+       [--fieldline-voltage U_KV] [--N N] [--no-plot] [--write-to-file FILE]
 
 .. list-table::
    :header-rows: 1
@@ -97,7 +98,9 @@ The last column appears only when the mechanism supplies the matrices
 ``--write-to-file`` writes a wide table instead — one row per voltage,
 a column ``U_kV``, then ``streamer_integral[LABEL]`` and, where available,
 ``eigenvalue_integral[LABEL]`` for every curve — under the usual metadata
-header.
+header, which also records the geometry as ``incept1d pdiv`` does
+(protrusion, reversal, polarity convention, field-line data) and the
+number of quadrature panels.
 
 API reference
 -------------

@@ -124,8 +124,8 @@ class TestChargeSimulation:
         """
         P2: β = 1.2 (h/R + 2.15)^0.9 within its few-percent accuracy.
 
-        The fit is [EdgcombeValdre2001]'s to their own finite-element
-        solutions for a hemisphere-capped cylinder on a plane.
+        The fit is [EdgcombeValdre2001]'s to their numerical solutions
+        for a hemisphere-capped cylinder on a plane.
         """
         beta = Rod(aspect * 1e-6, radius=1e-6).beta
         assert beta == pytest.approx(1.2 * (aspect + 2.15) ** 0.9, rel=0.05)

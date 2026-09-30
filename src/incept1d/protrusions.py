@@ -120,6 +120,16 @@ def spheroid_enhancement(h, b):
     β = E(tip)/E₀ for height *h* and base radius *b* (any common unit); see
     :func:`_spheroid_axial_field`.  3 for a hemisphere,
     ≈ (h/b)²/(ln(2h/b) − 1) for a needle (h ≫ b), → 1 for a flat disc.
+
+    Parameters
+    ----------
+    h, b : float
+        Height and base radius, > 0, in one unit.
+
+    Returns
+    -------
+    float
+        β ≥ 1.
     """
     return _spheroid_axial_field(0.0, h, b)
 
@@ -345,6 +355,13 @@ class Spheroid(Protrusion):
     Half-spheroid of height h and base radius b: a needle for h > b, a
     hemisphere for h = b, a flat bump for h < b.  Closed form,
     :func:`_spheroid_axial_field`.
+
+    Attributes
+    ----------
+    height : float
+        Height h in metres.
+    base_radius : float
+        Base radius b in metres; the tip radius of curvature is b²/h.
     """
 
     base_radius: float = 0.0
@@ -390,6 +407,13 @@ class Rod(_SimulatedProtrusion):
     """
     Cylinder of radius R with a hemispherical cap, total height h ≥ R: a
     whisker, fibre or wire end.  Charge simulation, :func:`_csm_solve`.
+
+    Attributes
+    ----------
+    height : float
+        Height h of the tip above the electrode, in metres.
+    radius : float
+        Radius R of the cylinder and its cap, in metres.
     """
 
     radius: float = 0.0
@@ -426,6 +450,15 @@ class Cone(_SimulatedProtrusion):
     Cone of half-angle θ whose apex is rounded by a sphere of radius r
     tangent to it, total height h: a burr or a sharp asperity.  Charge
     simulation, :func:`_csm_solve`.
+
+    Attributes
+    ----------
+    height : float
+        Height h of the tip above the electrode, in metres.
+    radius : float
+        Radius r of the rounded apex, in metres.
+    half_angle : float
+        Half-angle θ of the cone, in degrees.
     """
 
     radius: float = 0.0
@@ -482,6 +515,16 @@ def parse_protrusion_spec(tokens) -> Protrusion:
 
     ``spheroid H B``, ``cone H R ANGLE`` or ``rod H R``, lengths in mm and
     the cone half-angle in degrees.
+
+    Parameters
+    ----------
+    tokens : list of str
+        The shape keyword followed by its values.
+
+    Returns
+    -------
+    Protrusion
+        A :class:`Spheroid`, :class:`Cone` or :class:`Rod`, lengths in metres.
 
     Raises
     ------

@@ -62,7 +62,7 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
         Gap geometry.
     N : int
         Number of equal quadrature panels before they are refined to follow
-        the field (:func:`_gap_integral`).
+        the field (``_gap_integral``).
     """
     try:
         if field_dist.is_uniform:
@@ -192,7 +192,7 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
         Gap geometry.
     N : int
         Number of equal quadrature panels before they are refined to follow
-        the field (:func:`_gap_integral`).
+        the field (``_gap_integral``).
     """
     try:
         if field_dist.is_uniform:
