@@ -117,6 +117,36 @@ PROTRUSION_SCALE_LIMIT = 0.1
 # ── Tabulated field line ──────────────────────────────────────────────────────
 
 _LENGTH_UNITS = {"m": 1.0, "cm": 1e-2, "mm": 1e-3, "um": 1e-6, "µm": 1e-6}
+_VOLTAGE_UNITS = {"mV": 1e-3, "V": 1.0, "kV": 1e3, "MV": 1e6}
+
+
+def parse_field_unit(text):
+    """
+    The value in V/m of one unit of a field column, from ``[MULT*]VOLT/LENGTH``.
+
+    VOLT is one of mV, V, kV, MV and LENGTH one of m, cm, mm, um; MULT is an
+    optional positive factor for a column in scaled units.  ``"kV/mm"`` is
+    1e6, ``"V/cm"`` 100, and ``"1e3*V/m"`` 1e3.
+
+    Raises
+    ------
+    ValueError
+        If *text* is not of that form.
+    """
+    mult, _, unit = text.rpartition("*")
+    volt, sep, length = unit.partition("/")
+    if not sep or volt not in _VOLTAGE_UNITS or length not in _LENGTH_UNITS:
+        raise ValueError(
+            f"field unit {text!r} is not [MULT*]VOLT/LENGTH with VOLT one of "
+            f"{', '.join(_VOLTAGE_UNITS)} and LENGTH one of m, cm, mm, um"
+        )
+    try:
+        factor = float(mult) if mult else 1.0
+    except ValueError:
+        raise ValueError(f"field unit {text!r}: multiplier {mult!r} is not a number")
+    if not (factor > 0.0 and math.isfinite(factor)):
+        raise ValueError(f"field unit {text!r}: the multiplier must be positive")
+    return factor * _VOLTAGE_UNITS[volt] / _LENGTH_UNITS[length]
 
 
 def load_fieldline(path, length_unit="m"):
@@ -271,14 +301,20 @@ class FieldDistribution:
         commands can say it rather than leave the reader to guess.
     fieldline_integral : float or None
         For 'fieldline': ``∫|E| ds`` along the line, in the file's own field
-        units times metres.  It is a voltage only if the file tabulates
-        ``|E|`` in V/m, which the file does not say and this module cannot
-        know, so it is reported as a units check and never used as one.
+        units times metres.  A voltage only once the field unit is known
+        (:attr:`fieldline_line_voltage`).
+    fieldline_field_unit : str or None
+        For 'fieldline': the unit of the field column as declared
+        (``"kV/mm"``, ``"1e3*V/m"``, ...), or None when it was not.
     fieldline_applied_voltage : float or None
-        For 'fieldline': the excitation the line was computed at, in volts,
-        as declared by the caller.  The solve sees only the shape of the
-        profile, so this does not affect the result; it is what the
-        inception voltage is reported relative to.
+        For 'fieldline': the excitation the line was computed at, in volts:
+        declared with ``--fieldline-voltage``, or else ``∫|E| ds`` when the
+        field unit is known.  The solve sees only the shape of the profile,
+        so this does not affect the result; it is what the inception voltage
+        is reported relative to.
+    fieldline_voltage_source : str or None
+        For 'fieldline': where :attr:`fieldline_applied_voltage` came from,
+        for the reports.
     fieldline_path : str or None
         For 'fieldline': source file (for labels / output headers).
     reversed : bool
@@ -301,13 +337,15 @@ class FieldDistribution:
     fieldline_length: Optional[float] = None
     fieldline_reading: Optional[str] = None
     fieldline_integral: Optional[float] = None
+    fieldline_field_unit: Optional[str] = None
     fieldline_applied_voltage: Optional[float] = None
+    fieldline_voltage_source: Optional[str] = None
     fieldline_path: Optional[str] = None
     reversed: bool = False
     protrusion: Optional[Protrusion] = None
 
     @classmethod
-    def from_fieldline(cls, path, length_unit="m"):
+    def from_fieldline(cls, path, length_unit="m", field_unit=None):
         """
         Build a 'fieldline' distribution from a tabulated ``|E|(s)`` file.
 
@@ -317,9 +355,15 @@ class FieldDistribution:
         absolute scale of the tabulated field therefore drops out: the same
         line exported at 100 kV and at 200 kV gives identical results.
 
+        *field_unit* (``[MULT*]VOLT/LENGTH``, :func:`parse_field_unit`)
+        declares the unit of the field column.  It leaves the profile alone
+        and makes ``∫|E| ds`` a voltage, which then serves as the excitation.
+
         See :func:`load_fieldline` for the accepted file layouts.
         """
         s, E, reading = load_fieldline(path, length_unit)
+        if field_unit is not None:
+            parse_field_unit(field_unit)  # validate before building
         L = float(s[-1])
         xi = s / L
         _trapz = getattr(np, "trapezoid", None) or np.trapz  # numpy ≥2.0 / <2.0
@@ -332,8 +376,16 @@ class FieldDistribution:
             fieldline_reading=reading,
             # ∫|E| ds = L ∫|E| dξ = L ⟨|E|⟩, in the field units of the file.
             fieldline_integral=mean_E * L,
+            fieldline_field_unit=field_unit,
             fieldline_path=path,
         )
+
+    @property
+    def fieldline_line_voltage(self) -> Optional[float]:
+        """``∫|E| ds`` in volts, when the field unit of the file is known."""
+        if self.fieldline_field_unit is None:
+            return None
+        return self.fieldline_integral * parse_field_unit(self.fieldline_field_unit)
 
     @property
     def is_uniform(self) -> bool:
@@ -598,10 +650,13 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
             "tip radius of curvature R_mm in mm (exact on-axis field).  "
             "'coaxial A_mm B_mm': coaxial cylinders with inner radius A_mm and "
             "outer radius B_mm in mm (gap b - a, inner conductor at xi = 0).  "
-            "'fieldline FILE [UNIT]': tabulated |E| along a (curved) field line "
-            "read from FILE — numeric columns 's |E|', 'x y z |E|' or "
-            "'x y z Ex Ey Ez' (CSV or whitespace; header lines skipped); "
-            "UNIT is the length unit of the file (m, cm, mm, um; default m).  "
+            "'fieldline FILE [LENGTH] [FIELD]': tabulated |E| along a (curved) "
+            "field line read from FILE — numeric columns 's |E|', 'x y z |E|' "
+            "or 'x y z Ex Ey Ez' (CSV or whitespace; header lines skipped); "
+            "LENGTH is the length unit of the file (m, cm, mm, um; default m) "
+            "and FIELD the unit of the field column, [MULT*]VOLT/LENGTH such "
+            "as kV/mm, V/m or 1e3*V/cm, which makes the line integral the "
+            "applied voltage.  "
             "xi = 0 is the first row.  "
             "Grid resolution is set separately via --dx."
         ),
@@ -615,8 +670,9 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
             "Excitation in kV at which a tabulated field line was computed.  "
             "Only the shape of the profile enters the solve, so this does not "
             "change the result; it is what the inception voltage is reported "
-            "relative to.  Without it no such ratio is reported, since the "
-            "field units of the file are unknown."
+            "relative to.  Taken from the line integral when the field unit "
+            "is given in --field fieldline; without either, no such ratio is "
+            "reported."
         ),
     )
     parser.add_argument(
@@ -883,15 +939,41 @@ def _parse_background(spec, _err, applied_voltage_kv):
     if field_type == "fieldline":
         if len(spec) < 2:
             _err("--field fieldline requires a data file path")
-        unit = spec[2] if len(spec) > 2 else "m"
+        if len(spec) > 4:
+            _err("--field fieldline takes FILE [LENGTH] [FIELD]")
+        # A field unit has a '/', a length unit does not; either may be given.
+        fields = [t for t in spec[2:] if "/" in t]
+        lengths = [t for t in spec[2:] if "/" not in t]
+        if len(fields) > 1 or len(lengths) > 1:
+            _err("--field fieldline takes at most one length and one field unit")
         try:
-            fd = FieldDistribution.from_fieldline(spec[1], unit)
+            fd = FieldDistribution.from_fieldline(
+                spec[1], lengths[0] if lengths else "m", fields[0] if fields else None
+            )
         except (OSError, ValueError) as exc:
             _err(f"--field fieldline: {exc}")
+        line_voltage = fd.fieldline_line_voltage
         if applied_voltage_kv is not None:
             if applied_voltage_kv <= 0.0:
                 _err("--fieldline-voltage must be positive")
             fd.fieldline_applied_voltage = applied_voltage_kv * 1e3
+            fd.fieldline_voltage_source = "--fieldline-voltage"
+            if line_voltage is not None and not math.isclose(
+                line_voltage, applied_voltage_kv * 1e3, rel_tol=0.02
+            ):
+                print(
+                    f"note: ∫|E| ds = {line_voltage / 1e3:.6g} kV with |E| in "
+                    f"{fd.fieldline_field_unit}, but --fieldline-voltage is "
+                    f"{applied_voltage_kv:g} kV; the declared excitation is "
+                    f"used.  Check the units, the column, or whether the line "
+                    f"spans the whole gap.",
+                    file=sys.stderr,
+                )
+        elif line_voltage is not None:
+            fd.fieldline_applied_voltage = line_voltage
+            fd.fieldline_voltage_source = (
+                f"∫|E| ds with |E| in {fd.fieldline_field_unit}"
+            )
         return fd
 
     _err(

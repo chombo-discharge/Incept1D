@@ -230,6 +230,49 @@ class TestPdiv:
         assert rc == 0
         assert "U*/U_applied" in out, "the scale factor column is missing"
 
+    def test_a_declared_field_unit_makes_the_integral_the_excitation(
+        self, tmp_path, capsys
+    ):
+        """
+        C7d: with |E| in kV/mm the 20 mm line integrates to 30 kV, which is
+        the excitation; the solve itself is unchanged by the unit.
+        """
+        line = self._fieldline(tmp_path)
+
+        def run(*spec):
+            out = tmp_path / f"u{len(spec)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--field",
+                "fieldline",
+                line,
+                *spec,
+                "--pd-min",
+                "1",
+                "--pd-max",
+                "20",
+                "--pd-num",
+                "3",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return out
+
+        bare, unit = run("mm"), run("mm", "kV/mm")
+        stdout = capsys.readouterr().out
+        assert "U*/U_applied" in stdout
+        text = unit.read_text()
+        assert "# ∫|E| ds:     30 kV (|E| in kV/mm)" in text
+        assert "# U_applied:   30 kV (∫|E| ds with |E| in kV/mm;" in text
+        a, b = _columns(bare), _columns(unit)
+        for name in a:
+            if name.startswith("EN_Td"):
+                np.testing.assert_array_equal(a[name], b[name])
+
     def test_a_field_line_sweeps_pressure_at_fixed_geometry(self, tmp_path, capsys):
         """
         C7e: a tabulated line is one geometry at one size.

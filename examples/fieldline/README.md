@@ -11,9 +11,10 @@ long, with `|E|` falling linearly by a factor of two, scaled to an
 excitation of 100 kV. `make_line.py` writes it twice, as `line_si.csv`
 (m, V/m) and `line_engineering.csv` (mm, kV/mm). Only the *shape* of the
 profile enters the solve, so both must give identical results. The length
-unit is declared on the command line; the field unit cannot be, and
-`--fieldline-voltage` declares the excitation the line was computed at so
-that `U*/U_applied` can be reported.
+unit is declared on the command line, and `--fieldline-voltage` declares
+the excitation the line was computed at so that `U*/U_applied` can be
+reported; declaring the field unit instead (`mm kV/mm`) gives the same
+excitation from the line integral.
 
 ## Run it
 
@@ -53,5 +54,9 @@ The check: run the same command on `line_si.csv m`, writing
   plots the profile and says which field unit the line integral implies.
 * **Your own line.** Export `s |E|`, `x y z |E|` or `x y z Ex Ey Ez` from
   any field solver; see Python modules → *Gap geometry* for the layouts.
-* **Reverse the line.** Exporting from the other electrode swaps the
-  polarity labels, which confirms which end is which.
+* **Declare the field unit.** `--field fieldline examples/fieldline/line_engineering.csv mm kV/mm`
+  makes the line integral (100 kV) the excitation, with no
+  `--fieldline-voltage`; `line_si.csv m V/m` gives the same.
+* **Reverse the line.** `--reverse-field` reads it from the last row, which
+  swaps the polarity labels (`end=` instead of `start=`) and confirms which
+  end is which.

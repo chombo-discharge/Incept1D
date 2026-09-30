@@ -76,7 +76,15 @@ Inputs
    * - ``--field SPEC``
      - Geometry: ``uniform`` | ``sphere-plane R_mm`` | ``sphere-sphere R_mm``
        | ``hyperboloid-plane R_mm`` | ``coaxial A_mm B_mm``
-       | ``fieldline FILE [UNIT]``.  See :ref:`Chap:FieldDistributions`.
+       | ``fieldline FILE [LENGTH] [FIELD]``.  See
+       :ref:`Chap:FieldDistributions`.
+   * - ``--protrusion SHAPE ...``
+     - Protrusion on the :math:`\xi = 0` electrode: ``spheroid H B`` |
+       ``cone H R ANGLE`` | ``rod H R`` (mm, degrees).  See
+       :ref:`Chap:FieldDistributions`.
+   * - ``--reverse-field``
+     - Read the profile from the other electrode, :math:`f(\xi) \to
+       f(1 - \xi)`.
    * - ``--dx N_min [N_max [tol]]``
      - Adaptive integration grid (defaults 5, 200, 0.03).  See
        :ref:`Chap:Numerics:Propagator`.

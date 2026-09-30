@@ -825,9 +825,9 @@ def run(args, parser):
                 # Print summary table for this branch.  Only the shape of a
                 # tabulated field line enters the solve, so the useful extra
                 # quantity is how far the declared excitation is from
-                # inception: U* / U_applied.  Without --fieldline-voltage
-                # there is nothing to divide by -- the field units of the
-                # file are unknown -- and the column is omitted.
+                # inception: U* / U_applied.  Without --fieldline-voltage or
+                # a declared field unit there is nothing to divide by, and
+                # the column is omitted.
                 _vfile = _field_dist.fieldline_applied_voltage
                 _scale_hdr = f"  {'U*/U_applied':>14}" if _vfile else ""
                 # With the gap pinned at L, the p*d and d columns say nothing
@@ -1125,23 +1125,27 @@ def run(args, parser):
             if _field_dist.field_type == "fieldline":
                 fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
                 fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
-                fh.write(
-                    f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "
-                    f"(field units of the file × m; a voltage only if the "
-                    f"file tabulates |E| in V/m)\n"
-                )
+                _uline = _field_dist.fieldline_line_voltage
+                if _uline is not None:
+                    fh.write(
+                        f"# ∫|E| ds:     {_uline/1e3:.6g} kV (|E| in "
+                        f"{_field_dist.fieldline_field_unit})\n"
+                    )
+                else:
+                    fh.write(
+                        f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "
+                        f"(field units of the file × m; a voltage only if the "
+                        f"file tabulates |E| in V/m)\n"
+                    )
                 if _field_dist.fieldline_applied_voltage is not None:
                     fh.write(
                         f"# U_applied:   "
                         f"{_field_dist.fieldline_applied_voltage/1e3:.6g} kV "
-                        f"(--fieldline-voltage; only the shape of the profile "
-                        f"enters the solve, so U*/U_applied is the factor the "
-                        f"excitation must be scaled by to reach inception)\n"
+                        f"({_field_dist.fieldline_voltage_source}; only the "
+                        f"shape of the profile enters the solve, so "
+                        f"U*/U_applied is the factor the excitation must be "
+                        f"scaled by to reach inception)\n"
                     )
-                fh.write(
-                    "# Polarity:    start=positive → first tabulated point is "
-                    "anode (+),  start=negative → cathode (−)\n"
-                )
             if _streamer_records:
                 fh.write(f"# Streamer C:  {args.streamer_criterion}\n")
             fh.write("#\n")

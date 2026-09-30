@@ -116,18 +116,26 @@ def run(args, parser):
             f"Arc length = {fd.fieldline_length*1e3:.6g} mm"
             f"   (from the {fd.fieldline_reading})"
         )
-        print(
-            f"∫|E| ds  = {fd.fieldline_integral:.6g}"
-            f"   (in the field units of the file × m)"
-        )
-        if fd.fieldline_applied_voltage is not None:
-            u_kv = fd.fieldline_applied_voltage / 1e3
-            print(f"U_applied = {u_kv:.6g} kV   (--fieldline-voltage)")
-            print(f"           {_implied_field_unit(fd)}")
+        if fd.fieldline_line_voltage is not None:
+            print(
+                f"∫|E| ds  = {fd.fieldline_line_voltage / 1e3:.6g} kV"
+                f"   (|E| in {fd.fieldline_field_unit})"
+            )
         else:
             print(
-                "           a voltage only if the file is in V/m, which the "
-                "file does not say; pass --fieldline-voltage to report"
+                f"∫|E| ds  = {fd.fieldline_integral:.6g}"
+                f"   (in the field units of the file × m)"
+            )
+        if fd.fieldline_applied_voltage is not None:
+            u_kv = fd.fieldline_applied_voltage / 1e3
+            print(f"U_applied = {u_kv:.6g} kV   ({fd.fieldline_voltage_source})")
+            if fd.fieldline_field_unit is None:
+                print(f"           {_implied_field_unit(fd)}")
+        else:
+            print(
+                "           a voltage only if the file is in V/m; give the field "
+                "unit (e.g. kV/mm) after the file, or pass --fieldline-voltage, "
+                "to report"
             )
             print("           the inception voltage relative to the excitation")
     print(f"f(0) = {f(0.0):.6f}")

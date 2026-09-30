@@ -9,7 +9,12 @@ import dataclasses
 import numpy as np
 import pytest
 
-from incept1d.fields import FieldDistribution, load_fieldline, parse_field_spec
+from incept1d.fields import (
+    FieldDistribution,
+    load_fieldline,
+    parse_field_spec,
+    parse_field_unit,
+)
 from incept1d.protrusions import Cone, Rod, Spheroid
 
 _trapz = getattr(np, "trapezoid", None) or np.trapz
@@ -816,3 +821,78 @@ def test_a_protrusion_on_a_plate_is_not_uniform():
     assert FieldDistribution("uniform").is_uniform
     fd = _with_protrusion(FieldDistribution("uniform"), 1e-3, 1e-3)
     assert fd.field_type == "uniform" and not fd.is_uniform
+
+
+class TestFieldUnit:
+    @pytest.mark.parametrize(
+        "text, value",
+        [
+            ("V/m", 1.0),
+            ("kV/mm", 1e6),
+            ("kV/cm", 1e5),
+            ("V/mm", 1e3),
+            ("MV/m", 1e6),
+            ("mV/um", 1e3),
+            ("1e3*V/m", 1e3),
+            ("2.5*kV/cm", 2.5e5),
+        ],
+    )
+    def test_units(self, text, value):
+        """F70: the value of one unit of the field column in V/m."""
+        assert parse_field_unit(text) == pytest.approx(value, rel=1e-15)
+
+    @pytest.mark.parametrize(
+        "text", ["kV", "kV/ft", "kv/mm", "x*V/m", "-1*V/m", "V/m/s", "0*V/m"]
+    )
+    def test_rejected(self, text):
+        """F71."""
+        with pytest.raises(ValueError):
+            parse_field_unit(text)
+
+    @staticmethod
+    def _line(tmp_path, scale):
+        # 20 mm, |E| from 2 to 1 kV/mm: ∫|E| ds = 30 kV, written in V/m / scale.
+        s = np.linspace(0.0, 20.0, 41)
+        return _write_line(tmp_path / "l.dat", zip(s, (2.0 - 0.05 * s) * 1e6 / scale))
+
+    @pytest.mark.parametrize(
+        "unit, scale", [("V/m", 1.0), ("kV/mm", 1e6), ("kV/cm", 1e5)]
+    )
+    def test_the_integral_is_the_excitation(self, tmp_path, unit, scale):
+        """F72: any declared unit gives the same 30 kV, and the same profile."""
+        path = self._line(tmp_path, scale)
+        fd = parse_field_spec(["fieldline", path, "mm", unit])
+        assert fd.fieldline_line_voltage == pytest.approx(30e3, rel=1e-12)
+        assert fd.fieldline_applied_voltage == pytest.approx(30e3, rel=1e-12)
+        assert "∫|E| ds" in fd.fieldline_voltage_source
+        ref = parse_field_spec(["fieldline", path, "mm"]).build(20e-3)
+        f = fd.build(20e-3)
+        assert all(f(x) == ref(x) for x in np.linspace(0, 1, 11))
+
+    def test_order_and_default_length(self, tmp_path):
+        """F73: the field unit may come first, and the length defaults to m."""
+        path = self._line(tmp_path, 1e6)
+        a = parse_field_spec(["fieldline", path, "kV/mm", "mm"])
+        assert a.fieldline_line_voltage == pytest.approx(30e3)
+        b = parse_field_spec(["fieldline", path, "kV/mm"])  # read as metres
+        assert b.fieldline_line_voltage == pytest.approx(30e6)
+
+    def test_declared_voltage_wins_and_a_mismatch_is_noted(self, tmp_path, capsys):
+        """F74: --fieldline-voltage overrides the integral; 2 % is the tolerance."""
+        path = self._line(tmp_path, 1e6)
+        fd = parse_field_spec(
+            ["fieldline", path, "mm", "kV/mm"], applied_voltage_kv=30.3
+        )
+        assert fd.fieldline_applied_voltage == pytest.approx(30.3e3)
+        assert capsys.readouterr().err == ""
+        parse_field_spec(["fieldline", path, "mm", "kV/mm"], applied_voltage_kv=100)
+        assert "the declared excitation is used" in capsys.readouterr().err
+
+    @pytest.mark.parametrize(
+        "extra", [["mm", "cm"], ["kV/mm", "V/m"], ["mm", "kV/mm", "x"]]
+    )
+    def test_malformed_specs(self, tmp_path, extra):
+        """F75."""
+        path = self._line(tmp_path, 1e6)
+        with pytest.raises(ValueError):
+            parse_field_spec(["fieldline", path, *extra])

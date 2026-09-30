@@ -56,7 +56,7 @@ Geometries
        :math:`b` (mm).  Exact radial field, see `Coaxial cylinders`_.  Not
        symmetric: ``incept1d pdiv`` and ``incept1d growth`` compute both
        polarities (``inner=positive`` / ``inner=negative``).
-   * - ``fieldline FILE [UNIT]``
+   * - ``fieldline FILE [LENGTH] [FIELD]``
      - Tabulated :math:`|E|` along an arbitrary (curved) field line from
        an external electrostatic solver.  See below.
 
@@ -381,7 +381,7 @@ Tabulated field lines
 
 For electrode geometries beyond spheres and planes, the field along a field
 line can be computed with an external electrostatic solver, exported as a
-table, and used directly with ``--field fieldline FILE [UNIT]``.  The 1-D
+table, and used directly with ``--field fieldline FILE [LENGTH] [FIELD]``.  The 1-D
 model is then integrated along that line exactly as it is along the axis of
 a sphere gap.
 
@@ -416,10 +416,14 @@ that *is* an increasing arc length is unchanged by this.
 Rows are used in file order: the **first row defines** :math:`\xi = 0` and
 the last :math:`\xi = 1`, whichever way the coordinate runs.  Only
 :math:`|E|` enters the model, so the direction of the field vector and the
-absolute field units are irrelevant — the profile is normalised.  ``UNIT``
-(``m``, ``cm``, ``mm``, ``um``; default ``m``) is the unit of the length
-columns, and getting it wrong is what the check under
-`Declaring the excitation`_ is for.
+absolute field units are irrelevant to the solve — the profile is
+normalised.  ``LENGTH`` (``m``, ``cm``, ``mm``, ``um``; default ``m``) is
+the unit of the length columns, and getting it wrong is what the check
+under `Declaring the excitation`_ is for.  ``FIELD`` is the optional unit
+of the field column, ``[MULT*]VOLT/LENGTH`` with ``VOLT`` one of ``mV``,
+``V``, ``kV``, ``MV`` — for instance ``kV/mm``, ``V/m``, ``kV/cm``, or
+``1e3*V/m`` for a column in thousands of V/m.  The two tokens may come in
+either order, since only a field unit contains ``/``.
 
 Example (``line.csv``, lengths in mm):
 
@@ -435,19 +439,27 @@ Example (``line.csv``, lengths in mm):
 Declaring the excitation
 ........................
 
-The length unit is declared on the command line, but the **field** unit is
-not, and the file does not reveal it.  That is enough for the solve, which
-sees only the normalised shape, but not for reporting how far the supplied
-excitation is from inception.  ``--fieldline-voltage U_KV`` declares that
-excitation, and the commands then report :math:`U^*/U_\mathrm{applied}`,
-the factor by which the excitation must be scaled to reach inception.  The
-ratio is exact whatever the field column is in, because :math:`U^*` comes
-from the shape alone.  Without the flag no ratio is reported.
+The solve sees only the normalised shape, so it needs no field unit.
+Reporting how far the supplied excitation is from inception does: the
+commands then report :math:`U^*/U_\mathrm{applied}`, the factor by which the
+excitation must be scaled to reach inception, and that needs
+:math:`U_\mathrm{applied}`.  There are two ways to give it:
 
-The line integral :math:`\int|E|\,ds` is printed in the file's own units as
-a check: if the file is in V/m it must equal the declared excitation, and a
-disagreement means a wrong length unit, a wrong column, or a line that does
-not span the whole gap.  :ref:`Chap:Examples:FieldLine` works this through.
+* Declare the field unit, ``--field fieldline FILE mm kV/mm``.  The line
+  integral :math:`\int|E|\,ds` is then a voltage, and it is the excitation;
+* Declare the excitation, ``--fieldline-voltage U_KV``.  With a field unit
+  as well, this takes precedence, and a line integral more than 2 % away
+  from it is noted on stderr.
+
+The ratio is exact whichever way the voltage is given, because :math:`U^*`
+comes from the shape alone.  With neither, no ratio is reported, rather
+than a wrong one.
+
+Without a field unit the line integral is printed in the file's own units
+as a check: if the file is in V/m it must equal the declared excitation,
+and a disagreement means a wrong length unit, a wrong column, or a line
+that does not span the whole gap.  :ref:`Chap:Examples:FieldLine` works
+this through.
 
 How the line is used
 ....................
