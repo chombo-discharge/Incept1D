@@ -281,9 +281,11 @@ class FieldDistribution:
         inception voltage is reported relative to.
     fieldline_path : str or None
         For 'fieldline': source file (for labels / output headers).
-    fieldline_reversed : bool
-        For 'fieldline': the rows were read last to first, so that ξ = 0 is
-        the last tabulated point.
+    reversed : bool
+        The profile is read from the other electrode, f(ξ) → f(1 − ξ), so
+        that ξ = 0 — where a protrusion sits, and the electrode the polarity
+        labels name — is the plane, the outer conductor, or the last
+        tabulated point.
     protrusion : Protrusion or None
         A protrusion on the ξ = 0 electrode (:mod:`incept1d.protrusions`),
         or None for a smooth electrode.
@@ -301,11 +303,11 @@ class FieldDistribution:
     fieldline_integral: Optional[float] = None
     fieldline_applied_voltage: Optional[float] = None
     fieldline_path: Optional[str] = None
-    fieldline_reversed: bool = False
+    reversed: bool = False
     protrusion: Optional[Protrusion] = None
 
     @classmethod
-    def from_fieldline(cls, path, length_unit="m", reverse=False):
+    def from_fieldline(cls, path, length_unit="m"):
         """
         Build a 'fieldline' distribution from a tabulated ``|E|(s)`` file.
 
@@ -315,16 +317,10 @@ class FieldDistribution:
         absolute scale of the tabulated field therefore drops out: the same
         line exported at 100 kV and at 200 kV gives identical results.
 
-        With *reverse* the rows are read last to first, so that ξ = 0 is the
-        last tabulated point: the way to put the electrode of interest at
-        ξ = 0 without editing the file.
-
         See :func:`load_fieldline` for the accepted file layouts.
         """
         s, E, reading = load_fieldline(path, length_unit)
         L = float(s[-1])
-        if reverse:
-            s, E = L - s[::-1], E[::-1]
         xi = s / L
         _trapz = getattr(np, "trapezoid", None) or np.trapz  # numpy ≥2.0 / <2.0
         mean_E = float(_trapz(E, xi))
@@ -337,7 +333,6 @@ class FieldDistribution:
             # ∫|E| ds = L ∫|E| dξ = L ⟨|E|⟩, in the field units of the file.
             fieldline_integral=mean_E * L,
             fieldline_path=path,
-            fieldline_reversed=reverse,
         )
 
     @property
@@ -368,21 +363,24 @@ class FieldDistribution:
         """
         Name *polarity* (``"positive"`` or ``"negative"``) for this geometry.
 
-        Says which electrode is the anode in positive polarity: the sphere,
-        the hyperboloid tip, the inner conductor, the first tabulated
-        point, or, on a uniform field, the electrode with the protrusion.
+        Says which electrode, the one at ξ = 0, is the anode in positive
+        polarity: the sphere, the hyperboloid tip, the inner conductor, the
+        first tabulated point, or, reversed, the plane, the outer conductor
+        or the last point; on a uniform field, the electrode with the
+        protrusion.
         """
         if self.field_type == "uniform" and self.protrusion is not None:
             return f"protrusion={polarity}"
         if self.field_type == "uniform":
             return polarity
-        if self.field_type == "fieldline":
-            return f"start={polarity}"
-        if self.field_type == "coaxial":
-            return f"inner={polarity}"
-        if self.field_type == "hyperboloid-plane":
-            return f"tip={polarity}"
-        return f"sphere={polarity}"
+        names = {
+            "fieldline": ("start", "end"),
+            "coaxial": ("inner", "outer"),
+            "hyperboloid-plane": ("tip", "plane"),
+            "sphere-plane": ("sphere", "plane"),
+            "sphere-sphere": ("sphere", "sphere"),
+        }[self.field_type]
+        return f"{names[self.reversed]}={polarity}"
 
     @property
     def is_monotone_decreasing(self) -> bool:
@@ -393,9 +391,12 @@ class FieldDistribution:
         profiles have this property;
         sphere-sphere has maxima at both ends, and a tabulated field line may
         have any shape.  A protrusion keeps it, since its enhancement also
-        falls monotonically away from the tip.  Used by quadrature helpers
-        that would otherwise assume a single active region starting at ξ = 0.
+        falls monotonically away from the tip.  A reversed profile rises
+        instead.  Used by quadrature helpers that would otherwise assume a
+        single active region starting at ξ = 0.
         """
+        if self.reversed:
+            return False
         return self.field_type in (
             "uniform",
             "sphere-plane",
@@ -425,18 +426,25 @@ class FieldDistribution:
     @property
     def label(self) -> str:
         """Human-readable description for plot titles and file headers."""
+        label = self._background_label
+        if self.reversed:
+            label += f" (reversed, xi = 0 at the {self.electrode_name})"
         if self.protrusion is None:
-            return self._background_label
-        return f"{self._background_label}, {self.protrusion.label}"
+            return label
+        return f"{label}, {self.protrusion.label}"
+
+    @property
+    def electrode_name(self) -> str:
+        """The electrode at ξ = 0, as the polarity labels name it (``"plane"``, ...)."""
+        return self.polarity_label("positive").split("=")[0]
 
     @property
     def _background_label(self) -> str:
         if self.field_type == "uniform":
             return "uniform field"
         if self.field_type == "fieldline":
-            rev = " (reversed)" if self.fieldline_reversed else ""
             return (
-                f"field line {os.path.basename(self.fieldline_path)}{rev}, "
+                f"field line {os.path.basename(self.fieldline_path)}, "
                 f"L = {self.fieldline_length * 1e3:.4g} mm"
             )
         if self.field_type == "coaxial":
@@ -515,6 +523,17 @@ class FieldDistribution:
 
     def _background(self, d: float) -> Callable[[float], float]:
         """The profile of the electrodes alone, normalised over the gap d."""
+        f = self._forward(d)
+        if not self.reversed:
+            return f
+
+        def f_rev(xi, _f=f):
+            return _f(1.0 - xi)
+
+        return f_rev
+
+    def _forward(self, d: float) -> Callable[[float], float]:
+        """:meth:`_background` from the electrode the geometry names first."""
         if self.field_type == "uniform":
             return lambda xi: 1.0
 
@@ -601,13 +620,15 @@ def add_field_argument(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
-        "--fieldline-reverse",
+        "--reverse-field",
         action="store_true",
         default=False,
         help=(
-            "Read a tabulated field line last row first, so that xi = 0 (the "
-            "electrode a --protrusion sits on, and 'start' in the polarity "
-            "labels) is the last tabulated point."
+            "Read the profile from the other electrode, f(xi) -> f(1 - xi), so "
+            "that xi = 0 -- the electrode a --protrusion sits on and the "
+            "polarity labels name -- is the plane (sphere-plane, "
+            "hyperboloid-plane), the outer conductor (coaxial) or the last "
+            "tabulated point (fieldline).  No effect on a symmetric gap."
         ),
     )
     parser.add_argument(
@@ -639,9 +660,17 @@ def field_from_args(args, parser=None) -> "FieldDistribution":
         args.field,
         parser,
         applied_voltage_kv=args.fieldline_voltage,
-        fieldline_reverse=args.fieldline_reverse,
+        reverse=args.reverse_field,
         protrusion=args.protrusion,
     )
+
+
+def _fieldline_table(fd):
+    """The tabulated (ξ, f), in the order the solve reads them (reversal applied)."""
+    xi, f = fd.fieldline_xi, fd.fieldline_f
+    if fd.reversed:
+        return 1.0 - xi[::-1], f[::-1]
+    return xi, f
 
 
 def _fieldline_scale(fd):
@@ -651,12 +680,12 @@ def _fieldline_scale(fd):
     The slope is a least-squares fit through the first few points, so a
     single noisy sample does not decide it.  Infinite for a flat start.
     """
-    n = min(5, len(fd.fieldline_xi))
-    s = fd.fieldline_xi[:n] * fd.fieldline_length
-    slope = np.polyfit(s, fd.fieldline_f[:n], 1)[0]
+    xi, f = _fieldline_table(fd)
+    n = min(5, len(xi))
+    slope = np.polyfit(xi[:n] * fd.fieldline_length, f[:n], 1)[0]
     if slope == 0.0:
         return math.inf
-    return float(fd.fieldline_f[0] / abs(slope))
+    return float(f[0] / abs(slope))
 
 
 def protrusion_notes(fd, d_min=None) -> list:
@@ -665,8 +694,8 @@ def protrusion_notes(fd, d_min=None) -> list:
 
     The superposition in :meth:`FieldDistribution.build` needs the
     protrusion small against the length scale of the electrode it sits on
-    (sphere radius, tip radius, inner radius, or the scale over which a
-    tabulated field changes) and against the gap, since the closed form
+    (sphere radius, tip radius, inner or outer radius, or the scale over
+    which a tabulated field changes) and against the gap, since the closed form
     leaves the other electrode an equipotential only to O((h/d)³).  A field
     line that is stronger at its far end probably has the protrusion on the
     wrong electrode.
@@ -687,20 +716,27 @@ def protrusion_notes(fd, d_min=None) -> list:
     h = fd.protrusion.height
     notes = []
     scale = None
-    if fd.field_type in ("sphere-plane", "sphere-sphere"):
+    # On a reversed plane the field varies over the gap, which the gap
+    # check below covers.
+    if fd.field_type == "sphere-sphere" or (
+        fd.field_type == "sphere-plane" and not fd.reversed
+    ):
         scale, what = fd.sphere_R, "the sphere radius R"
-    elif fd.field_type == "hyperboloid-plane":
+    elif fd.field_type == "hyperboloid-plane" and not fd.reversed:
         scale, what = fd.tip_R, "the tip radius r"
-    elif fd.field_type == "coaxial":
+    elif fd.field_type == "coaxial" and not fd.reversed:
         scale, what = fd.coax_a, "the inner radius a"
+    elif fd.field_type == "coaxial":
+        scale, what = fd.coax_b, "the outer radius b"
     elif fd.field_type == "fieldline":
         scale = _fieldline_scale(fd)
         what = "the length f/|df/ds| over which the tabulated field changes"
-        if fd.fieldline_f[-1] > fd.fieldline_f[0]:
+        _, f = _fieldline_table(fd)
+        if f[-1] > f[0]:
             notes.append(
-                "the field line is stronger at its last point than at its "
-                "first, but the protrusion sits on the first (xi = 0); pass "
-                "--fieldline-reverse if it belongs on the other electrode"
+                "the field line is stronger at its far end than at xi = 0, "
+                "where the protrusion sits; --reverse-field puts the other "
+                "end at xi = 0 if the protrusion belongs there"
             )
     if scale is not None and h > PROTRUSION_SCALE_LIMIT * scale:
         notes.append(
@@ -740,7 +776,7 @@ def parse_field_spec(
     spec: list,
     parser=None,
     applied_voltage_kv=None,
-    fieldline_reverse=False,
+    reverse=False,
     protrusion=None,
 ) -> "FieldDistribution":
     """
@@ -757,8 +793,9 @@ def parse_field_spec(
         Value of ``--fieldline-voltage``.  Meaningful only for a tabulated
         field line; supplying it for any other geometry is an error, since
         there the voltage is an output rather than a property of the input.
-    fieldline_reverse : bool
-        Value of ``--fieldline-reverse``; a tabulated field line only.
+    reverse : bool
+        Value of ``--reverse-field``: read the profile from the other
+        electrode.  A symmetric gap is unchanged by it, which is noted.
     protrusion : list of str or None
         The raw ``--protrusion`` tokens (e.g. ['spheroid', '0.5', '0.1']).
         Where the geometry fixes the gap, the notes of
@@ -775,7 +812,15 @@ def parse_field_spec(
             parser.error(msg)
         raise ValueError(msg)
 
-    fd = _parse_background(spec, _err, applied_voltage_kv, fieldline_reverse)
+    fd = _parse_background(spec, _err, applied_voltage_kv)
+    if reverse and fd.is_symmetric:
+        print(
+            f"note: --field {fd.field_type} is symmetric, so --reverse-field "
+            f"changes nothing.",
+            file=sys.stderr,
+        )
+    elif reverse:
+        fd.reversed = True
     if protrusion is None:
         return fd
 
@@ -794,7 +839,7 @@ def parse_field_spec(
     return fd
 
 
-def _parse_background(spec, _err, applied_voltage_kv, fieldline_reverse):
+def _parse_background(spec, _err, applied_voltage_kv):
     """The electrodes alone, from the ``--field`` tokens."""
     field_type = spec[0]
     if applied_voltage_kv is not None and field_type != "fieldline":
@@ -802,8 +847,6 @@ def _parse_background(spec, _err, applied_voltage_kv, fieldline_reverse):
             "--fieldline-voltage applies only to '--field fieldline'; for "
             "every other geometry the voltage is a result, not an input"
         )
-    if fieldline_reverse and field_type != "fieldline":
-        _err("--fieldline-reverse applies only to '--field fieldline'")
     if field_type == "uniform":
         return FieldDistribution(field_type="uniform")
 
@@ -842,7 +885,7 @@ def _parse_background(spec, _err, applied_voltage_kv, fieldline_reverse):
             _err("--field fieldline requires a data file path")
         unit = spec[2] if len(spec) > 2 else "m"
         try:
-            fd = FieldDistribution.from_fieldline(spec[1], unit, fieldline_reverse)
+            fd = FieldDistribution.from_fieldline(spec[1], unit)
         except (OSError, ValueError) as exc:
             _err(f"--field fieldline: {exc}")
         if applied_voltage_kv is not None:

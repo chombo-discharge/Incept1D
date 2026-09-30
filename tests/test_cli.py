@@ -635,6 +635,85 @@ class TestProtrusion:
         assert "smallest gap d = 1 mm" in capsys.readouterr().err
 
 
+class TestReverseField:
+    def test_the_plane_is_named_and_recorded(self, tmp_path, capsys):
+        """--reverse-field on sphere-plane: the plane is xi = 0 in every label."""
+        out = tmp_path / "rev.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "sphere-plane",
+            "5",
+            "--reverse-field",
+            "--d",
+            "10",
+            "--pd-min",
+            "5",
+            "--pd-max",
+            "20",
+            "--pd-num",
+            "2",
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        text = out.read_text()
+        assert "# Reversed:    xi = 0 is the plane" in text
+        assert "# Polarity:    plane=positive → plane is anode" in text
+        col = _columns(out)
+        for pol in ("positive", "negative"):
+            EN = [
+                c
+                for n, c in col.items()
+                if n.startswith("EN_Td") and f"plane={pol}" in n
+            ]
+            assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
+
+    def test_reversing_swaps_the_polarities(self, tmp_path, capsys):
+        """
+        Reversing only renames the electrode at xi = 0: sphere=positive (sphere
+        anode) is plane=negative (plane cathode), the same physical case.
+        """
+
+        def run(*extra):
+            out = tmp_path / f"sp{len(extra)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--field",
+                "sphere-plane",
+                "5",
+                *extra,
+                "--d",
+                "10",
+                "--pd-min",
+                "5",
+                "--pd-max",
+                "50",
+                "--pd-num",
+                "3",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return {
+                n.split("(")[-1].split(")")[0]: c
+                for n, c in _columns(out).items()
+                if n.startswith("EN_Td")
+            }
+
+        fwd, rev = run(), run("--reverse-field")
+        capsys.readouterr()
+        np.testing.assert_allclose(fwd["sphere=positive"], rev["plane=negative"])
+        np.testing.assert_allclose(fwd["sphere=negative"], rev["plane=positive"])
+
+
 class TestJobs:
     def test_parallel_sweep_writes_the_same_file(self, tmp_path, capsys):
         outs = []

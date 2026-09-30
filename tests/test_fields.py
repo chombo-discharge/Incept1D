@@ -731,43 +731,88 @@ class TestProtrusionParsing:
         assert protrusion_notes(fd, 1.0) == []
 
 
-class TestFieldLineReverse:
+class TestReverseField:
     @staticmethod
     def _line(tmp_path):
         s = np.linspace(0.0, 10.0, 11)
-        return _write_line(tmp_path / "up.dat", zip(s, 1.0 + 0.3 * s)), s
+        return _write_line(tmp_path / "up.dat", zip(s, 1.0 + 0.3 * s))
 
-    def test_reversed_profile_is_the_mirror_image(self, tmp_path):
-        """F57: f_rev(ξ) = f(1 − ξ), same arc length."""
-        path, _ = self._line(tmp_path)
-        fwd = FieldDistribution.from_fieldline(path)
-        rev = FieldDistribution.from_fieldline(path, reverse=True)
-        assert rev.fieldline_length == fwd.fieldline_length
-        f, g = fwd.build(fwd.fieldline_length), rev.build(rev.fieldline_length)
+    @pytest.mark.parametrize(
+        "spec, electrode",
+        [
+            (["sphere-plane", "5"], "plane"),
+            (["hyperboloid-plane", "0.5"], "plane"),
+            (["coaxial", "1", "10"], "outer"),
+        ],
+    )
+    def test_reversed_profile_is_the_mirror_image(self, spec, electrode):
+        """F57: f_rev(ξ) = f(1 − ξ), and ξ = 0 is named in the labels."""
+        fwd = parse_field_spec(spec)
+        rev = parse_field_spec(spec, reverse=True)
+        d = fwd.fixed_gap_length or 10e-3
+        f, g = fwd.build(d), rev.build(d)
         for x in np.linspace(0.0, 1.0, 21):
             assert g(x) == pytest.approx(f(1.0 - x), rel=1e-12)
-        assert "(reversed)" in rev.label
+        assert rev.polarity_label("negative") == f"{electrode}=negative"
+        assert f"xi = 0 at the {electrode}" in rev.label
+        assert fwd.is_monotone_decreasing and not rev.is_monotone_decreasing
+        assert rev.fixed_gap_length == fwd.fixed_gap_length
 
-    def test_reverse_applies_to_field_lines_only(self):
-        """F58."""
-        with pytest.raises(ValueError, match="only to"):
-            parse_field_spec(["uniform"], fieldline_reverse=True)
+    def test_a_field_line_is_read_from_its_last_point(self, tmp_path):
+        """F58: for a table, reversing makes the last row ξ = 0."""
+        path = self._line(tmp_path)
+        fwd = parse_field_spec(["fieldline", path])
+        rev = parse_field_spec(["fieldline", path], reverse=True)
+        L = fwd.fieldline_length
+        f, g = fwd.build(L), rev.build(L)
+        for x in np.linspace(0.0, 1.0, 21):
+            assert g(x) == pytest.approx(f(1.0 - x), rel=1e-12)
+        assert rev.polarity_label("positive") == "end=positive"
+
+    @pytest.mark.parametrize("spec", [["uniform"], ["sphere-sphere", "5"]])
+    def test_a_symmetric_gap_is_unchanged(self, spec, capsys):
+        """F59: nothing to reverse, and the command says so."""
+        fd = parse_field_spec(spec, reverse=True)
+        assert not fd.reversed
+        assert "changes nothing" in capsys.readouterr().err
+
+    def test_a_protrusion_on_the_plane(self):
+        """F60: reversed sphere-plane puts the protrusion on the plane."""
+        fd = parse_field_spec(
+            ["sphere-plane", "50"], reverse=True, protrusion=["spheroid", "0.1", "0.1"]
+        )
+        bg = parse_field_spec(["sphere-plane", "50"]).build(10e-3 + 0.1e-3)
+        f = fd.build(10e-3)
+        # Far from the tip, the plane side of the background, renormalised.
+        ratio = f(0.5) / bg(1.0 - (0.1e-3 + 0.5 * 10e-3) / 10.1e-3)
+        assert f(0.9) / bg(1.0 - (0.1e-3 + 0.9 * 10e-3) / 10.1e-3) == pytest.approx(
+            ratio, rel=1e-3
+        )
+        assert f(0.0) > 2.5 * f(0.5)
+        assert fd.polarity_label("positive") == "plane=positive"
 
     def test_protrusion_at_the_weak_end_is_pointed_out(self, tmp_path, capsys):
-        """F59: a line rising towards ξ = 1 suggests --fieldline-reverse."""
-        path, _ = self._line(tmp_path)
+        """F61: a line rising towards ξ = 1 suggests --reverse-field."""
+        path = self._line(tmp_path)
         parse_field_spec(["fieldline", path], protrusion=["spheroid", "1", "1"])
-        assert "--fieldline-reverse" in capsys.readouterr().err
+        assert "--reverse-field" in capsys.readouterr().err
         parse_field_spec(
-            ["fieldline", path],
-            fieldline_reverse=True,
-            protrusion=["spheroid", "1", "1"],
+            ["fieldline", path], reverse=True, protrusion=["spheroid", "1", "1"]
         )
-        assert "--fieldline-reverse" not in capsys.readouterr().err
+        assert "--reverse-field" not in capsys.readouterr().err
+
+    def test_the_scale_note_follows_the_electrode(self, capsys):
+        """F62: reversed coaxial compares h with the outer radius."""
+        parse_field_spec(["coaxial", "0.5", "5"], protrusion=["spheroid", "0.2", "0.2"])
+        assert "inner radius" in capsys.readouterr().err
+        parse_field_spec(
+            ["coaxial", "0.5", "5"], reverse=True, protrusion=["spheroid", "0.2", "0.2"]
+        )
+        assert capsys.readouterr().err == ""
 
 
 def test_a_protrusion_on_a_plate_is_not_uniform():
-    """F60: the constant-field shortcut must not swallow the protrusion."""
+    """F63: the constant-field shortcut must not swallow the protrusion."""
     assert FieldDistribution("uniform").is_uniform
     fd = _with_protrusion(FieldDistribution("uniform"), 1e-3, 1e-3)
     assert fd.field_type == "uniform" and not fd.is_uniform

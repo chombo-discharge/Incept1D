@@ -1095,31 +1095,35 @@ def run(args, parser):
                     f"xi = 0 electrode; beta = {_field_dist.protrusion.beta:.6g}; "
                     f"d is measured from its tip\n"
                 )
+            if _field_dist.reversed:
+                fh.write(
+                    f"# Reversed:    xi = 0 is the {_field_dist.electrode_name} "
+                    f"(--reverse-field)\n"
+                )
             if _field_dist.sphere_R is not None:
                 fh.write(f"# Sphere R:    {_field_dist.sphere_R*1e3:.4g} mm\n")
-            if _field_dist.field_type == "sphere-plane":
-                fh.write(
-                    "# Polarity:    sphere=positive → sphere is anode (+),  "
-                    "sphere=negative → sphere is cathode (−)\n"
-                )
             if _field_dist.field_type == "hyperboloid-plane":
                 fh.write(f"# Tip R:       {_field_dist.tip_R*1e3:.4g} mm\n")
-                fh.write(
-                    "# Polarity:    tip=positive → tip is anode (+),  "
-                    "tip=negative → tip is cathode (−)\n"
-                )
             if _field_dist.field_type == "coaxial":
                 fh.write(
                     f"# Radii:       a = {_field_dist.coax_a*1e3:.6g} mm, "
                     f"b = {_field_dist.coax_b*1e3:.6g} mm\n"
                 )
+            if not _field_dist.is_symmetric:
+                _el = _field_dist.electrode_name
+                _what = {
+                    "inner": "inner conductor",
+                    "outer": "outer conductor",
+                    "start": "first tabulated point",
+                    "end": "last tabulated point",
+                    "protrusion": "electrode with the protrusion",
+                }.get(_el, _el)
                 fh.write(
-                    "# Polarity:    inner=positive → inner conductor is anode "
-                    "(+),  inner=negative → inner conductor is cathode (−)\n"
+                    f"# Polarity:    {_el}=positive → {_what} is anode (+),  "
+                    f"{_el}=negative → {_what} is cathode (−)\n"
                 )
             if _field_dist.field_type == "fieldline":
-                _rev = " (read reversed)" if _field_dist.fieldline_reversed else ""
-                fh.write(f"# Field line:  {_field_dist.fieldline_path}{_rev}\n")
+                fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
                 fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
                 fh.write(
                     f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "

@@ -20,9 +20,10 @@ so that the "reference" reduced field :math:`E_\mathrm{ref}/N` used on the
 axes of every plot and output file is always the *mean* field
 :math:`U/d`, whatever the geometry.  :math:`\xi = 0` is the high-field
 electrode (sphere surface, hyperboloid tip, inner conductor, or either plate
-for a uniform field) and :math:`\xi = 1` the low-field side.  Any of these
-electrodes can carry a protrusion (``--protrusion``, see `Protrusions`_) on
-the :math:`\xi = 0` side.
+for a uniform field) and :math:`\xi = 1` the low-field side, unless the
+profile is reversed (see `Reversing the profile`_).  The electrode at
+:math:`\xi = 0` can carry a protrusion (``--protrusion``, see
+`Protrusions`_).
 
 Geometries
 ----------
@@ -67,6 +68,41 @@ together), while a sweep at fixed :math:`d` varies only the pressure.  For a
 tabulated field line the arc length fixes :math:`d = L`, and for coaxial
 cylinders the radii fix :math:`d = b - a`, so only fixed-:math:`d` sweeps are
 meaningful there.
+
+Reversing the profile
+---------------------
+
+``--reverse-field`` reads the profile from the other electrode,
+:math:`f(\xi) \to f(1 - \xi)`, for any geometry.  The physics is
+unchanged; what changes is which electrode is at :math:`\xi = 0`, and so
+which one the polarity labels name and a protrusion sits on:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - ``--field``
+     - :math:`\xi = 0` as given
+     - :math:`\xi = 0` reversed
+   * - ``sphere-plane``
+     - ``sphere``
+     - ``plane``
+   * - ``hyperboloid-plane``
+     - ``tip``
+     - ``plane``
+   * - ``coaxial``
+     - ``inner`` conductor
+     - ``outer`` conductor
+   * - ``fieldline``
+     - ``start`` (first row)
+     - ``end`` (last row)
+
+So ``plane=negative`` on a reversed sphere-plane gap is the same case as
+``sphere=positive`` without it, and gives the same inception field; the
+option exists to put a protrusion on the plane or the outer conductor, and
+to take a field line from whichever end it was exported.  A uniform or
+sphere-sphere gap is symmetric, and is left unchanged with a note.  The
+reversal is recorded in the labels and in the ``--write-to-file`` header.
 
 Hyperboloid-plane
 -----------------
@@ -306,7 +342,9 @@ dipole field, a relative error of order :math:`(h/d)^3`.  On a curved
 electrode the enhancement is superposed on the background, which needs
 :math:`h` small against the length over which the background varies: the
 sphere radius :math:`R`, the tip radius :math:`r`, the inner radius
-:math:`a`, or, for a tabulated line, :math:`f/|df/ds|` near its start.
+:math:`a` (outer radius :math:`b` when reversed), or, for a tabulated
+line, :math:`f/|df/ds|` near :math:`\xi = 0`.  On a reversed plane the
+field varies over the gap, which the gap check covers.
 The commands print a ``note:`` on stderr when :math:`h` exceeds a tenth of
 any of these (the gap check uses the smallest gap of the sweep), and
 compute anyway.
@@ -317,8 +355,8 @@ fan out and photons escape sideways; both are neglected (see
 `Limitations`_), and increasingly so as :math:`h/b` grows.
 
 For a tabulated field line, the protrusion sits on the first point.  If the
-line is stronger at its last point, the command says so and suggests
-``--fieldline-reverse`` (see `Polarity`_).  A line exported from a model
+line is stronger at its far end, the command says so and suggests
+``--reverse-field`` (see `Reversing the profile`_).  A line exported from a model
 that already contains the protrusion must not be given ``--protrusion``
 too: that counts the enhancement twice.
 
@@ -431,9 +469,9 @@ The file does not say which end is the anode.  ``incept1d pdiv`` and
 point is the anode) and ``start=negative`` (the first point is the
 cathode).  Use the one that matches your electrode arrangement.
 
-``--fieldline-reverse`` reads the rows last to first, which makes the last
-tabulated point :math:`\xi = 0` and ``start`` without editing the file.
-That matters for ``--protrusion``, which always sits at :math:`\xi = 0`.
+``--reverse-field`` reads the rows last to first, which makes the last
+tabulated point :math:`\xi = 0`, labelled ``end``, without editing the
+file (see `Reversing the profile`_).
 
 Sweeps
 ~~~~~~
@@ -506,6 +544,7 @@ field-line file before using it in a solve.
    incept1d field --field fieldline line.csv mm
    incept1d field --field uniform --d 10 --protrusion spheroid 0.5 0.1
    incept1d field --field uniform --d 10 --protrusion cone 0.5 0.01 20
+   incept1d field --field sphere-plane 50 --d 20 --reverse-field --protrusion rod 0.5 0.02
 
 API reference
 -------------
