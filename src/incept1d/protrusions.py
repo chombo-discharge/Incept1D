@@ -322,8 +322,6 @@ class Protrusion:
 
     height: float
 
-    shape = ""
-
     def enhancement(self, s: float) -> float:
         """E/E₀ on the axis at distance *s* (m) above the tip."""
         raise NotImplementedError
@@ -365,7 +363,6 @@ class Spheroid(Protrusion):
     """
 
     base_radius: float = 0.0
-    shape = "spheroid"
 
     def enhancement(self, s):
         return _spheroid_axial_field(s, self.height, self.base_radius)
@@ -417,7 +414,6 @@ class Rod(_SimulatedProtrusion):
     """
 
     radius: float = 0.0
-    shape = "rod"
 
     @property
     def tip_radius(self):
@@ -463,7 +459,6 @@ class Cone(_SimulatedProtrusion):
 
     radius: float = 0.0
     half_angle: float = 0.0  # degrees
-    shape = "cone"
 
     @property
     def tip_radius(self):
