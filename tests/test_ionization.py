@@ -131,3 +131,54 @@ class TestStreamerEN:
     def test_unreachable_C_gives_nan(self, toy):
         fd = FieldDistribution("uniform")
         assert np.isnan(streamer_EN(1e12, 1.0, 1e-3, toy, 293.0, fd, 200))
+
+
+class _Quadratic:
+    """α = c (E/N)², η = 0: an integrand that weights the peak of the field."""
+
+    c = 1e-3
+
+    def alpha(self, EN, p, T):
+        return self.c * EN * EN
+
+    def eta(self, EN, p, T):
+        return 0.0
+
+
+class TestFieldFollowingPanels:
+    """A thin high-field layer is integrated, not stepped over."""
+
+    @staticmethod
+    def _reference(f, EN, d):
+        # Independent of the panels: quad on geometric breakpoints to the tip.
+        from scipy.integrate import quad
+
+        edges = [0.0, *np.geomspace(1e-7, 1.0, 29)]
+        return d * sum(
+            quad(lambda x: _Quadratic.c * (EN * f(x)) ** 2, a, b, limit=200)[0]
+            for a, b in zip(edges[:-1], edges[1:])
+        )
+
+    @pytest.mark.parametrize(
+        "spec, reverse",
+        [
+            (["uniform"], False),
+            (["sphere-plane", "50"], True),
+            (["sphere-sphere", "50"], False),
+        ],
+    )
+    def test_protrusion_in_a_wide_gap(self, spec, reverse):
+        """
+        X10: a 10 um rod tip in a 50 mm gap, on monotone and general profiles.
+
+        Evenly spaced cells missed the tip entirely on a general profile
+        and returned zero for the reversed plane.
+        """
+        from incept1d.fields import parse_field_spec
+
+        fd = parse_field_spec(spec, reverse=reverse, protrusion=["rod", "1", "0.01"])
+        EN, d = 60.0, 50e-3
+        ref = self._reference(fd.build(d), EN, d)
+        for N in (10, 50):
+            got = aed_integral(EN, 1.0, d, _Quadratic(), 293.0, fd, N)
+            assert got == pytest.approx(ref, rel=1e-4)

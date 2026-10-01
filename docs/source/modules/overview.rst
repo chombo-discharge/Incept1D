@@ -118,8 +118,13 @@ The four solver commands share the same first arguments and most options:
 
 ``--field SPEC``
    Gap geometry: ``uniform`` (default), ``sphere-plane R_mm``,
-   ``sphere-sphere R_mm``, ``hyperboloid-plane R_mm``, ``coaxial A_mm B_mm``, or ``fieldline FILE [UNIT]``.  See
+   ``sphere-sphere R_mm``, ``hyperboloid-plane R_mm``, ``coaxial A_mm B_mm``, or ``fieldline FILE [LENGTH] [FIELD]``.  See
    :ref:`Chap:FieldDistributions` and :ref:`Chap:FieldLines`.
+
+``--protrusion SHAPE ...``, ``--reverse-field``
+   A protrusion (``spheroid``, ``cone``, ``rod``) on the electrode at
+   :math:`\xi = 0`, and which electrode that is.  See
+   :ref:`Chap:FieldDistributions`.
 
 ``--dx [N_min [N_max [tol]]]``, ``--method {midpoint,magnus2}``
    Integration grid and propagator for non-uniform fields; see

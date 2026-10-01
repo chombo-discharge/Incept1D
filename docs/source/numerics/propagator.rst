@@ -102,10 +102,20 @@ half steps, and cannot see a feature that falls between those sample
 points: a thin high-field layer at a small electrode can be missed
 altogether, and with it the avalanche.  The :math:`N_{\min}` initial
 segments are therefore first split until the field changes by at most
-20 % across each (:func:`incept1d.solver._field_following_edges`), which
+20 % across each (:func:`incept1d.fields.field_following_edges`), which
 for a wire of radius :math:`a` in a gap of :math:`100\,a` adds a couple of
 dozen short segments at the wire; a uniform or gently varying field keeps
-its :math:`N_{\min}` equal segments.  With that start the defaults keep
+its :math:`N_{\min}` equal segments.  Comparing the ends of a segment
+cannot see a feature *inside* it, such as a narrow peak halfway along a
+tabulated field line; where the profile is tabulated, the tabulated values
+inside a segment count as well, so such a peak is split like any other
+change.  A change is judged relative to at least :math:`10^{-3}` of the
+mean field, so that a field falling to zero does not ask for ever finer
+segments next to the zero, and the start is capped at :math:`N_{\max}`
+segments, the segments across which the field changes most being split
+first, so that a noisy table cannot take the cost past what ``--dx``
+allows.  The same refinement, started from ``--N`` panels, gives the
+quadrature panels of the ionization integrals.  With that start the defaults keep
 the inception field within about 0.1–0.2 % of its converged value on
 sphere-plane and thin-wire coaxial gaps; ``--dx 5 1000 1e-3`` brings that
 to about 0.01 % at three to seven times the cost.

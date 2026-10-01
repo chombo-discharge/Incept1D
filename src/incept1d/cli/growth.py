@@ -21,7 +21,12 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
 from incept1d.constants import kB as _kB
-from incept1d.fields import add_field_argument, parse_field_spec
+from incept1d.fields import (
+    add_field_argument,
+    field_from_args,
+    field_header_lines,
+    print_protrusion_notes,
+)
 from incept1d.growth import solve_voltage, voltage_sweep
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
@@ -154,6 +159,8 @@ def _write_results(out_path, curve_records, args, raw_dicts, mech_name, field_di
             fh.write("# Cases:       every pressure with every distance (see labels)\n")
         fh.write(f"# Temperature: {args.T} K\n")
         fh.write(f"# Field type:  {field_dist.label}\n")
+        for line in field_header_lines(field_dist):
+            fh.write(f"# {line}\n")
         fh.write(f"# V_max_factor:{args.v_max_factor}\n")
         fh.write(f"# n_voltages:  {args.n_voltages}\n")
         fh.write(
@@ -321,9 +328,7 @@ def run(args, parser):
     if args.n_voltages < 2:
         parser.error("--n-voltages must be >= 2")
 
-    _field_dist = parse_field_spec(
-        args.field, parser, applied_voltage_kv=args.fieldline_voltage
-    )
+    _field_dist = field_from_args(args, parser)
     _N_min, _N_max, _tol = parse_dx_spec(args.dx, parser)
     _propagator = (
         midpoint_propagator if args.method == "midpoint" else magnus2_propagator
@@ -339,6 +344,8 @@ def run(args, parser):
     fixed = _field_dist.fixed_gap_length
     if fixed is not None:
         why = "b - a" if _field_dist.field_type == "coaxial" else "its arc length"
+        if _field_dist.protrusion is not None:
+            why += ", less the protrusion height"
         given = (
             _parse_values(args.distance, "--distance", parser) if args.distance else []
         )
@@ -354,6 +361,7 @@ def run(args, parser):
         parser.error(f"--distance is required for --field {_field_dist.field_type}")
     else:
         distances = _parse_values(args.distance, "--distance", parser)
+    print_protrusion_notes(_field_dist, min(distances) * 1e-3, gap_only=True)
     # Every pressure with every distance.
     cases = [(p, d) for p in pressures for d in distances]
     args.pressures, args.distances = pressures, distances
@@ -467,9 +475,13 @@ def run(args, parser):
             print(f"  [{solved[k]['label']}]  no inception found  ({seconds:.1f} s)")
             return
         V_star = EN_star * solved[k]["pd_m"] * 1e-16 / (_kB * args.T)
+        # Against a declared excitation (a tabulated line with a field unit
+        # or --fieldline-voltage): the factor it must be scaled by.
+        u_app = _field_dist.fieldline_applied_voltage
+        ratio = f"   V*/U_applied = {V_star / u_app:.4f}" if u_app else ""
         print(
             f"  [{solved[k]['label']}]  V* = {V_star * 1e-3:.4f} kV   "
-            f"E/N* = {EN_star:.2f} Td   ({seconds:.1f} s){_verdict(check)}",
+            f"E/N* = {EN_star:.2f} Td{ratio}   ({seconds:.1f} s){_verdict(check)}",
             flush=True,
         )
 

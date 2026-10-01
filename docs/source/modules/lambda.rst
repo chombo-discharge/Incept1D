@@ -73,7 +73,9 @@ Inputs
    incept1d growth MECHANISM.py [CONFIG.json ...]
        [--pressure P [P ...]] [--distance D [D ...]] [--T T]
        [--n-voltages N] [--v-max-factor F]
-       [--field SPEC] [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
+       [--field SPEC] [--protrusion SHAPE ...] [--reverse-field]
+       [--fieldline-voltage U_KV]
+       [--dx [N_min [N_max [tol]]]] [--method {midpoint,magnus2}]
        [--criterion {riccati,detq}] [--jobs N] [--verify] [--silent]
        [--no-plot] [--write-to-file FILE]
 
@@ -113,7 +115,8 @@ point, exactly as ``incept1d pdiv`` does: the two are solved separately
 unless the gap is symmetric and the configuration has no per-polarity
 overrides, in which case the negative-polarity curve repeats the positive
 one.  For each curve the inception point is reported first (:math:`U^*` and
-:math:`(E/N)^*`), then a table with one row per voltage:
+:math:`(E/N)^*`, and :math:`U^*/U_\mathrm{applied}` when a field line
+declares its excitation), then a table with one row per voltage:
 
 .. code-block:: text
 
@@ -136,7 +139,8 @@ curve then has its own four columns: the voltage in kV, :math:`\lambda`,
 :math:`\tau` and :math:`\nu_\mathrm{ion}`, named after the curve (for
 example ``lambda_s-1[Baseline (negative)]``, or with several cases
 ``lambda_s-1[Baseline, p=2 bar, d=10 mm (negative)]``) in the ``# Column``
-lines of the header, which also lists the pressures and distances.
+lines of the header, which also lists the pressures and distances and
+records the geometry as ``incept1d pdiv`` does.
 
 :math:`\nu_\mathrm{ion}` is the fastest local net ionization rate in the gap,
 evaluated at the peak of the field profile; in a non-uniform gap the

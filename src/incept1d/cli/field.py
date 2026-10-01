@@ -3,19 +3,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-``incept1d field`` — plot the normalised field profile f(ξ) and the midpoint
-quadrature grid for a gap geometry (see :mod:`incept1d.fields`).
+``incept1d field`` — plot the normalised field profile f(ξ) of a gap
+geometry over a reference grid of N equal cells (see :mod:`incept1d.fields`).
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-from incept1d.fields import add_field_argument, parse_field_spec
+from incept1d.fields import (
+    add_field_argument,
+    field_following_edges,
+    field_from_args,
+    print_protrusion_notes,
+)
 
 HELP = "Plot the normalised field profile f(ξ) of a gap geometry."
 DESCRIPTION = (
-    "Plot the normalised on-axis electric field and midpoint quadrature grid "
-    "for a given gap geometry."
+    "Plot the normalised on-axis electric field of a gap geometry over a "
+    "reference grid of N equal cells."
 )
 
 
@@ -38,7 +43,10 @@ def add_arguments(parser):
         type=int,
         default=25,
         metavar="N",
-        help="Number of grid points to display (default: 25).",
+        help=(
+            "Number of equal reference cells drawn (default: 25); the solver's "
+            "own grid follows the field and is not the one shown."
+        ),
     )
 
 
@@ -82,7 +90,7 @@ def _implied_field_unit(fd):
 
 def run(args, parser):
     """Run the command with parsed *args*; *parser* is used for ``parser.error``."""
-    fd = parse_field_spec(args.field, parser, applied_voltage_kv=args.fieldline_voltage)
+    fd = field_from_args(args, parser)
     N = args.N
     if args.d is None:
         if fd.fixed_gap_length is None:
@@ -90,6 +98,7 @@ def run(args, parser):
         args.d = fd.fixed_gap_length * 1e3
     d_mm = args.d
     d = d_mm * 1e-3
+    print_protrusion_notes(fd, d, gap_only=True)
     f = fd.build(d)
     color = "tab:blue"
 
@@ -100,23 +109,37 @@ def run(args, parser):
         geom_str += f"  (d/r = {d/fd.tip_R:.3f})"
 
     print(f"Geometry:  {geom_str}")
+    if fd.protrusion is not None:
+        pr = fd.protrusion
+        print(
+            f"Protrusion: beta = {pr.beta:.4g} on a uniform field, tip radius "
+            f"of curvature {pr.tip_radius * 1e3:.4g} mm, d measured from the tip"
+        )
     if fd.field_type == "fieldline":
         print(
             f"Arc length = {fd.fieldline_length*1e3:.6g} mm"
             f"   (from the {fd.fieldline_reading})"
         )
-        print(
-            f"∫|E| ds  = {fd.fieldline_integral:.6g}"
-            f"   (in the field units of the file × m)"
-        )
-        if fd.fieldline_applied_voltage is not None:
-            u_kv = fd.fieldline_applied_voltage / 1e3
-            print(f"U_applied = {u_kv:.6g} kV   (--fieldline-voltage)")
-            print(f"           {_implied_field_unit(fd)}")
+        if fd.fieldline_line_voltage is not None:
+            print(
+                f"∫|E| ds  = {fd.fieldline_line_voltage / 1e3:.6g} kV"
+                f"   (|E| in {fd.fieldline_field_unit})"
+            )
         else:
             print(
-                "           a voltage only if the file is in V/m, which the "
-                "file does not say; pass --fieldline-voltage to report"
+                f"∫|E| ds  = {fd.fieldline_integral:.6g}"
+                f"   (in the field units of the file × m)"
+            )
+        if fd.fieldline_applied_voltage is not None:
+            u_kv = fd.fieldline_applied_voltage / 1e3
+            print(f"U_applied = {u_kv:.6g} kV   ({fd.fieldline_voltage_source})")
+            if fd.fieldline_field_unit is None:
+                print(f"           {_implied_field_unit(fd)}")
+        else:
+            print(
+                "           a voltage only if the file is in V/m; give the field "
+                "unit (e.g. kV/mm) after the file, or pass --fieldline-voltage, "
+                "to report"
             )
             print("           the inception voltage relative to the excitation")
     print(f"f(0) = {f(0.0):.6f}")
@@ -124,7 +147,12 @@ def run(args, parser):
     print(f"N = {N}  (cell width = {d_mm / N:.3f} mm)")
     print()
 
-    xi_plot = np.linspace(0.0, 1.0, 2000)
+    # Evenly spaced samples, plus field-following ones so that a thin
+    # high-field layer (a protrusion tip) is drawn rather than stepped over.
+    xi_plot = np.union1d(
+        np.linspace(0.0, 1.0, 2000),
+        field_following_edges(f, 200, rel=0.02, nodes=fd.nodes(d)),
+    )
     f_plot = np.array([f(xi) for xi in xi_plot])
     x_plot = xi_plot * d_mm
 

@@ -51,15 +51,28 @@ def peak_ionization_frequency(mod, EN_ref, pd, p, T, field_dist, n_samples=201):
     field_dist : FieldDistribution
         Gap geometry.
     n_samples : int
-        Points at which the profile f(ξ) is sampled, endpoints included.
+        Evenly spaced points at which the profile f(ξ) is sampled, endpoints
+        included, in addition to the field-following edges and any
+        tabulated points.
 
     Returns
     -------
     float
         ν_ion ≥ 0 in s⁻¹.
     """
-    f = field_dist.build(pd / p)
-    EN_peak = EN_ref * max(f(xi) for xi in np.linspace(0.0, 1.0, n_samples))
+    d = pd / p
+    f = field_dist.build(d)
+    # Evenly spaced samples miss a peak between them; the field-following
+    # edges and the tabulated points do not.
+    nodes = field_dist.nodes(d)
+    xis = np.concatenate(
+        (
+            np.linspace(0.0, 1.0, n_samples),
+            field_dist.grid_edges(d, 5),
+            [] if nodes is None else nodes,
+        )
+    )
+    EN_peak = EN_ref * max(f(xi) for xi in xis)
     lam_eig = _max_real_eigenvalue(mod, EN_peak, p, T)  # m⁻¹
     v_e = abs(float(np.diag(mod.get_V(EN_peak, p, T))[mod.ELECTRON_INDEX]))
     return max(lam_eig, 0.0) * v_e

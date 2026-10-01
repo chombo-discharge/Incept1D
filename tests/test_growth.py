@@ -199,3 +199,23 @@ class TestPolarity:
             positive_polarity=positive,
         )
         assert seen == {positive}
+
+
+class TestPeakIonizationFrequency:
+    def test_a_peak_between_samples_is_found(self, tmp_path, toy):
+        """The peak field of a line with a narrow interior bump is its bump."""
+        from incept1d.fields import parse_field_spec
+        from incept1d.growth import peak_ionization_frequency
+
+        s = np.union1d(np.linspace(0, 20, 401), np.linspace(7.2, 7.46, 131))
+        E = 1.0 - 0.02 * s + 2.0 * np.exp(-(((s - 7.33) / 0.02) ** 2))
+        path = tmp_path / "bump.dat"
+        np.savetxt(path, np.c_[s, E])
+        fd = parse_field_spec(["fieldline", str(path), "mm"])
+        f = fd.build(20e-3)
+        peak = max(f(x) for x in fd.nodes(20e-3))
+        nu = peak_ionization_frequency(toy, 50.0, 20e-3, 1.0, 293.0, fd)
+        nu_peak = peak_ionization_frequency(
+            toy, 50.0 * peak, 1e-3, 1.0, 293.0, FieldDistribution("uniform")
+        )
+        assert nu == pytest.approx(nu_peak, rel=1e-9)

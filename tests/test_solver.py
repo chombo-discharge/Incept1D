@@ -472,11 +472,11 @@ class TestFieldFollowingStart:
         20 % change of the field, so sample points land in the ionizing
         layer at the wire, which equal segments of ~5 mm would straddle.
         """
-        from incept1d.solver import _field_following_edges
+        from incept1d.fields import field_following_edges
 
         fd = FieldDistribution("coaxial", coax_a=0.25e-3, coax_b=25e-3)
         f = fd.build(24.75e-3)
-        edges = _field_following_edges(f, 5)
+        edges = field_following_edges(f, 5)
         values = np.array([f(x) for x in edges])
         change = np.abs(np.diff(values)) / np.maximum(values[:-1], values[1:])
         assert change.max() <= 0.2 + 1e-12
@@ -484,8 +484,90 @@ class TestFieldFollowingStart:
         # The wire is at xi = 0 (the field decreases away from it).
         assert edges[1] < 0.02
 
+    @staticmethod
+    def _bump_line(tmp_path):
+        """20 mm, gently falling, with a x3 bump 0.05 mm wide at 7.3 mm."""
+        s = np.union1d(np.linspace(0, 20, 401), np.linspace(7.0, 7.6, 601))
+        E = 1.0 - 0.02 * s + 2.0 * np.exp(-(((s - 7.3) / 0.05) ** 2))
+        path = tmp_path / "bump.dat"
+        np.savetxt(path, np.c_[s, E])
+        return str(path)
+
+    def test_a_peak_inside_a_tabulated_line_is_resolved(self, tmp_path):
+        """
+        A peak between the first sample points is invisible to the ends of a
+        segment; the tabulated values inside it are not.  Without them the
+        default grid put no edge near the bump, and the inception field of
+        the air mechanism came out 7 % high.
+        """
+        from incept1d.fields import field_following_edges, parse_field_spec
+
+        fd = parse_field_spec(["fieldline", self._bump_line(tmp_path), "mm"])
+        f = fd.build(20e-3)
+        near = lambda e: np.sum(np.abs(e - 7.3 / 20) < 0.01)  # noqa: E731
+        assert near(field_following_edges(f, 5)) == 0
+        edges = field_following_edges(f, 5, nodes=fd.nodes(20e-3))
+        assert near(edges) >= 8
+        # Between edges the tabulated field changes by at most 20 %.
+        nodes = fd.nodes(20e-3)
+        for a, b in zip(edges, edges[1:]):
+            vals = [f(a), f(b), *[f(x) for x in nodes[(nodes > a) & (nodes < b)]]]
+            assert max(vals) - min(vals) <= 0.2 * max(vals) + 1e-12
+
+    def test_nodes_follow_reversal_and_protrusion(self, tmp_path):
+        """The tabulated points, in the xi of build(), after both mappings."""
+        from incept1d.fields import parse_field_spec
+
+        path = self._bump_line(tmp_path)
+        fwd = parse_field_spec(["fieldline", path, "mm"])
+        assert FieldDistribution("sphere-plane", 5e-3).nodes(1e-2) is None
+        rev = parse_field_spec(["fieldline", path, "mm"], reverse=True)
+        assert np.allclose(np.sort(1.0 - rev.nodes(20e-3)), fwd.nodes(20e-3))
+        pr = parse_field_spec(
+            ["fieldline", path, "mm"], protrusion=["spheroid", "1", "1"]
+        )
+        d = pr.fixed_gap_length
+        s_tab = fwd.nodes(20e-3) * 20e-3
+        expected = (s_tab - 1e-3) / d
+        assert np.allclose(pr.nodes(d), expected[(expected > 0) & (expected < 1)])
+
+    def test_a_field_falling_to_zero_stays_bounded(self):
+        """
+        A purely relative test never converges next to f = 0; the floor
+        judges changes there absolutely.
+        """
+        from incept1d.fields import field_following_edges
+
+        edges = field_following_edges(lambda x: 2.0 * (1.0 - x), 5)
+        assert len(edges) < 100
+
+    def test_the_cap_splits_the_largest_changes_first(self):
+        """A noisy profile is held to max_edges, with the worst segments split."""
+        from incept1d.fields import field_following_edges
+
+        rng = np.random.default_rng(1)
+        xs = np.linspace(0.0, 1.0, 2001)
+        ys = 1.0 + 0.3 * rng.uniform(-1.0, 1.0, xs.size)
+        ys[1000] = 10.0  # one real peak among the noise
+        f = lambda x: float(np.interp(x, xs, ys))  # noqa: E731
+        edges = field_following_edges(f, 5, max_edges=41, nodes=xs[1:-1])
+        assert len(edges) == 41
+        assert np.sum(np.abs(edges - 0.5) < 0.01) >= 5
+
+    def test_grid_edges_are_cached_and_follow_the_geometry(self):
+        """The cache is keyed on the geometry, not on d alone."""
+        from incept1d.protrusions import Spheroid
+
+        fd = FieldDistribution("uniform", protrusion=Spheroid(1e-3, base_radius=1e-3))
+        a = fd.grid_edges(10e-3, 5)
+        assert fd.grid_edges(10e-3, 5) is a
+        f0 = fd.build(10e-3)(0.0)
+        fd.protrusion = Spheroid(1e-3, base_radius=1e-4)
+        assert fd.build(10e-3)(0.0) > 10 * f0
+        assert fd.grid_edges(10e-3, 5) is not a
+
     def test_uniform_field_keeps_equal_segments(self):
-        from incept1d.solver import _field_following_edges
+        from incept1d.fields import field_following_edges
 
         f = FieldDistribution("uniform").build(1e-2)
-        assert np.allclose(_field_following_edges(f, 5), np.linspace(0.0, 1.0, 6))
+        assert np.allclose(field_following_edges(f, 5), np.linspace(0.0, 1.0, 6))

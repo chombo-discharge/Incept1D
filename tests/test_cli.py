@@ -230,6 +230,49 @@ class TestPdiv:
         assert rc == 0
         assert "U*/U_applied" in out, "the scale factor column is missing"
 
+    def test_a_declared_field_unit_makes_the_integral_the_excitation(
+        self, tmp_path, capsys
+    ):
+        """
+        C7d: with |E| in kV/mm the 20 mm line integrates to 30 kV, which is
+        the excitation; the solve itself is unchanged by the unit.
+        """
+        line = self._fieldline(tmp_path)
+
+        def run(*spec):
+            out = tmp_path / f"u{len(spec)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--field",
+                "fieldline",
+                line,
+                *spec,
+                "--pd-min",
+                "1",
+                "--pd-max",
+                "20",
+                "--pd-num",
+                "3",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return out
+
+        bare, unit = run("mm"), run("mm", "kV/mm")
+        stdout = capsys.readouterr().out
+        assert "U*/U_applied" in stdout
+        text = unit.read_text()
+        assert "# ∫|E| ds:     30 kV (|E| in kV/mm)" in text
+        assert "# U_applied:   30 kV (∫|E| ds with |E| in kV/mm;" in text
+        a, b = _columns(bare), _columns(unit)
+        for name in a:
+            if name.startswith("EN_Td"):
+                np.testing.assert_array_equal(a[name], b[name])
+
     def test_a_field_line_sweeps_pressure_at_fixed_geometry(self, tmp_path, capsys):
         """
         C7e: a tabulated line is one geometry at one size.
@@ -527,6 +570,234 @@ class TestHyperboloidPlane:
                 c for n, c in col.items() if n.startswith("EN_Td") and f"tip={pol}" in n
             ]
             assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
+
+
+class TestTabulatedPeak:
+    def test_default_grid_converges_on_a_peaked_line(self, tmp_path, capsys):
+        """
+        A narrow peak halfway along a tabulated line: the default --dx must
+        agree with a much finer grid, which it did not when the grid saw only
+        the ends of its segments.
+        """
+        s = np.union1d(np.linspace(0, 20, 401), np.linspace(7.0, 7.6, 601))
+        E = 1.0 - 0.02 * s + 2.0 * np.exp(-(((s - 7.3) / 0.05) ** 2))
+        line = tmp_path / "bump.dat"
+        np.savetxt(line, np.c_[s, E])
+
+        def EN(*dx):
+            out = tmp_path / f"b{len(dx)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--field",
+                "fieldline",
+                str(line),
+                "mm",
+                *dx,
+                "--pd-min",
+                "20",
+                "--pd-max",
+                "20",
+                "--pd-num",
+                "1",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return np.array(
+                [c[0] for n, c in _columns(out).items() if n.startswith("EN_Td")]
+            )
+
+        coarse, fine = EN(), EN("--dx", "200", "20000", "0.001")
+        capsys.readouterr()
+        np.testing.assert_allclose(coarse, fine, rtol=3e-3)
+
+
+class TestProtrusion:
+    @pytest.mark.parametrize(
+        "spec, label",
+        [
+            (["spheroid", "0.5", "0.1"], "spheroid protrusion h = 0.5 mm, b = 0.1 mm"),
+            (["cone", "0.5", "0.01", "20"], "cone protrusion h = 0.5 mm, r = 0.01 mm"),
+            (["rod", "0.5", "0.05"], "rod protrusion h = 0.5 mm, R = 0.05 mm"),
+        ],
+    )
+    def test_both_polarities_of_a_protrusion_on_a_plate(
+        self, tmp_path, capsys, spec, label
+    ):
+        """A protrusion makes a uniform gap asymmetric, and reaches the header."""
+        out = tmp_path / "pr.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--protrusion",
+            *spec,
+            "--d",
+            "10",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "50",
+            "--pd-num",
+            "3",
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        assert f"# Protrusion:  {label}" in out.read_text()
+        col = _columns(out)
+        for pol in ("positive", "negative"):
+            EN = [
+                c
+                for n, c in col.items()
+                if n.startswith("EN_Td") and f"protrusion={pol}" in n
+            ]
+            assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
+
+    def test_a_protrusion_changes_inception(self, tmp_path, capsys):
+        """
+        A protrusion on a plate is solved as a non-uniform gap.
+
+        Guards the constant-field shortcut, which once took the plate for a
+        uniform gap and dropped the protrusion without a word.  Whether the
+        protrusion raises or lowers the mean field at inception depends on
+        the mechanism, so only the change is asserted.
+        """
+
+        def EN(*extra):
+            out = tmp_path / f"run{len(extra)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                *extra,
+                "--d",
+                "10",
+                "--pd-min",
+                "10",
+                "--pd-max",
+                "10",
+                "--pd-num",
+                "1",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return [c[0] for n, c in _columns(out).items() if n.startswith("EN_Td")]
+
+        smooth = EN()
+        rough = EN("--protrusion", "spheroid", "1", "0.1")
+        capsys.readouterr()
+        assert np.all(np.isfinite(smooth + rough))
+        assert min(abs(r / s - 1.0) for r in rough for s in smooth) > 1e-3
+
+    def test_a_short_gap_is_pointed_out(self, capsys):
+        """The gap check runs once the command knows its smallest gap."""
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--protrusion",
+            "spheroid",
+            "0.5",
+            "0.5",
+            "--p",
+            "1",
+            "--pd-min",
+            "1",
+            "--pd-max",
+            "1",
+            "--pd-num",
+            "1",
+            "--silent",
+            "--no-plot",
+        )
+        assert rc == 0
+        assert "smallest gap d = 1 mm" in capsys.readouterr().err
+
+
+class TestReverseField:
+    def test_the_plane_is_named_and_recorded(self, tmp_path, capsys):
+        """--reverse-field on sphere-plane: the plane is xi = 0 in every label."""
+        out = tmp_path / "rev.dat"
+        rc = _run(
+            "pdiv",
+            TOY,
+            "--field",
+            "sphere-plane",
+            "5",
+            "--reverse-field",
+            "--d",
+            "10",
+            "--pd-min",
+            "5",
+            "--pd-max",
+            "20",
+            "--pd-num",
+            "2",
+            "--silent",
+            "--no-plot",
+            "--write-to-file",
+            str(out),
+        )
+        capsys.readouterr()
+        assert rc == 0
+        text = out.read_text()
+        assert "# Reversed:    xi = 0 is the plane" in text
+        assert "# Polarity:    plane=positive → plane is anode" in text
+        col = _columns(out)
+        for pol in ("positive", "negative"):
+            EN = [
+                c
+                for n, c in col.items()
+                if n.startswith("EN_Td") and f"plane={pol}" in n
+            ]
+            assert len(EN) == 1 and np.all(np.isfinite(EN[0]))
+
+    def test_reversing_swaps_the_polarities(self, tmp_path, capsys):
+        """
+        Reversing only renames the electrode at xi = 0: sphere=positive (sphere
+        anode) is plane=negative (plane cathode), the same physical case.
+        """
+
+        def run(*extra):
+            out = tmp_path / f"sp{len(extra)}.dat"
+            rc = _run(
+                "pdiv",
+                TOY,
+                "--field",
+                "sphere-plane",
+                "5",
+                *extra,
+                "--d",
+                "10",
+                "--pd-min",
+                "5",
+                "--pd-max",
+                "50",
+                "--pd-num",
+                "3",
+                "--silent",
+                "--no-plot",
+                "--write-to-file",
+                str(out),
+            )
+            assert rc == 0
+            return {
+                n.split("(")[-1].split(")")[0]: c
+                for n, c in _columns(out).items()
+                if n.startswith("EN_Td")
+            }
+
+        fwd, rev = run(), run("--reverse-field")
+        capsys.readouterr()
+        np.testing.assert_allclose(fwd["sphere=positive"], rev["plane=negative"])
+        np.testing.assert_allclose(fwd["sphere=negative"], rev["plane=positive"])
 
 
 class TestJobs:

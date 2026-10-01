@@ -1,0 +1,16 @@
+{
+    "configurations": [
+    {
+        "label": "Optimistic",
+        "cross_sections": "../lxcat/phelps.txt",
+        "gamma0": 1E-3,
+        "gamma1": 0.0
+    },
+    {
+        "label": "Conservative",
+        "cross_sections": "../lxcat/biagi.txt",
+        "gamma0": 1E-1,
+        "gamma1": 0.1
+    }
+  ]
+}

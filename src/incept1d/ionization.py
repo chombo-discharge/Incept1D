@@ -19,7 +19,32 @@ import numpy as np
 import scipy.optimize
 
 from incept1d.eigenvalues import max_real_eigenvalue as _max_real_eigenvalue
-from incept1d.fields import FieldDistribution
+from incept1d.fields import FieldDistribution, field_following_edges
+
+#: Gauss–Legendre nodes and weights on [−1, 1] for one quadrature panel.
+_GL_X, _GL_W = np.polynomial.legendre.leggauss(4)
+
+
+def _gap_integral(rate, f, xi_hi, N, nodes=None):
+    """
+    ∫₀^xi_hi max(rate(ξ), 0) dξ on panels that follow the field.
+
+    The panels start as *N* equal ones and are halved wherever f changes by
+    more than 20 % across one (:func:`incept1d.fields.field_following_edges`),
+    so a thin high-field layer — the tip of a protrusion in a wide gap —
+    gets panels however small it is against the gap.  Each panel is
+    integrated with 4-point Gauss–Legendre.  *nodes* are the tabulated
+    points of the profile (:meth:`FieldDistribution.nodes`), if any.
+    """
+    t_nodes = None
+    if nodes is not None:
+        t_nodes = np.asarray(nodes) / xi_hi
+        t_nodes = t_nodes[t_nodes < 1.0]
+    edges = xi_hi * field_following_edges(lambda t: f(xi_hi * t), N, nodes=t_nodes)
+    half = 0.5 * np.diff(edges)
+    nodes = (0.5 * (edges[1:] + edges[:-1]))[:, None] + half[:, None] * _GL_X
+    vals = np.array([rate(x) for x in nodes.ravel()]).reshape(nodes.shape)
+    return float(np.sum(np.maximum(vals, 0.0) * _GL_W * half[:, None]))
 
 
 def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N: int):
@@ -36,10 +61,11 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
     field_dist : FieldDistribution
         Gap geometry.
     N : int
-        Number of midpoint-rule integration steps.
+        Number of equal quadrature panels before they are refined to follow
+        the field (``_gap_integral``).
     """
     try:
-        if field_dist.field_type == "uniform":
+        if field_dist.is_uniform:
             val = (mod.alpha(EN_ref, p_val, T) - mod.eta(EN_ref, p_val, T)) * d_val
             result = max(0.0, float(val))
             return result if np.isfinite(result) else float("nan")
@@ -51,12 +77,10 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
             return mod.alpha(en, p_val, T) - mod.eta(en, p_val, T)
 
         if not field_dist.is_monotone_decreasing:
-            # General profile (sphere-sphere, tabulated field line): the active
-            # region need not start at xi = 0 nor be a single interval, so use
-            # plain midpoint quadrature of max(α−η, 0) over the whole gap.
-            xis = (np.arange(N) + 0.5) / N
-            diff = np.array([_net(xi) for xi in xis])
-            result = float(np.sum(np.maximum(0.0, diff)) * d_val / N)
+            # General profile (sphere-sphere, tabulated field line, reversed):
+            # the active region need not start at xi = 0 nor be a single
+            # interval, so integrate max(α−η, 0) over the whole gap.
+            result = _gap_integral(_net, f, 1.0, N, field_dist.nodes(d_val)) * d_val
             return result if np.isfinite(result) else float("nan")
 
         # If there is no net ionisation even at the sphere surface, return 0 immediately.
@@ -80,15 +104,8 @@ def aed_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
                     hi = mid
             xi_cross = 0.5 * (lo + hi)
 
-        # Midpoint-rule quadrature over [0, xi_cross·d].  Every cell is within the
-        # active region so all contributions are positive — no max(0,·) needed.
-        xis = (np.arange(N) + 0.5) / N * xi_cross
-        EN_arr = EN_ref * np.array([f(xi) for xi in xis])
-        ds = xi_cross * d_val / N
-        diff = np.array(
-            [mod.alpha(en, p_val, T) - mod.eta(en, p_val, T) for en in EN_arr]
-        )
-        result = float(np.sum(diff) * ds)
+        # Quadrature over [0, xi_cross·d], all of it in the active region.
+        result = _gap_integral(_net, f, xi_cross, N, field_dist.nodes(d_val)) * d_val
 
     except (OverflowError, ValueError):
         return float("nan")
@@ -118,7 +135,7 @@ def streamer_EN(C, p_val, d_val, mod, T, field_dist: FieldDistribution, N, hint=
     field_dist : FieldDistribution
         Gap geometry.
     N : int
-        Quadrature points of :func:`aed_integral`.
+        Initial quadrature panels of :func:`aed_integral`.
     hint : float or None
         Starting estimate of the root in Td.
 
@@ -174,10 +191,11 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
     field_dist : FieldDistribution
         Gap geometry.
     N : int
-        Number of midpoint-rule integration steps.
+        Number of equal quadrature panels before they are refined to follow
+        the field (``_gap_integral``).
     """
     try:
-        if field_dist.field_type == "uniform":
+        if field_dist.is_uniform:
             val = _max_real_eigenvalue(mod, EN_ref, p_val, T) * d_val
             result = max(0.0, float(val))
             return result if np.isfinite(result) else float("nan")
@@ -189,9 +207,7 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
 
         if not field_dist.is_monotone_decreasing:
             # General profile: see aed_integral.
-            xis = (np.arange(N) + 0.5) / N
-            eigs = np.array([_lmax(xi) for xi in xis])
-            result = float(np.sum(np.maximum(0.0, eigs)) * d_val / N)
+            result = _gap_integral(_lmax, f, 1.0, N, field_dist.nodes(d_val)) * d_val
             return result if np.isfinite(result) else float("nan")
 
         if _lmax(0.0) <= 0.0:
@@ -209,11 +225,7 @@ def eig_integral(EN_ref, p_val, d_val, mod, T, field_dist: FieldDistribution, N:
                     hi = mid
             xi_cross = 0.5 * (lo + hi)
 
-        xis = (np.arange(N) + 0.5) / N * xi_cross
-        EN_arr = EN_ref * np.array([f(xi) for xi in xis])
-        ds = xi_cross * d_val / N
-        eigs = np.array([_max_real_eigenvalue(mod, en, p_val, T) for en in EN_arr])
-        result = float(np.sum(eigs) * ds)
+        result = _gap_integral(_lmax, f, xi_cross, N, field_dist.nodes(d_val)) * d_val
 
     except (OverflowError, ValueError, np.linalg.LinAlgError):
         return float("nan")

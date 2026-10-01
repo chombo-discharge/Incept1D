@@ -64,7 +64,9 @@ The field column is a different matter: the file does not say what unit it
 is in, and nothing in the table reveals it.  A profile is therefore enough
 to compute the inception voltage :math:`U^*`, but not enough to say how far
 the *supplied* excitation is from inception.  That ratio needs the
-excitation itself, which is what ``--fieldline-voltage`` declares:
+excitation itself, which is what ``--fieldline-voltage`` declares — or,
+equivalently, the field unit, after which the line integral is the
+excitation (see below):
 
 .. code-block:: bash
 
@@ -95,7 +97,11 @@ unlabelled column can be identified rather than guessed:
    U_applied = 100 kV   (--fieldline-voltage)
               consistent with |E| tabulated in kV/mm or MV/m (×1e+06 V/m); the solve is unaffected either way
 
-The SI file reports ``consistent with |E| tabulated in V/m`` instead.  A
+The SI file reports ``consistent with |E| tabulated in V/m`` instead.
+Once the unit is known it can simply be stated,
+``--field fieldline examples/fieldline/line_engineering.csv mm kV/mm``: the
+line integral is then printed as 100 kV and used as the excitation, with
+no ``--fieldline-voltage`` needed, and ``line_si.csv m V/m`` gives the same.  A
 ratio matching no common unit is the useful failure: it means the length
 unit is wrong, the wrong column was exported, or the line does not span the
 whole gap — the last of which is a modelling mistake rather than a units

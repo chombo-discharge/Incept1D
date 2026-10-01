@@ -29,7 +29,11 @@ from incept1d.constants import kB as _kB
 from incept1d.fields import (
     FieldDistribution,
     add_field_argument,
-    parse_field_spec,
+    describe_fixed_gap,
+    fixed_gap_warning,
+    field_from_args,
+    field_header_lines,
+    print_protrusion_notes,
 )
 from incept1d.mechanism import load_mechanism, read_json_configs
 from incept1d.solver import (
@@ -49,11 +53,10 @@ from incept1d.ionization import aed_integral, streamer_EN
 from incept1d.output import write_metadata_header
 from incept1d.parallel import parallel_map, physical_cores
 
-#: Quadrature points for the ionization integral (overlay and streamer
-#: criterion).  For a field that falls off from the electrode they are placed
-#: in the active layer only, which a handful of points over the whole gap
-#: would straddle.
-_AED_N = 200
+#: Initial quadrature panels for the ionization integral (overlay and
+#: streamer criterion), refined to follow the field; see
+#: :func:`incept1d.ionization.aed_integral`.
+_AED_N = 50
 
 #: Relative distance from a root at which det Q is checked for a sign change.
 #: Not smaller: the adaptive grid is chosen per E/N, so det Q's root on the
@@ -214,8 +217,8 @@ def add_arguments(parser):
         help=(
             "Temporal growth rate λ in s⁻¹ for the generalised inception criterion "
             "det Q(λ) = 0 (default: 0.0 = standard inception threshold).  "
-            "λ > 0 → growing discharge (lower breakdown voltage); "
-            "λ < 0 → decaying discharge (higher breakdown voltage)."
+            "λ > 0 → growing discharge (lower inception voltage); "
+            "λ < 0 → decaying discharge (higher inception voltage)."
         ),
     )
     parser.add_argument(
@@ -310,37 +313,22 @@ def run(args, parser):
     if args.streamer_criterion is not None and args.streamer_criterion <= 0:
         parser.error("--streamer-criterion value must be > 0")
 
-    _field_dist = parse_field_spec(
-        args.field, parser, applied_voltage_kv=args.fieldline_voltage
-    )
+    _field_dist = field_from_args(args, parser)
 
     # A tabulated field line (arc length) and a coaxial arrangement (b - a)
     # are one geometry at one size: the geometry fixes the gap, and the
     # sweep is in pressure alone.
     _fixed_d = _field_dist.fixed_gap_length
-    if _field_dist.field_type == "fieldline":
-        _L_what = (
-            f"the arc length L = {{L:.4g}} mm of "
-            f"{os.path.basename(_field_dist.fieldline_path)}"
-        )
-    else:
-        _L_what = "L = b - a = {L:.4g} mm"
+    _gap = describe_fixed_gap(_field_dist)
+    if _fixed_d is not None:
+        _L_mm = _fixed_d * 1e3
     if not args.p and not args.d:
         if _fixed_d is not None:
-            args.d = [float(f"{_fixed_d * 1e3:.6g}")]
-            _why = (
-                "arc length of the tabulated line"
-                if _field_dist.field_type == "fieldline"
-                else "outer minus inner radius"
-            )
-            print(
-                f"--field {_field_dist.field_type}: no --p/--d given, using "
-                f"d = L = {args.d[0]:.4g} mm ({_why})."
-            )
+            args.d = [float(f"{_L_mm:.6g}")]
+            print(f"--field {_field_dist.field_type}: no --p/--d given, using {_gap}.")
         else:
             args.p = [1.0]
     elif _fixed_d is not None:
-        _L_mm = _fixed_d * 1e3
         if args.p:
             # Fixing the pressure makes the gap the swept variable, so every
             # point of the sweep is a differently sized copy of the
@@ -349,22 +337,17 @@ def run(args, parser):
             _pd = args.p[0] * _L_mm
             parser.error(
                 f"--p cannot be used with --field {_field_dist.field_type}: it "
-                f"would sweep the gap length, and every d \u2260 L = "
-                f"{_L_mm:.4g} mm is the electrode arrangement at a different "
-                f"size.  Omit --p for a pressure sweep at d = L, or for the "
-                f"single point p = {args.p[0]:.4g} bar use --pd-min {_pd:.6g} "
-                f"--pd-max {_pd:.6g} --pd-num 1."
+                f"would sweep the gap length, and the geometry fixes it at "
+                f"{_gap}; any other d is the electrode arrangement at a "
+                f"different size.  Omit --p for a pressure sweep at that d, or "
+                f"for the single point p = {args.p[0]:.4g} bar use --pd-min "
+                f"{_pd:.6g} --pd-max {_pd:.6g} --pd-num 1."
             )
         # An explicit --d other than L rescales the arrangement too, but it
         # does so once and on purpose, so it is reported rather than refused.
-        _off = [d for d in args.d or [] if abs(d / _L_mm - 1.0) > 1e-6]
-        if _off:
-            print(
-                f"Warning: --d {', '.join(f'{d:g}' for d in _off)} mm differs "
-                f"from {_L_what.format(L=_L_mm)}; the arrangement is solved "
-                f"scaled by d/L.  Omit --d to use d = L.",
-                file=sys.stderr,
-            )
+        _warn = fixed_gap_warning(_field_dist, args.d or [])
+        if _warn:
+            print(f"Warning: {_warn}", file=sys.stderr)
     _N_min, _N_max, _dx_tol = parse_dx_spec(args.dx, parser)
 
     _propagator = (
@@ -446,6 +429,11 @@ def run(args, parser):
                     mod,
                 )
             )
+
+    if curve_specs:
+        print_protrusion_notes(
+            _field_dist, min(float(np.min(c[2])) for c in curve_specs), gap_only=True
+        )
 
     # Compute alpha=eta crossover E/N from the first config's module (for annotation).
     _en_cross = {}
@@ -620,7 +608,7 @@ def run(args, parser):
         # A symmetric field with identical electrodes needs one solve; per-
         # polarity overrides make the cathodes differ even in a uniform gap.
         same_polarity = polarities_equivalent(mod, _field_dist)
-        if _field_dist.field_type == "uniform":
+        if _field_dist.is_uniform:
             det_pos, det_neg = (
                 functools.partial(
                     _criterion,
@@ -819,9 +807,9 @@ def run(args, parser):
                 # Print summary table for this branch.  Only the shape of a
                 # tabulated field line enters the solve, so the useful extra
                 # quantity is how far the declared excitation is from
-                # inception: U* / U_applied.  Without --fieldline-voltage
-                # there is nothing to divide by -- the field units of the
-                # file are unknown -- and the column is omitted.
+                # inception: U* / U_applied.  Without --fieldline-voltage or
+                # a declared field unit there is nothing to divide by, and
+                # the column is omitted.
                 _vfile = _field_dist.fieldline_applied_voltage
                 _scale_hdr = f"  {'U*/U_applied':>14}" if _vfile else ""
                 # With the gap pinned at L, the p*d and d columns say nothing
@@ -1083,48 +1071,8 @@ def run(args, parser):
             fh.write(
                 f"# Stepping:    N_min={_N_min}, N_max={_N_max}, tol={_dx_tol:.3g}\n"
             )
-            if _field_dist.sphere_R is not None:
-                fh.write(f"# Sphere R:    {_field_dist.sphere_R*1e3:.4g} mm\n")
-            if _field_dist.field_type == "sphere-plane":
-                fh.write(
-                    "# Polarity:    sphere=positive → sphere is anode (+),  "
-                    "sphere=negative → sphere is cathode (−)\n"
-                )
-            if _field_dist.field_type == "hyperboloid-plane":
-                fh.write(f"# Tip R:       {_field_dist.tip_R*1e3:.4g} mm\n")
-                fh.write(
-                    "# Polarity:    tip=positive → tip is anode (+),  "
-                    "tip=negative → tip is cathode (−)\n"
-                )
-            if _field_dist.field_type == "coaxial":
-                fh.write(
-                    f"# Radii:       a = {_field_dist.coax_a*1e3:.6g} mm, "
-                    f"b = {_field_dist.coax_b*1e3:.6g} mm\n"
-                )
-                fh.write(
-                    "# Polarity:    inner=positive → inner conductor is anode "
-                    "(+),  inner=negative → inner conductor is cathode (−)\n"
-                )
-            if _field_dist.field_type == "fieldline":
-                fh.write(f"# Field line:  {_field_dist.fieldline_path}\n")
-                fh.write(f"# Arc length:  {_field_dist.fieldline_length*1e3:.6g} mm\n")
-                fh.write(
-                    f"# ∫|E| ds:     {_field_dist.fieldline_integral:.6g} "
-                    f"(field units of the file × m; a voltage only if the "
-                    f"file tabulates |E| in V/m)\n"
-                )
-                if _field_dist.fieldline_applied_voltage is not None:
-                    fh.write(
-                        f"# U_applied:   "
-                        f"{_field_dist.fieldline_applied_voltage/1e3:.6g} kV "
-                        f"(--fieldline-voltage; only the shape of the profile "
-                        f"enters the solve, so U*/U_applied is the factor the "
-                        f"excitation must be scaled by to reach inception)\n"
-                    )
-                fh.write(
-                    "# Polarity:    start=positive → first tabulated point is "
-                    "anode (+),  start=negative → cathode (−)\n"
-                )
+            for _line in field_header_lines(_field_dist):
+                fh.write(f"# {_line}\n")
             if _streamer_records:
                 fh.write(f"# Streamer C:  {args.streamer_criterion}\n")
             fh.write("#\n")
@@ -1201,7 +1149,7 @@ def run(args, parser):
 
         ax1.set_xlabel(_x_label)
         ax1.set_ylabel("U  (kV)")
-        ax1.set_title("Breakdown voltage")
+        ax1.set_title("Inception voltage")
         ax1.legend(loc="upper left", framealpha=1.0)
         ax1.grid(True, which="both", ls="--", alpha=0.4)
 
