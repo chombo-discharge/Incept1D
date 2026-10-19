@@ -21,4 +21,12 @@ Library layout
 ``cli``          the ``incept1d`` command-line interface
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
+
+# The version is set by the git release tag (setuptools-scm, see pyproject.toml)
+# and read from the installed package metadata.
+try:
+    __version__ = _version("incept1d")
+except PackageNotFoundError:  # used from a source tree without being installed
+    __version__ = "unknown"
