@@ -414,6 +414,19 @@ air mechanisms:
        ``morgan.txt``.  A relative path is resolved first against the
        directory of the JSON file, then against the mechanism directory, so
        the shipped files are named ``"../lxcat/lisbon.txt"``.
+   * - ``x_n2``, ``x_o2``
+     - from the table
+     - Mole fractions of N\ :sub:`2` and O\ :sub:`2` for the neutral
+       densities (both or neither).  They must match the mixture the
+       transport data were computed for: if the BOLSIG+ file records its
+       mixture (``Mole fraction`` lines, as in ``lisbon.txt``: 0.79/0.21),
+       that mixture is the default and a different value is an error.  The
+       LXCat-generated files (``phelps.txt``, ``biagi.txt``, ``trinity.txt``,
+       ``morgan.txt``) do not record it; then the mechanism's own values are
+       used (0.8/0.2 in ``air_pancheshnyi.py``, 0.79/0.21 in
+       ``air_2body.py``), with a warning, unless ``x_n2`` and ``x_o2`` are set.
+       A gas temperature that differs from the table's by more than 20 K
+       also gives a warning.
    * - ``reaction_multipliers``
      - ``{}``
      - Dictionary ``{reaction string: factor}``, keyed by the strings
