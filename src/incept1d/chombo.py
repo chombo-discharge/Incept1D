@@ -67,6 +67,8 @@ def _load_modifier(modifier_path, config_label=None):
         ("_GAMMA1", "gamma1"),
         ("_EREF", "eref"),
         ("_BETA", "beta"),
+        ("_XN2", "x_n2"),
+        ("_XO2", "x_o2"),
     ]:
         if cfg.get(key) is not None:
             pre_vars[attr] = cfg[key]

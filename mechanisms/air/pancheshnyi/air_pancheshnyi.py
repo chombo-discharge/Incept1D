@@ -113,8 +113,18 @@ init_photoionization()
 # Gas composition
 # ---------------------------------------------------------------------------
 
-xO2 = 0.2  # Mole fraction of O2
-xN2 = 0.8  # Mole fraction of N2
+# The neutral densities must use the mixture the electron transport data were
+# computed for.  If the BOLSIG+ table records its mixture, that mixture is used
+# (and configured x_n2/x_o2 must agree with it); otherwise the configured values,
+# or the defaults below with a warning.  See ../bolsig_conditions.py.
+
+BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_LXCAT, "lisbon.txt"))
+_conditions = load_helper(os.path.join(_AIR, "bolsig_conditions.py"))
+xN2, xO2 = _conditions.resolve_composition(
+    BOLSIG_FILE, globals().get("_XN2"), globals().get("_XO2"), default=(0.8, 0.2)
+)
+# Gas temperature of the table [K], checked against the run temperature in _make_N
+_T_TABLE = _conditions.read_conditions(BOLSIG_FILE)[1]
 
 # ---------------------------------------------------------------------------
 # Ion transport
@@ -273,8 +283,6 @@ def _load_lxcat_mobility(path):
 # Cross-section and transport data tables (loaded once at import time)
 # ---------------------------------------------------------------------------
 
-BOLSIG_FILE = globals().get("BOLSIG_FILE", os.path.join(_LXCAT, "lisbon.txt"))
-
 (
     energy_table,
     mobility_table,
@@ -312,6 +320,7 @@ def _make_N(p=1.0, T=293.0):
     float
         Neutral number density N in m^-3.
     """
+    _conditions.check_temperature(T, _T_TABLE, BOLSIG_FILE)
     return p * 1e5 / (kB * T)
 
 

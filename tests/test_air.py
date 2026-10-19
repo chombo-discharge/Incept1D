@@ -154,9 +154,12 @@ class TestInceptionCurve:
     @pytest.mark.parametrize(
         "pd_mm, EN_expected",
         [
-            (1.0, 175.9713),
-            (10.0, 116.4574),
-            (100.0, 100.5216),
+            # 79/21 neutral densities, the mixture recorded in lisbon.txt
+            # (80/20 before the composition followed the table: 175.9713,
+            # 116.4574, 100.5216)
+            (1.0, 175.4867),
+            (10.0, 116.2765),
+            (100.0, 100.711),
         ],
     )
     def test_reference_values(self, air, det, pd_mm, EN_expected):
