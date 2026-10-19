@@ -23,7 +23,8 @@ import os
 import re
 import warnings
 
-#: Largest allowed difference between configured and tabulated mole fractions.
+#: Largest allowed difference between configured and tabulated mole fractions,
+#: and between their sum and 1.
 COMPOSITION_TOL = 1e-3
 
 #: Gas temperature difference (K) above which check_temperature() warns.
@@ -63,6 +64,8 @@ def resolve_composition(path, x_n2, x_o2, default):
     """
     N2 and O2 mole fractions for the neutral densities, consistent with the table.
 
+    - x_n2 and x_o2 must be given together, lie in [0, 1] and sum to 1 within
+      COMPOSITION_TOL (the mechanisms contain no other neutral species).
     - The table records its mixture: without x_n2/x_o2 the table's values are
       used; configured values that differ by more than COMPOSITION_TOL raise.
     - The table does not record its mixture: configured values are used as
@@ -86,15 +89,20 @@ def resolve_composition(path, x_n2, x_o2, default):
     Raises
     ------
     ValueError
-        If the configured mixture differs from the mixture of the table.
+        If only one of x_n2 and x_o2 is given, if they are not valid mole
+        fractions, or if they differ from the mixture of the table.
     """
+    _check_fractions(x_n2, x_o2)
     fractions, _ = read_conditions(path)
     name = os.path.basename(path)
     if "N2" in fractions and "O2" in fractions:
         table = (fractions["N2"], fractions["O2"])
         if x_n2 is None:
             return table
-        if abs(x_n2 - table[0]) > COMPOSITION_TOL or abs(x_o2 - table[1]) > COMPOSITION_TOL:
+        if (
+            abs(x_n2 - table[0]) > COMPOSITION_TOL
+            or abs(x_o2 - table[1]) > COMPOSITION_TOL
+        ):
             raise ValueError(
                 f"x_n2 = {x_n2:g}, x_o2 = {x_o2:g} differ from the mixture of the "
                 f"transport data in {name} (N2 {table[0]:g}, O2 {table[1]:g}). "
@@ -115,8 +123,28 @@ def resolve_composition(path, x_n2, x_o2, default):
     return (x_n2, x_o2)
 
 
+def _check_fractions(x_n2, x_o2):
+    """Raise ValueError unless x_n2, x_o2 are both None or a valid N2/O2 mixture."""
+    if (x_n2 is None) != (x_o2 is None):
+        raise ValueError(
+            f"Only one of x_n2 = {x_n2} and x_o2 = {x_o2} is set; "
+            f"give both mole fractions or neither."
+        )
+    if x_n2 is None:
+        return
+    if not (0.0 <= x_n2 <= 1.0 and 0.0 <= x_o2 <= 1.0):
+        raise ValueError(
+            f"Mole fractions x_n2 = {x_n2:g}, x_o2 = {x_o2:g} must lie in [0, 1]."
+        )
+    if abs(x_n2 + x_o2 - 1.0) > COMPOSITION_TOL:
+        raise ValueError(
+            f"Mole fractions x_n2 = {x_n2:g} and x_o2 = {x_o2:g} sum to "
+            f"{x_n2 + x_o2:g}, not 1; the air mechanisms contain only N2 and O2."
+        )
+
+
 def check_temperature(T, T_table, path):
-    """Warn once if the gas temperature T differs from the table's by more than TEMPERATURE_TOL."""
+    """Warn once if T differs from the table's gas temperature by > TEMPERATURE_TOL."""
     if T_table is None or abs(T - T_table) <= TEMPERATURE_TOL:
         return
     key = ("temperature", os.path.realpath(path), float(T))

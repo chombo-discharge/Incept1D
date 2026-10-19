@@ -123,7 +123,8 @@ _conditions = load_helper(os.path.join(_AIR, "bolsig_conditions.py"))
 xN2, xO2 = _conditions.resolve_composition(
     BOLSIG_FILE, globals().get("_XN2"), globals().get("_XO2"), default=(0.8, 0.2)
 )
-_T_TABLE = _conditions.read_conditions(BOLSIG_FILE)[1]  # Gas temperature of the table [K]
+# Gas temperature of the table [K], checked against the run temperature in _make_N
+_T_TABLE = _conditions.read_conditions(BOLSIG_FILE)[1]
 
 # ---------------------------------------------------------------------------
 # Ion transport

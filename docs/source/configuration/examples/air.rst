@@ -420,13 +420,17 @@ air mechanisms:
        densities (both or neither).  They must match the mixture the
        transport data were computed for: if the BOLSIG+ file records its
        mixture (``Mole fraction`` lines, as in ``lisbon.txt``: 0.79/0.21),
-       that mixture is the default and a different value is an error.  The
+       that mixture is the default and a value that differs by more than
+       :math:`10^{-3}` is an error.  ``x_n2 + x_o2`` must be 1 (within
+       :math:`10^{-3}`), since the mechanisms contain no other neutrals.  The
        LXCat-generated files (``phelps.txt``, ``biagi.txt``, ``trinity.txt``,
        ``morgan.txt``) do not record it; then the mechanism's own values are
        used (0.8/0.2 in ``air_pancheshnyi.py``, 0.79/0.21 in
        ``air_2body.py``), with a warning, unless ``x_n2`` and ``x_o2`` are set.
-       A gas temperature that differs from the table's by more than 20 K
-       also gives a warning.
+       The shipped ``conservative.json`` (Biagi), ``databases.json``
+       (Trinity) and the 2body ``example_config.json`` (Phelps) therefore
+       warn; this is expected.  A gas temperature that differs from the
+       table's by more than 20 K also gives a warning.
    * - ``reaction_multipliers``
      - ``{}``
      - Dictionary ``{reaction string: factor}``, keyed by the strings
