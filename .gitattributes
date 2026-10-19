@@ -1,0 +1,3 @@
+# Fill in .git_archival.txt in source archives (GitHub/Zenodo downloads), so
+# that setuptools-scm can find the version without the .git directory.
+.git_archival.txt  export-subst

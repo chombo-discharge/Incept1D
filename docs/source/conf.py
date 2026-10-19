@@ -35,7 +35,10 @@ matplotlib.use("Agg")
 project = "Incept1D"
 copyright = "2026, SINTEF Energy Research"
 author = "Robert Marskar"
-# release = "0.1.0"
+try:  # the installed package's version, from the git release tag
+    from incept1d import __version__ as release
+except Exception:
+    release = "unknown"
 
 try:
     commit_id = (
