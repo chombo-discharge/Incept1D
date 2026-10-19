@@ -139,6 +139,13 @@ class Mechanism:
     def get_kappa(self, p, T):
         return self._mod.get_kappa(p, T)
 
+    # The backward stream Ψ⁻ couples like the forward one unless the
+    # mechanism defines its own (OPTIONAL_ATTRS).
+    def get_B_bck(self, EN, p, T):
+        if not hasattr(self._mod, "get_B_bck"):
+            return self.get_B(EN, p, T)
+        return self._mod.get_B_bck(EN, p, T) * self._xi_photo
+
     def get_gamma_plus(self, EN, p, T):
         return self._mod.get_gamma_plus_with(
             EN,
@@ -183,6 +190,11 @@ REQUIRED_ATTRS = [
     "get_kappa",
     "get_gamma_Psi",
 ]
+
+#: Attributes a mechanism module may expose.  ``get_B_bck`` gives the
+#: backward photon stream its own coupling to the species (same signature
+#: as ``get_B``); without it the backward stream couples like the forward one.
+OPTIONAL_ATTRS = ["alpha", "eta", "get_B_bck"]
 
 
 def read_json_configs(json_paths):

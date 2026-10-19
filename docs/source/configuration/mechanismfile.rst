@@ -95,6 +95,11 @@ Optional interface
      - Townsend coefficients in m\ :sup:`-1`.  Required for
        ``--plot-ionization-integral``, ``--streamer-criterion`` and
        ``incept1d ionization``.
+   * - ``get_B_bck(EN, p, T)``
+     - Coupling of the backward photon streams :math:`\bm{B}^-`, same shape
+       and units as ``get_B``, which then couples the forward streams
+       alone.  Omitted, the backward streams couple like the forward ones
+       (:eq:`eq_two_stream_directional`).
    * - ``init_photoionization(ngroups, cone_angle_deg)``
      - Called by ``Config.post_exec_init`` to (re)build the photon groups.
    * - ``REACTIONS``

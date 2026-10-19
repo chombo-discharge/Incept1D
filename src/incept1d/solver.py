@@ -33,8 +33,39 @@ from incept1d.constants import kB as _kB, c_light as _C_LIGHT  # noqa: F401
 from incept1d.fields import FieldDistribution  # noqa: F401
 
 
+def photon_blocks(mod, EN, p, T):
+    """
+    The photon coupling of the forward and backward streams.
+
+    A mechanism supplies ``get_B`` for the coupling of the forward stream
+    Ψ⁺; the backward stream Ψ⁻ uses the same unless the mechanism also
+    defines ``get_B_bck`` (eq. ``eq_two_stream_directional``).  Source and
+    absorption belong to the group, not the stream: directional emission is
+    a group per direction, each coupling through one of its streams only.
+
+    Parameters
+    ----------
+    mod : Mechanism
+        Mechanism, or any object with the photon accessors.
+    EN, p, T : float
+        Reduced field (Td), pressure (bar), temperature (K).
+
+    Returns
+    -------
+    tuple
+        ``(B⁺, B⁻)``, each of shape (N_s, N_γ).
+    """
+    B_f = mod.get_B(EN, p, T)
+    B_b = mod.get_B_bck(EN, p, T) if hasattr(mod, "get_B_bck") else B_f
+    return B_f, B_b
+
+
 def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     """Build the augmented ODE matrix for reduced field EN and gap length d.
+
+    A_aug = [[A, B⁺, B⁻], [C, −D, 0], [−C, 0, D]] (eq.
+    ``eq_augmented_ode``); B⁺ = B⁻ unless the mechanism gives the backward
+    stream its own coupling (:func:`photon_blocks`).
 
     Every photon group is propagated explicitly, however optically thick.
     Folding a thick group into A as the local source 2 b_j c_jᵀ / κ_j keeps
@@ -73,28 +104,27 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     if lam != 0.0:
         A = A - lam * np.diag(v_inv)  # (R − λI) V⁻¹
 
-    B = mod.get_B(EN, p, T)  # (N_s, N_gamma)
+    B_f, B_b = photon_blocks(mod, EN, p, T)  # (N_s, N_gamma) each
     C = mod.get_C(EN, p, T) * v_inv[np.newaxis, :]  # (N_gamma, N_s)
     kappa = mod.get_kappa(p, T)  # (N_gamma,)
     if lam != 0.0:
         kappa = kappa + lam / _C_LIGHT  # κ + λ/c
-    N_gamma = B.shape[1]
+    N_gamma = B_f.shape[1]
 
     N_gamma_eff = N_gamma
     aug_mask = np.ones(N_gamma, dtype=bool) if N_gamma > 0 else None
-    B_aug, C_aug_ph, kappa_aug = B, C, kappa
 
     if N_gamma_eff == 0:
         A_aug = A
         n_aug = n
     else:
-        D_mat = np.diag(kappa_aug)
+        D_mat = np.diag(kappa)
         z_gg = np.zeros((N_gamma_eff, N_gamma_eff))
         A_aug = np.block(
             [
-                [A, B_aug, B_aug],
-                [C_aug_ph, -D_mat, z_gg],
-                [-C_aug_ph, z_gg, D_mat],
+                [A, B_f, B_b],
+                [C, -D_mat, z_gg],
+                [-C, z_gg, D_mat],
             ]
         )
         n_aug = n + 2 * N_gamma_eff
@@ -1052,7 +1082,17 @@ def _slab_scattering(Omega, b, fw):
     self-sustaining on its own (above inception).
     """
     mu = np.real(np.linalg.eigvals(Omega))
-    m = max(1, math.ceil((mu.max() - mu.min()) / math.log(_RICCATI_STEP_COND)))
+    # A substep with ‖Ω/m‖ < ln 2 cannot be self-sustaining at any thickness
+    # up to its own: ‖E − I‖ ≤ e^‖Ω/m‖ − 1 < 1 keeps E_ff invertible all the
+    # way, so its R and T are on the physical branch.  Without the bound a
+    # step that is supercritical on its own is formed directly and nothing
+    # sees its pole -- which is the whole answer when the feedback closes
+    # inside the gas rather than through the cathode (Q0_b = 0, g ≡ 1).
+    m = max(
+        1,
+        math.ceil((mu.max() - mu.min()) / math.log(_RICCATI_STEP_COND)),
+        math.ceil(np.linalg.norm(Omega, 2) / math.log(2.0)),
+    )
     E = _expm_shifted(-Omega / m)
     while np.linalg.cond(E) > _RICCATI_STEP_COND and m < 2**40:
         m *= 2

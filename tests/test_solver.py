@@ -60,6 +60,17 @@ class PhotonStub:
         return self._kappa
 
 
+class DirectionalStub(PhotonStub):
+    """PhotonStub whose backward streams couple to the species differently."""
+
+    def __init__(self, n=2, kappa=(1.0,), b_bck=0.1):
+        super().__init__(n, kappa)
+        self._b_bck = b_bck
+
+    def get_B_bck(self, EN, p, T):
+        return np.full((self._n, len(self._kappa)), self._b_bck)
+
+
 class TestBuildAAug:
     def test_without_photons_reduces_to_R_Vinv(self, toy):
         """S1: with no photon groups A_aug is exactly R V^-1."""
@@ -91,6 +102,33 @@ class TestBuildAAug:
         assert D_br == pytest.approx(np.diag(mod.get_kappa(p, T)))
         assert Z_tr == pytest.approx(np.zeros((2, 2)))
         assert Z_bl == pytest.approx(np.zeros((2, 2)))
+
+    def test_directional_coupling(self):
+        """S2b: A_aug = [[A, B+, B-], [C, -D, 0], [-C, 0, D]].
+
+        A mechanism with get_B_bck gives the backward streams their own
+        coupling to the species; source and absorption stay the group's.
+        """
+        mod = DirectionalStub(n=2, kappa=(1.0, 2.0))
+        EN, p, T, d = 100.0, 1.0, 293.0, 1e-3
+        A_aug, *_ = _build_A_aug(EN, d, mod, p, T)
+        n, g = 2, 2
+        v_inv = 1.0 / np.diag(mod.get_V(EN, p, T))
+        assert A_aug[:n, n : n + g] == pytest.approx(mod.get_B(EN, p, T))
+        assert A_aug[:n, n + g :] == pytest.approx(mod.get_B_bck(EN, p, T))
+        assert A_aug[n : n + g, :n] == pytest.approx(mod.get_C(EN, p, T) * v_inv)
+        assert A_aug[n + g :, :n] == pytest.approx(-mod.get_C(EN, p, T) * v_inv)
+        kappa = np.diag(mod.get_kappa(p, T))
+        assert A_aug[n : n + g, n : n + g] == pytest.approx(-kappa)
+        assert A_aug[n + g :, n + g :] == pytest.approx(kappa)
+
+    def test_backward_coupling_equal_to_forward_changes_nothing(self):
+        """S2c: a mechanism that spells out symmetric coupling is unchanged."""
+        plain = PhotonStub(n=2, kappa=(1.0, 2.0))
+        spelled = DirectionalStub(n=2, kappa=(1.0, 2.0), b_bck=0.3)
+        a = _build_A_aug(100.0, 1e-3, plain, 1.0, 293.0)[0]
+        b = _build_A_aug(100.0, 1e-3, spelled, 1.0, 293.0)[0]
+        assert np.array_equal(a, b)
 
     @pytest.mark.parametrize("kd", [0.01, 11.99, 12.01, 100.0, 1e4])
     def test_every_group_is_propagated(self, kd):

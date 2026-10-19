@@ -108,6 +108,13 @@ class TestMechanismWrapper:
         raw_B = mod._mod.get_B(300.0, 1.0, 293.0)
         assert mod.get_B(300.0, 1.0, 293.0).shape == raw_B.shape
 
+    def test_backward_coupling_defaults_to_forward(self, toy_path):
+        """M8c: without get_B_bck the backward streams couple like the forward."""
+        mod = load_mechanism(toy_path, {"xi_photo": 0.5})
+        EN, p, T = 300.0, 1.0, 293.0
+        assert not hasattr(mod._mod, "get_B_bck")
+        assert np.array_equal(mod.get_B_bck(EN, p, T), mod.get_B(EN, p, T))
+
     def test_gamma_override_is_applied(self, toy_path):
         """M8b: gamma0 from the configuration reaches get_gamma_plus."""
         mod = load_mechanism(toy_path, {"gamma0": 0.25})

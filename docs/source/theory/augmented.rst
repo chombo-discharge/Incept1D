@@ -57,6 +57,11 @@ absorption producing charged species; :math:`\bm{C}` is electron impact
 producing photons; and :math:`\bm{D}` is photon absorption plus the
 retardation term :math:`\lambda/c`.
 
+With directional coupling (:eq:`eq_two_stream_directional`) the two
+streams couple to the species through their own blocks,
+:math:`\bm{B}^\pm = [\vec{b}_1^{\,\pm}\;\vec{b}_2^{\,\pm}\;\cdots]`; in
+the isotropic case :math:`\bm{B}^\pm = \bm{B}`.
+
 The augmented ODE
 -----------------
 
@@ -70,7 +75,7 @@ With those, :eq:`eq_flux_ode` and :eq:`eq_two_stream` are one system:
    =
    \underbrace{
    \begin{bmatrix}
-     \bm{A} & \bm{B} & \bm{B} \\
+     \bm{A} & \bm{B}^+ & \bm{B}^- \\
      \bm{C} & -\bm{D} & \bm{0} \\
      -\bm{C} & \bm{0} & \bm{D}
    \end{bmatrix}
@@ -81,7 +86,8 @@ With those, :eq:`eq_flux_ode` and :eq:`eq_two_stream` are one system:
 
 The sign pattern in the lower blocks is the two-stream structure: the
 forward and backward photon populations see the same source and the same
-absorption, but propagate in opposite directions.
+absorption, but propagate in opposite directions.  With isotropic coupling
+:math:`\bm{B}^+ = \bm{B}^- = \bm{B}`.
 
 :math:`\bm{\mathcal{A}}` follows directly from the plasma chemistry and
 photoionization data, and depends only on :math:`E/N`, :math:`p`, :math:`T`
@@ -92,7 +98,8 @@ and :math:`\lambda`.  When the mechanism has no photon groups
 
    :func:`incept1d.solver._build_A_aug` assembles :math:`\bm{\mathcal{A}}` for a
    given :math:`E/N`, :math:`p`, :math:`T`, and :math:`\lambda` from the
-   mechanism's ``get_R``, ``get_V``, ``get_B``, ``get_C``, and ``get_kappa``.
+   mechanism's ``get_R``, ``get_V``, ``get_B``, ``get_C``, and ``get_kappa``
+   (and ``get_B_bck`` where it defines it).
    Note that the mechanism returns :math:`\bm{C}` *without* the
    :math:`\bm{V}^{-1}` factor (it acts on densities); the solver applies
    :math:`\bm{V}^{-1}` itself.  Every photon group is carried explicitly,
