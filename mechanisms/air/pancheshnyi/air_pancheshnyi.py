@@ -113,8 +113,8 @@ init_photoionization()
 # Gas composition
 # ---------------------------------------------------------------------------
 
-xO2 = 0.2  # Mole fraction of O2
-xN2 = 0.8  # Mole fraction of N2
+xO2 = globals().get("_XO2", 0.2)  # Mole fraction of O2 (config key x_o2)
+xN2 = globals().get("_XN2", 0.8)  # Mole fraction of N2 (config key x_n2)
 
 # ---------------------------------------------------------------------------
 # Ion transport

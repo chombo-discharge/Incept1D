@@ -37,6 +37,8 @@ COMMON_KEYS = frozenset(
         "gamma1",
         "eref",
         "beta",
+        "x_n2",
+        "x_o2",
         "positive",
         "negative",
     }
@@ -64,6 +66,10 @@ class AirConfig:
     gamma1: Optional[float] = None
     eref: Optional[float] = None
     beta: Optional[float] = None
+    #: Mole fractions of N2 and O2 for the neutral densities; None keeps the
+    #: mechanism's own values. Give both or neither.
+    x_n2: Optional[float] = None
+    x_o2: Optional[float] = None
     positive_override: Optional[dict] = None
     negative_override: Optional[dict] = None
 
@@ -79,6 +85,8 @@ class AirConfig:
             ("_GAMMA1", self.gamma1),
             ("_EREF", self.eref),
             ("_BETA", self.beta),
+            ("_XN2", self.x_n2),
+            ("_XO2", self.x_o2),
         ]:
             if val is not None:
                 d[attr] = val
@@ -120,6 +128,11 @@ class AirConfig:
                 f"mechanism in {os.path.basename(mech_dir)}/ does not use: "
                 f"{unknown}.  It accepts: {sorted(cls.KEYS)}."
             )
+        if ("x_n2" in d) != ("x_o2" in d):
+            raise ValueError(
+                f"Configuration '{d.get('label', 'Baseline')}' sets only one of "
+                f"x_n2 and x_o2; give both mole fractions or neither."
+            )
         cs = d.get("cross_sections")
         if cs is not None and not os.path.isabs(cs):
             cfg_dir = d.get("_cfg_dir", mech_dir)
@@ -139,6 +152,8 @@ class AirConfig:
             gamma1=d.get("gamma1"),
             eref=d.get("eref"),
             beta=d.get("beta"),
+            x_n2=d.get("x_n2"),
+            x_o2=d.get("x_o2"),
             positive_override=d.get("positive"),
             negative_override=d.get("negative"),
         )
