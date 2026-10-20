@@ -17,8 +17,14 @@ cathode yields, and a family of ready-made configurations built on top.  Read
 it to see what each part of the interface looks like when the chemistry is
 not trivial.
 
+:ref:`Chap:RFDScheme` is not a gas discharge at all: runaway electrons,
+positrons and photons in a thundercloud, whose feedback closes in the gas
+with nothing emitted at either end.  Read it to see one-way photon groups
+(``PHOTON_DIRECTIONS``) and how far the interface stretches.
+
 .. toctree::
    :maxdepth: 2
 
    paschen
    air
+   rfd

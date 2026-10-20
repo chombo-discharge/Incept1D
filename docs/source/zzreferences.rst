@@ -30,6 +30,13 @@ Works cited in this documentation:
    computational modelling to elucidate the enhancement factor for field
    electron emitters*, J. Microsc. **203**, 188–194 (2001).
 
+.. [Faerder2026b] Ø. Færder, N. Lehtinen, D. Sarria, M. Marisaldi,
+   N. Østgaard, I. Bjørge-Engeland and A. Mezentsev, *A novel
+   self-consistent relativistic fluid model reproducing relativistic
+   feedback discharges*, preprint, ESS Open Archive (2026), with
+   supplementary material.
+   `doi:10.22541/essoar.15010550/v1 <https://doi.org/10.22541/essoar.15010550/v1>`_
+
 .. [Ferreira2019] N. G. C. Ferreira, D. F. N. Santos, P. G. C. Almeida,
    G. V. Naidis and M. S. Benilov, *Simulation of pre-breakdown discharges
    in high-pressure air. I: The model and its application to corona

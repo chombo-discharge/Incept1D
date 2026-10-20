@@ -124,6 +124,7 @@ SPDX-License-Identifier = "LicenseRef-LXCat"
 path = [
   "examples/**/sim*.dat",
   "examples/paschen/closed_form.dat",
+  "examples/rfd/normal_modes.dat",
   "examples/fieldline/line_*.csv",
 ]
 SPDX-FileCopyrightText = "2026 SINTEF Energy Research"

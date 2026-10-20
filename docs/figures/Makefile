@@ -34,9 +34,10 @@ export PD_NUM
 
 # Figures built by default: self-contained and cheap.  `paschen` verifies the
 # solver against its own closed form; `zheleznyakfit` shows the quality of the
-# two-stream fit; `coaxial` shows corona inception on a wire in a cylinder.
+# two-stream fit; `coaxial` shows corona inception on a wire in a cylinder;
+# `rfd` checks relativistic feedback against the normal modes of its model.
 # Together they take about a minute.
-FIGURES := paschen zheleznyakfit coaxial
+FIGURES := paschen zheleznyakfit coaxial rfd
 
 # Opt-in figures.  These compare against IEC 60052 and CIGRE ELECTRA reference
 # tables that are copyrighted and therefore not part of this repository (see
@@ -134,6 +135,18 @@ $(BUILD)/paschen/closed_form.dat: $(ROOT)/examples/paschen/closed_form.py $(SOLV
 	@mkdir -p $(dir $@)
 	cd $(ROOT) && python3 examples/paschen/closed_form.py $@
 
+$(BUILD)/rfd/sim.dat: $(SOLVER_DEPS)
+	@mkdir -p $(dir $@)
+	$(PDIV) mechanisms/air/rfd/air_rfd.py mechanisms/air/rfd/radius.json \
+	    --p 1.01325 --T 293.15 \
+	    --pd-min 2.5e4 --pd-max 5e6 --pd-num $(or $(PD_NUM),60) \
+	    --no-plot \
+	    --write-to-file $@
+
+$(BUILD)/rfd/normal_modes.dat: $(ROOT)/examples/rfd/normal_modes.py $(SOLVER_DEPS)
+	@mkdir -p $(dir $@)
+	cd $(ROOT) && python3 examples/rfd/normal_modes.py $@
+
 # Coaxial: three wires in a 10 mm cylinder, each from 0.1 to 10 bar, so the
 # pd range (bar mm) is the pressure range times b - a.  The table in
 # examples/coaxial/README.md lists the same numbers.
@@ -162,7 +175,8 @@ $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat: $(ROOT)/mechanisms/air/z
 
 # `data` covers the default figures only; the opt-in ones pull their own.
 data: $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat \
-      $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat $(COAX_SIM)
+      $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat $(COAX_SIM) \
+      $(BUILD)/rfd/sim.dat $(BUILD)/rfd/normal_modes.dat
 
 # ---- 2. pgfplots + 3. outputs ---------------------------------------------------
 
@@ -171,6 +185,7 @@ DATA_electra      := $(BUILD)/electra/sim.dat $(ELECTRA_REF)
 DATA_zheleznyakfit := $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat
 DATA_paschen      := $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat
 DATA_coaxial      := $(COAX_SIM)
+DATA_rfd          := $(BUILD)/rfd/sim.dat $(BUILD)/rfd/normal_modes.dat
 
 # One rule set per figure: tex + data -> PDF in the build dir -> PDF/PNG in OUT.
 define FIGURE_RULES

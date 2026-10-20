@@ -1,0 +1,71 @@
+% Relativistic feedback discharge: Incept1D vs the normal modes of the same model.
+%
+% Data files (in the working directory when this is compiled):
+%   sim.dat            incept1d pdiv output from docs/figures/Makefile (examples/rfd/README.md)
+%   normal_modes.dat   normal-mode E_s(L) from examples/rfd/normal_modes.py
+%
+% Both are computed from the same coefficients, so nothing third-party is
+% involved and the figure always reflects the current solver.
+%
+% 0-based column indices (\thisrowno) into sim.dat; 1-based layout:
+%    3  d_mm[R >> L]       6  E_Vm[R >> L]
+%   13  d_mm[R = 100 m]   16  E_Vm[R = 100 m]
+% and into normal_modes.dat:
+%    1  L (m)   2  E_s (kV/m) [R >> L]   3  E_s (kV/m) [R = 100 m]
+\documentclass[10pt]{article}
+\input{preamble.tex}
+\usepackage[paperwidth=15cm,paperheight=9.4cm,margin=0in]{geometry}
+
+\pgfplotsset{
+  solver/.style={very thick, no marks},
+  exact/.style={only marks, mark=o, mark size=2.0pt,
+                mark options={thin, fill=white, fill opacity=0.9}},
+}
+\setlength{\figwidth}{14cm}
+\setlength{\figheight}{9cm}
+
+\begin{document}
+\centering
+\begin{tikzpicture}
+  \begin{axis}[
+      anchor=south west,
+      axis y line=left,
+      axis x line=bottom,
+      font=\small,
+      width=\figwidth,
+      height=\figheight,
+      grid=both,
+      minor grid style={very thin, densely dotted},
+      axis line style={thick, black},
+      unbounded coords=jump,
+      xmode=log, ymode=log,
+      xmin=20, xmax=5e3,
+      ymin=250, ymax=3.5e3,
+      ytick={300, 500, 1000, 2000, 3000},
+      xtick={20, 50, 100, 200, 500, 1000, 2000, 5000},
+      log ticks with fixed point,
+      cycle list name=exotic,
+      ylabel={$E_\mathrm{s}$ (\si{\kilo\volt\per\meter})},
+      xlabel={$L$ (\si{\meter})},
+      boxedlegend,
+      legend style={at={(0.97, 0.97)}, anchor=north east, legend columns=1},
+    ]
+
+    % Solver: lines.  Normal modes: open markers.
+    \addplot+[solver] table[x expr=\thisrowno{2}/1000, y expr=\thisrowno{5}/1000] {sim.dat};
+    \addplot[exact, forget plot, black] table[x expr=\thisrowno{0}, y expr=\thisrowno{1}] {normal_modes.dat};
+
+    \addplot+[solver] table[x expr=\thisrowno{12}/1000, y expr=\thisrowno{15}/1000] {sim.dat};
+    \addplot[exact, forget plot, black] table[x expr=\thisrowno{0}, y expr=\thisrowno{2}] {normal_modes.dat};
+
+    \addlegendentry{$R \gg L$};
+    \addlegendentry{$R = \SI{100}{\meter}$};
+    \addplot[exact, black] coordinates {(1e-9,1e-9)};
+    \addlegendentry{normal modes};
+
+    % Runaway avalanche threshold and conventional breakdown.
+    \addplot[thick, dashed, gray, forget plot] coordinates {(20,284) (5e3,284)};
+    \addplot[thick, dotted, gray, forget plot] coordinates {(20,3000) (5e3,3000)};
+  \end{axis}
+\end{tikzpicture}
+\end{document}

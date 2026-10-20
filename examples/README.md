@@ -12,6 +12,7 @@ again: that is the point.
 | `coaxial/`   | Corona inception on a wire in a cylinder                   | none needed (self-contained)              |
 | `iec60052/`  | Standard sphere gaps                                       | IEC 60052 tables (not included)           |
 | `electra/`   | Quasi-uniform gaps over five decades of `pd`               | Dakin et al., ELECTRA 32 (not included)   |
+| `rfd/`       | Relativistic feedback in a thundercloud                    | normal modes, computed alongside          |
 
 **The IEC 60052 and ELECTRA reference tables are not part of this
 repository.** They are copyrighted by the IEC and by CIGRE respectively.
