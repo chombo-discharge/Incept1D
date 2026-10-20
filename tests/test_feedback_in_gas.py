@@ -30,8 +30,8 @@ step, which put the threshold at 3-4 times the right field.
 
 Two realisations of the same A are checked: a forward and a backward
 species (b a positive-ion-like species that regenerates the forward one in
-the gas), and electrons with one photon group whose backward stream alone
-couples back (directional coupling, eq. eq_two_stream_directional).
+the gas), and electrons with one photon group that radiates backward only
+(eq. eq_two_stream_directional).
 """
 
 import functools
@@ -119,19 +119,21 @@ class TwoSpecies(_Gap):
         return np.zeros(0)
 
 
-class BackwardPhotons(_Gap):
+class PhotonGap(_Gap):
     """
-    Electrons and one photon group whose backward stream alone ionizes.
+    Electrons and photon groups, each ``(direction, b, gamma_Psi)``.
 
-    The forward stream is transported but couples to nothing, so b is the
-    backward stream, and A is the same as for :class:`TwoSpecies`.  With
-    ``isotropic`` the forward stream ionizes too.
+    Every group is emitted at s and absorbed at l, and ionizes at b.  With
+    the default single backward group b is its backward stream, and A is
+    the same as for :class:`TwoSpecies`.
     """
 
     SPECIES = ["e"]
 
-    def __init__(self, isotropic=False):
-        self.isotropic = isotropic
+    def __init__(self, groups=(("backward", C, 0.0),)):
+        self.PHOTON_DIRECTIONS = [g[0] for g in groups]
+        self._b = np.array([[g[1] for g in groups]])
+        self._gamma_Psi = np.array([g[2] for g in groups])
 
     def get_V(self, EN, p, T):
         return np.diag([V])
@@ -143,19 +145,17 @@ class BackwardPhotons(_Gap):
         return np.zeros((0, 1))
 
     def get_B(self, EN, p, T):
-        return np.array([[C if self.isotropic else 0.0]])
-
-    def get_B_bck(self, EN, p, T):
-        return np.array([[C]])
+        return self._b
 
     def get_C(self, EN, p, T):
-        return np.array([[S * V]])  # acts on densities; the solver divides by V
+        # Acts on densities; the solver divides by V.
+        return np.full((self._b.shape[1], 1), S * V)
 
     def get_kappa(self, p, T):
-        return np.array([L])
+        return np.full(self._b.shape[1], L)
 
     def get_gamma_Psi(self, EN, p, T):
-        return np.zeros(1)
+        return self._gamma_Psi
 
 
 def _threshold(mod, d, criterion):
@@ -165,7 +165,7 @@ def _threshold(mod, d, criterion):
     return roots[0]
 
 
-@pytest.mark.parametrize("mod", [TwoSpecies(), BackwardPhotons()], ids=type)
+@pytest.mark.parametrize("mod", [TwoSpecies(), PhotonGap()], ids=type)
 @pytest.mark.parametrize("criterion", [riccati_criterion, inception_det])
 @pytest.mark.parametrize("d", [8e-3, 12e-3, 20e-3])
 def test_threshold_matches_closed_form(mod, criterion, d):
@@ -184,9 +184,36 @@ def test_riccati_is_one_below_and_negative_above():
     assert g(EN * 1.01, P * d, TwoSpecies(), P, T) < 0.0
 
 
-def test_forward_coupling_lowers_the_threshold():
-    """F3: the forward stream matters when, and only when, it couples."""
+def test_forward_stream_lowers_the_threshold():
+    """F3: radiating both ways adds the forward stream's ionization."""
     d = 12e-3
-    directional = _threshold(BackwardPhotons(), d, riccati_criterion)
-    isotropic = _threshold(BackwardPhotons(isotropic=True), d, riccati_criterion)
-    assert isotropic < directional
+    backward = _threshold(PhotonGap(), d, riccati_criterion)
+    both = _threshold(PhotonGap((("both", C, 0.0),)), d, riccati_criterion)
+    assert both < backward
+
+
+@pytest.mark.parametrize("criterion", [riccati_criterion, inception_det])
+@pytest.mark.parametrize("EN", [60.0, 80.0, 95.0])
+def test_both_ways_is_a_forward_and_a_backward_group(criterion, EN):
+    """
+    F4: a group radiating both ways equals one per direction, same data.
+
+    Below the threshold (near 100 Td), where g is a value and not the pole
+    sentinel.
+    """
+    g = functools.partial(criterion, field_dist=UNIFORM)
+    d, b, gamma = 12e-3, 0.4 * C, 0.05
+    one = PhotonGap((("both", b, gamma),))
+    two = PhotonGap((("forward", b, gamma), ("backward", b, gamma)))
+    assert g(EN, P * d, two, P, T) == pytest.approx(g(EN, P * d, one, P, T), rel=1e-10)
+
+
+@pytest.mark.parametrize("criterion", [riccati_criterion, inception_det])
+def test_forward_group_ejects_no_photoelectrons(criterion):
+    """F5: no stream of a forward group reaches the cathode."""
+    g = functools.partial(criterion, field_dist=UNIFORM)
+    d, EN = 12e-3, 80.0  # below the threshold, near 100 Td
+    back = ("backward", 0.4 * C, 0.05)
+    quiet = PhotonGap((("forward", 0.4 * C, 0.0), back))
+    yields = PhotonGap((("forward", 0.4 * C, 0.5), back))
+    assert g(EN, P * d, yields, P, T) == g(EN, P * d, quiet, P, T)

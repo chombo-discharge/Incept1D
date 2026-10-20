@@ -95,10 +95,11 @@ Optional interface
      - Townsend coefficients in m\ :sup:`-1`.  Required for
        ``--plot-ionization-integral``, ``--streamer-criterion`` and
        ``incept1d ionization``.
-   * - ``get_B_bck(EN, p, T)``
-     - Coupling of the backward photon streams :math:`\bm{B}^-`, same shape
-       and units as ``get_B``, which then couples the forward streams
-       alone.  Omitted, the backward streams couple like the forward ones
+   * - ``PHOTON_DIRECTIONS``
+     - One entry per photon group, ``"both"``, ``"forward"`` (toward the
+       anode) or ``"backward"`` (toward the cathode): the direction the
+       group radiates in.  Radiation that differs between the two directions
+       is one group per direction.  Omitted, every group radiates both ways
        (:eq:`eq_two_stream_directional`).
    * - ``init_photoionization(ngroups, cone_angle_deg)``
      - Called by ``Config.post_exec_init`` to (re)build the photon groups.

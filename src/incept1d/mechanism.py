@@ -139,12 +139,10 @@ class Mechanism:
     def get_kappa(self, p, T):
         return self._mod.get_kappa(p, T)
 
-    # The backward stream Ψ⁻ couples like the forward one unless the
-    # mechanism defines its own (OPTIONAL_ATTRS).
-    def get_B_bck(self, EN, p, T):
-        if not hasattr(self._mod, "get_B_bck"):
-            return self.get_B(EN, p, T)
-        return self._mod.get_B_bck(EN, p, T) * self._xi_photo
+    # Read on use: init_photoionization may rebuild the groups after loading.
+    @property
+    def PHOTON_DIRECTIONS(self):
+        return getattr(self._mod, "PHOTON_DIRECTIONS", None)
 
     def get_gamma_plus(self, EN, p, T):
         return self._mod.get_gamma_plus_with(
@@ -191,10 +189,11 @@ REQUIRED_ATTRS = [
     "get_gamma_Psi",
 ]
 
-#: Attributes a mechanism module may expose.  ``get_B_bck`` gives the
-#: backward photon stream its own coupling to the species (same signature
-#: as ``get_B``); without it the backward stream couples like the forward one.
-OPTIONAL_ATTRS = ["alpha", "eta", "get_B_bck"]
+#: Attributes a mechanism module may expose.  ``PHOTON_DIRECTIONS`` lists,
+#: per photon group, the direction it radiates in (``"both"``, ``"forward"``
+#: or ``"backward"``, see :func:`incept1d.solver.photon_streams`); without it
+#: every group radiates both ways.
+OPTIONAL_ATTRS = ["alpha", "eta", "PHOTON_DIRECTIONS"]
 
 
 def read_json_configs(json_paths):

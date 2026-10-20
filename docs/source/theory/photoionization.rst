@@ -87,36 +87,34 @@ feedback off entirely.  It is exposed as ``cone_angle`` in the JSON
 configuration (:ref:`Chap:Configuration`); ``mechanisms/air/pancheshnyi/see.json`` contains a
 ready-made sensitivity sweep over it.
 
-Directional coupling
+Directional emission
 ....................
 
-:eq:`eq_two_stream` absorbs both streams into the same products:
-photons from either direction ionize alike.  When the two directions carry
-different spectra they need not — absorbed forward photons may produce
-species that backward ones do not, at different rates — so each stream may
-couple to the species through its own vector, and the production per unit
-volume and time is
+:eq:`eq_two_stream` gives every group both streams: a group is emitted and
+absorbed alike in the two directions.  Radiation that is not — from fast
+particles beamed along their motion, say — is described by groups that
+radiate in one direction only.  Group :math:`j` carries the streams of a
+set :math:`\mathcal{D}_j`, which is :math:`\{+,-\}`, :math:`\{+\}` or
+:math:`\{-\}`; the stream equations of :eq:`eq_two_stream` hold for
+:math:`\pm \in \mathcal{D}_j`, the others are absent, and the production
+per unit volume and time is
 
 .. math::
    :label: eq_two_stream_directional
 
-   \sum_j\left(\vec{b}_j^{\,+}\Psi_j^+ + \vec{b}_j^{\,-}\Psi_j^-\right)
-   \quad\text{in place of}\quad
-   \sum_j\vec{\beta}_j\xi_j\kappa_j\left(\Psi_j^+ + \Psi_j^-\right),
+   \sum_j\vec{\beta}_j\xi_j\kappa_j\sum_{\pm\in\mathcal{D}_j}\Psi_j^\pm .
 
-with :math:`\vec{b}_j^{\,\pm}` not necessarily proportional to
-:math:`\kappa_j`.  Isotropic absorption is the case
-:math:`\vec{b}_j^{\,\pm} = \vec{\beta}_j\xi_j\kappa_j`.
-
-Source and absorption stay properties of the group.  That is no loss:
-radiation that is emitted, or attenuated, differently in the two directions
-— from fast particles beamed along their motion, say — is two groups, one
-per direction, each with its own source and :math:`\kappa_j` and each
-coupling through one stream only (:math:`\vec{b}_1^{\,-} = \vec{0}` for the
-forward group, :math:`\vec{b}_2^{\,+} = \vec{0}` for the backward one).
-The other stream of each group is still transported, but produces nothing,
-so it is a passive output of the gap and does not change the inception
-condition.
+Source, absorption, products and photoemission yield all stay properties of
+the group.  Radiation that differs between the two directions in any of
+them is two groups, one per direction, each with its own data; a group that
+radiates both ways is exactly the pair of one-way groups with its data
+(the streams of a group interact only through the species).  Of the
+:math:`N_\gamma` groups, :math:`N_\gamma^+` radiate forward and
+:math:`N_\gamma^-` backward, so the gap carries
+:math:`N_\gamma^+ + N_\gamma^-` photon fluxes, :math:`2N_\gamma` when every
+group radiates both ways.  A forward
+group never reaches the cathode, so it ejects no photoelectrons
+(:ref:`Chap:SecondaryEmission`).
 
 After the eigenvalue substitution :math:`\vec{\Psi}(x,t) \to
 \vec{\Psi}(x)e^{\lambda t}`, :eq:`eq_two_stream` becomes
@@ -127,12 +125,11 @@ After the eigenvalue substitution :math:`\vec{\Psi}(x,t) \to
      \pm \frac{\Delta\Omega}{4\pi}\,\rho\,\vec{g}\,\vec{u}_\mathrm{e}^\intercal\bm{V}^{-1}\vec{y},
 
 which supplies the :math:`\bm{C}` and :math:`\bm{D}` blocks of the
-augmented matrix :eq:`eq_augmented_ode`, while the coupling term
+augmented matrix :eq:`eq_augmented_ode`, while the absorption term
 :eq:`eq_two_stream_directional` in :eq:`eq_flux_ode` supplies
-:math:`\bm{B}^\pm = [\vec{b}_1^{\,\pm}\;\vec{b}_2^{\,\pm}\;\cdots]`.  The
-:math:`\lambda/c` term is retardation; it is negligible at inception
-(:math:`\lambda = 0`) but is kept
-for the growth-rate calculation in :ref:`Chap:Lambda`.
+:math:`\bm{B}`.  The :math:`\lambda/c` term is retardation; it is
+negligible at inception (:math:`\lambda = 0`) but is kept for the
+growth-rate calculation in :ref:`Chap:Lambda`.
 
 .. admonition:: Code
 
@@ -149,10 +146,9 @@ for the growth-rate calculation in :ref:`Chap:Lambda`.
    * ``get_gamma_Psi(EN, p, T)`` → photoemission yields, see
      :ref:`Chap:SecondaryEmission`.
 
-   ``get_B`` is the coupling of the forward streams, and of the backward
-   ones too unless the mechanism also defines ``get_B_bck`` (same
-   signature), which gives :math:`\bm{B}^-`
-   (:func:`incept1d.solver.photon_blocks`).
+   An optional ``PHOTON_DIRECTIONS`` lists :math:`\mathcal{D}_j` per group,
+   as ``"both"``, ``"forward"`` or ``"backward"``; without it every group
+   radiates both ways (:func:`incept1d.solver.photon_streams`).
 
    A mechanism without photoionization returns zero-width arrays
    (:math:`N_\gamma = 0`).

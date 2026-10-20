@@ -54,9 +54,12 @@ a component travelling toward the anode and one travelling back that
 regenerates it, whose threshold is :math:`[e^{\bm{\mathcal{A}}d}]_{bb} = 0`
 for a :math:`2\times2` matrix.  Both criteria must reproduce it to
 :math:`10^{-8}`, once with two species and once with electrons and a photon
-group whose backward stream alone couples back
-(:eq:`eq_two_stream_directional`).  The reflection criterion sees this
-threshold only as a pole (:ref:`Chap:Numerics:Riccati`).
+group that radiates backward only (:eq:`eq_two_stream_directional`).  The
+reflection criterion sees this threshold only as a pole
+(:ref:`Chap:Numerics:Riccati`).  The same file checks that a group
+radiating both ways gives the criteria of a forward and a backward group
+with its data, and that a forward group's photoemission yield does not
+enter.
 
 **Unit tests** of the building blocks:
 
@@ -70,9 +73,9 @@ threshold only as a pole (:ref:`Chap:Numerics:Riccati`).
 * The propagators — ``magnus2`` reduces to the midpoint rule for constant
   :math:`\bm{\mathcal{A}}`; composed propagators reproduce a single
   ``expm``; the uniform-field shortcut agrees with the stepped path; every
-  photon group is propagated, however optically thick; backward photon
-  streams take their own coupling, and spelling out a symmetric one changes
-  nothing;
+  photon group is propagated, however optically thick; a group carries
+  only the streams it radiates into, and declaring every group ``"both"``
+  changes nothing;
 * The two criteria — the reflection criterion and :math:`\det\bm{Q}`
   change sign at the same :math:`E/N` and :math:`\lambda`; both match
   :math:`\det\bm{Q}` computed in high-precision arithmetic, including

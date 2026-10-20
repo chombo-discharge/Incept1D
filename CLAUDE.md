@@ -78,7 +78,7 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `fields.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere / hyperboloid-plane / coaxial / tabulated field-line profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`, optionally with a protrusion (`protrusions.py`) on the `ξ = 0` electrode (`--protrusion`; `d` measured from its tip, renormalised so the voltage is kept); `--reverse-field` reads any profile from the other electrode, `f(ξ) → f(1−ξ)`. Shared `--field` CLI parsing (`add_field_argument` / `field_from_args` → `parse_field_spec`, field-line units `parse_field_unit`), `field_header_lines` for results headers, and `field_following_edges` (with `FieldDistribution.nodes` / `grid_edges`): the field-following initial segments the solver and the ionization panels share. |
 | `protrusions.py` | Protrusions on the `ξ = 0` electrode (`--protrusion`): on-axis enhancement `E/E₀` of a `Spheroid` (closed form), `Cone` and `Rod` (charge simulation method `_csm_solve`, solved once on construction and self-checked). `FieldDistribution.build` multiplies the background by it. |
 | `mechanism.py` | `load_mechanism` execs a mechanism file + optional JSON config (`read_json_configs`) into a `Mechanism` object; `REQUIRED_ATTRS` is the mechanism interface. |
-| `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix, every photon group explicit; `photon_blocks` gives the backward streams their own coupling `B⁻` when the mechanism defines `get_B_bck`), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping from a field-following start (`fields.field_following_edges`, `parse_dx_spec`, `DX_*_DEFAULT`), the two criteria — `riccati_criterion` (default; `_riccati_g`, adding–doubling in `_slab_scattering` / `_star`, pole test `_spectral_radius`) and `inception_det` (`det Q(λ)`, compound-matrix fallback `_det_Q_compound`) — and `CRITERIA` / `add_criterion_argument` for `--criterion`. |
+| `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix, every photon group explicit, each carrying only the streams `photon_streams` reads from the mechanism's `PHOTON_DIRECTIONS`), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping from a field-following start (`fields.field_following_edges`, `parse_dx_spec`, `DX_*_DEFAULT`), the two criteria — `riccati_criterion` (default; `_riccati_g`, adding–doubling in `_slab_scattering` / `_star`, pole test `_spectral_radius`) and `inception_det` (`det Q(λ)`, compound-matrix fallback `_det_Q_compound`) — and `CRITERIA` / `add_criterion_argument` for `--criterion`. |
 | `inception.py` | `find_all_breakdown_EN` finds the `E/N` roots of the criterion (bottom-up scan, floor check below 10 Td, + → − rule for Riccati); `compute_inception_curve` tracks them (branches) over a `p·d` sweep, in parallel blocks with `jobs` → the inception curve PDIV(p·d). CLI: `cli/pdiv.py`. |
 | `eigenvalues.py` | Diagnostic: eigenvalues of the *local* transport matrix `A = R V⁻¹` vs `E/N` (no gap integration); `max_real_eigenvalue` is shared with `ionization`/`growth`. CLI: `cli/eigenvalues.py`. |
 | `ionization.py` | Ionization integrals `∫max(α−η,0)dx` and `∫max(Re λ_max(RV⁻¹),0)dx` across the gap, for comparison against the full `det Q` criterion. CLI: `cli/ionization.py`. |
@@ -117,11 +117,12 @@ A mechanism module must expose the fixed interface
   electron emission efficiencies (ion- and photon-induced)
 
 Optional (`incept1d.mechanism.OPTIONAL_ATTRS`): `alpha`/`eta`, and
-`get_B_bck`, the coupling of the backward photon streams
-(`theory/photoionization.rst`, eq. `eq_two_stream_directional`); without
-it the backward streams couple like the forward ones.  Source and
-absorption stay per group: directional emission is one group per direction,
-each coupling through one stream.  A mechanism whose feedback closes in the gas with no cathode emission is
+`PHOTON_DIRECTIONS`, one of `"both"` / `"forward"` / `"backward"` per photon
+group (`theory/photoionization.rst`, eq. `eq_two_stream_directional`);
+without it every group radiates both ways.  Source, absorption, coupling and
+photoemission yield stay per group: radiation that differs between the two
+directions is one group per direction, and the solver drops the stream a
+group does not radiate into.  A mechanism whose feedback closes in the gas with no cathode emission is
 the case where only the Riccati pole test sees inception.
 
 When writing or editing a mechanism file, follow the coordinate convention

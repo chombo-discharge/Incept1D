@@ -25,6 +25,7 @@ from incept1d.solver import (
     magnus2_propagator,
     midpoint_propagator,
     parse_dx_spec,
+    photon_streams,
     polarities_equivalent,
 )
 
@@ -61,31 +62,36 @@ class PhotonStub:
 
 
 class DirectionalStub(PhotonStub):
-    """PhotonStub whose backward streams couple to the species differently."""
+    """PhotonStub with one direction per group and distinct group data."""
 
-    def __init__(self, n=2, kappa=(1.0,), b_bck=0.1):
-        super().__init__(n, kappa)
-        self._b_bck = b_bck
+    def __init__(self, directions, n=2):
+        super().__init__(n, kappa=1.0 + np.arange(len(directions)))
+        self.PHOTON_DIRECTIONS = directions
 
-    def get_B_bck(self, EN, p, T):
-        return np.full((self._n, len(self._kappa)), self._b_bck)
+    def get_B(self, EN, p, T):
+        return np.arange(self._n * len(self._kappa), dtype=float).reshape(
+            self._n, len(self._kappa)
+        )
+
+    def get_C(self, EN, p, T):
+        return 10.0 + self.get_B(EN, p, T).T
 
 
 class TestBuildAAug:
     def test_without_photons_reduces_to_R_Vinv(self, toy):
         """S1: with no photon groups A_aug is exactly R V^-1."""
         EN, p, T, d = 300.0, 1.0, 293.0, 10e-3
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(EN, d, toy, p, T)
+        A_aug, fwd, bck, n_aug = _build_A_aug(EN, d, toy, p, T)
         R, V = toy.get_R(EN, p, T), toy.get_V(EN, p, T)
-        assert n_gamma == 0 and mask is None and n_aug == len(toy.SPECIES)
+        assert len(fwd) == len(bck) == 0 and n_aug == len(toy.SPECIES)
         assert A_aug == pytest.approx(R @ np.linalg.inv(V))
 
     def test_block_structure_with_photons(self):
         """S2: A_aug = [[A, B, B], [C, -D, 0], [-C, 0, D]]."""
         mod = PhotonStub(n=2, kappa=(1.0, 2.0))
         EN, p, T, d = 100.0, 1.0, 293.0, 1e-3  # kappa*d small: nothing collapses
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(EN, d, mod, p, T)
-        assert n_gamma == 2 and n_aug == 2 + 2 * 2
+        A_aug, fwd, bck, n_aug = _build_A_aug(EN, d, mod, p, T)
+        assert list(fwd) == list(bck) == [0, 1] and n_aug == 2 + 2 * 2
         n = 2
         A = A_aug[:n, :n]
         B1, B2 = A_aug[:n, n : n + 2], A_aug[:n, n + 2 :]
@@ -103,32 +109,49 @@ class TestBuildAAug:
         assert Z_tr == pytest.approx(np.zeros((2, 2)))
         assert Z_bl == pytest.approx(np.zeros((2, 2)))
 
-    def test_directional_coupling(self):
-        """S2b: A_aug = [[A, B+, B-], [C, -D, 0], [-C, 0, D]].
+    def test_directional_groups(self):
+        """S2b: a group carries only the streams it radiates into.
 
-        A mechanism with get_B_bck gives the backward streams their own
-        coupling to the species; source and absorption stay the group's.
+        A_aug = [[A, B+, B-], [C+, -D+, 0], [-C-, 0, D-]], the + blocks those
+        of the groups radiating forward, the - blocks those radiating backward.
         """
-        mod = DirectionalStub(n=2, kappa=(1.0, 2.0))
+        mod = DirectionalStub(["forward", "backward", "both"])
         EN, p, T, d = 100.0, 1.0, 293.0, 1e-3
-        A_aug, *_ = _build_A_aug(EN, d, mod, p, T)
-        n, g = 2, 2
-        v_inv = 1.0 / np.diag(mod.get_V(EN, p, T))
-        assert A_aug[:n, n : n + g] == pytest.approx(mod.get_B(EN, p, T))
-        assert A_aug[:n, n + g :] == pytest.approx(mod.get_B_bck(EN, p, T))
-        assert A_aug[n : n + g, :n] == pytest.approx(mod.get_C(EN, p, T) * v_inv)
-        assert A_aug[n + g :, :n] == pytest.approx(-mod.get_C(EN, p, T) * v_inv)
-        kappa = np.diag(mod.get_kappa(p, T))
-        assert A_aug[n : n + g, n : n + g] == pytest.approx(-kappa)
-        assert A_aug[n + g :, n + g :] == pytest.approx(kappa)
+        A_aug, fwd, bck, n_aug = _build_A_aug(EN, d, mod, p, T)
+        assert list(fwd) == [0, 2] and list(bck) == [1, 2] and n_aug == 2 + 4
+        n = 2
+        B, kappa = mod.get_B(EN, p, T), mod.get_kappa(p, T)
+        C = mod.get_C(EN, p, T) / np.diag(mod.get_V(EN, p, T))
+        assert A_aug[:n, n : n + 2] == pytest.approx(B[:, [0, 2]])
+        assert A_aug[:n, n + 2 :] == pytest.approx(B[:, [1, 2]])
+        assert A_aug[n : n + 2, :n] == pytest.approx(C[[0, 2]])
+        assert A_aug[n + 2 :, :n] == pytest.approx(-C[[1, 2]])
+        assert A_aug[n : n + 2, n:] == pytest.approx(
+            np.hstack([-np.diag(kappa[[0, 2]]), np.zeros((2, 2))])
+        )
+        assert A_aug[n + 2 :, n:] == pytest.approx(
+            np.hstack([np.zeros((2, 2)), np.diag(kappa[[1, 2]])])
+        )
 
-    def test_backward_coupling_equal_to_forward_changes_nothing(self):
-        """S2c: a mechanism that spells out symmetric coupling is unchanged."""
-        plain = PhotonStub(n=2, kappa=(1.0, 2.0))
-        spelled = DirectionalStub(n=2, kappa=(1.0, 2.0), b_bck=0.3)
+    def test_both_ways_spelled_out_changes_nothing(self):
+        """S2c: declaring every group "both" is the default, bit for bit."""
+        plain = DirectionalStub(["both", "both"])
+        del plain.PHOTON_DIRECTIONS
+        spelled = DirectionalStub(["both", "both"])
         a = _build_A_aug(100.0, 1e-3, plain, 1.0, 293.0)[0]
         b = _build_A_aug(100.0, 1e-3, spelled, 1.0, 293.0)[0]
         assert np.array_equal(a, b)
+
+    @pytest.mark.parametrize(
+        "directions, match",
+        [(["both"], "1 entries for 2"), (["both", "up"], "unknown direction")],
+    )
+    def test_bad_directions_are_rejected(self, directions, match):
+        """S2d: one known direction per group, or an error that says which."""
+        mod = PhotonStub(n=2, kappa=(1.0, 2.0))
+        mod.PHOTON_DIRECTIONS = directions
+        with pytest.raises(ValueError, match=match):
+            photon_streams(mod, 2)
 
     @pytest.mark.parametrize("kd", [0.01, 11.99, 12.01, 100.0, 1e4])
     def test_every_group_is_propagated(self, kd):
@@ -139,9 +162,8 @@ class TestBuildAAug:
         upstream seeding by photons, which is the photoionization feedback.
         """
         mod = PhotonStub(n=2, kappa=(1.0, 1e4))
-        A_aug, n_gamma, mask, n_aug = _build_A_aug(100.0, kd, mod, 1.0, 293.0)
-        assert n_gamma == 2 and n_aug == 2 + 2 * 2
-        assert list(mask) == [True, True]
+        A_aug, fwd, bck, n_aug = _build_A_aug(100.0, kd, mod, 1.0, 293.0)
+        assert list(fwd) == list(bck) == [0, 1] and n_aug == 2 + 2 * 2
         v_inv = 1.0 / np.diag(mod.get_V(100.0, 1.0, 293.0))
         assert A_aug[:2, :2] == pytest.approx(
             mod.get_R(100.0, 1.0, 293.0) * v_inv[np.newaxis, :]
@@ -409,8 +431,8 @@ class TestCompoundRoute:
     @staticmethod
     def _routes(mod, EN, pd, lam=0.0, n_steps=1, p=1.0, T=293.0):
         d = pd / p
-        A, Ng, mask, n_aug = _build_A_aug(EN, d, mod, p, T, lam=lam)
-        Q0, S = _boundary_rows(EN, mod, p, T, Ng, mask, n_aug)
+        A, fwd, bck, n_aug = _build_A_aug(EN, d, mod, p, T, lam=lam)
+        Q0, S = _boundary_rows(EN, mod, p, T, fwd, bck, n_aug)
         exponents = [A * d / n_steps] * n_steps
         M = np.linalg.matrix_power(scipy.linalg.expm(A * d / n_steps), n_steps)
         with np.errstate(over="ignore", invalid="ignore"):

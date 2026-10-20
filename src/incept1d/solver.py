@@ -33,39 +33,63 @@ from incept1d.constants import kB as _kB, c_light as _C_LIGHT  # noqa: F401
 from incept1d.fields import FieldDistribution  # noqa: F401
 
 
-def photon_blocks(mod, EN, p, T):
-    """
-    The photon coupling of the forward and backward streams.
+#: Directions a photon group may be transported in (``PHOTON_DIRECTIONS``):
+#: forward is toward the anode, backward toward the cathode.
+PHOTON_DIRECTIONS = ("both", "forward", "backward")
 
-    A mechanism supplies ``get_B`` for the coupling of the forward stream
-    Ψ⁺; the backward stream Ψ⁻ uses the same unless the mechanism also
-    defines ``get_B_bck`` (eq. ``eq_two_stream_directional``).  Source and
-    absorption belong to the group, not the stream: directional emission is
-    a group per direction, each coupling through one of its streams only.
+
+def photon_streams(mod, n_gamma):
+    """
+    The photon groups whose forward and backward streams are carried.
+
+    A mechanism may declare a direction for each photon group in
+    ``PHOTON_DIRECTIONS``; without it every group radiates both ways.  A
+    group's source, absorption, coupling and photoemission yield belong to
+    the group, so radiation that differs between the two directions is one
+    group per direction, and the stream a group does not radiate into is
+    left out of the augmented system (eq. ``eq_two_stream_directional``).
 
     Parameters
     ----------
     mod : Mechanism
         Mechanism, or any object with the photon accessors.
-    EN, p, T : float
-        Reduced field (Td), pressure (bar), temperature (K).
+    n_gamma : int
+        Number of photon groups, N_γ.
 
     Returns
     -------
     tuple
-        ``(B⁺, B⁻)``, each of shape (N_s, N_γ).
+        ``(fwd, bck)``, integer arrays of the groups with a forward stream
+        Ψ⁺ and with a backward stream Ψ⁻, in group order.
     """
-    B_f = mod.get_B(EN, p, T)
-    B_b = mod.get_B_bck(EN, p, T) if hasattr(mod, "get_B_bck") else B_f
-    return B_f, B_b
+    directions = getattr(mod, "PHOTON_DIRECTIONS", None)
+    if directions is None:
+        directions = ["both"] * n_gamma
+    directions = list(directions)
+    if len(directions) != n_gamma:
+        raise ValueError(
+            f"PHOTON_DIRECTIONS has {len(directions)} entries for "
+            f"{n_gamma} photon groups"
+        )
+    unknown = sorted(set(directions) - set(PHOTON_DIRECTIONS))
+    if unknown:
+        raise ValueError(
+            f"PHOTON_DIRECTIONS: unknown direction(s) {unknown}; "
+            f"expected one of {list(PHOTON_DIRECTIONS)}"
+        )
+    fwd = [j for j, s in enumerate(directions) if s != "backward"]
+    bck = [j for j, s in enumerate(directions) if s != "forward"]
+    return np.array(fwd, dtype=int), np.array(bck, dtype=int)
 
 
 def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     """Build the augmented ODE matrix for reduced field EN and gap length d.
 
-    A_aug = [[A, B⁺, B⁻], [C, −D, 0], [−C, 0, D]] (eq.
-    ``eq_augmented_ode``); B⁺ = B⁻ unless the mechanism gives the backward
-    stream its own coupling (:func:`photon_blocks`).
+    A_aug = [[A, B⁺, B⁻], [C⁺, −D⁺, 0], [−C⁻, 0, D⁻]] (eq.
+    ``eq_augmented_ode``), where the ⁺ blocks are the columns or rows of the
+    groups that radiate forward and the ⁻ blocks those of the groups that
+    radiate backward (:func:`photon_streams`).  With every group radiating
+    both ways B⁺ = B⁻ = B, C⁺ = C⁻ = C and D⁺ = D⁻ = D.
 
     Every photon group is propagated explicitly, however optically thick.
     Folding a thick group into A as the local source 2 b_j c_jᵀ / κ_j keeps
@@ -88,8 +112,9 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     Returns
     -------
     tuple
-        ``(A_aug, N_gamma_eff, aug_mask, n_aug)``.  ``aug_mask`` selects the
-        explicitly propagated photon groups — all of them — and is None when
+        ``(A_aug, fwd, bck, n_aug)``.  ``fwd`` and ``bck`` are the groups
+        whose forward and backward streams are carried (:func:`photon_streams`),
+        in the order θ holds them after the species; both are empty when
         N_γ = 0.
     """
     n = len(mod.SPECIES)
@@ -104,32 +129,27 @@ def _build_A_aug(EN, d, mod, p, T, lam=0.0):
     if lam != 0.0:
         A = A - lam * np.diag(v_inv)  # (R − λI) V⁻¹
 
-    B_f, B_b = photon_blocks(mod, EN, p, T)  # (N_s, N_gamma) each
+    B = mod.get_B(EN, p, T)  # (N_s, N_gamma)
     C = mod.get_C(EN, p, T) * v_inv[np.newaxis, :]  # (N_gamma, N_s)
     kappa = mod.get_kappa(p, T)  # (N_gamma,)
     if lam != 0.0:
         kappa = kappa + lam / _C_LIGHT  # κ + λ/c
-    N_gamma = B_f.shape[1]
+    fwd, bck = photon_streams(mod, B.shape[1])
+    n_f, n_b = len(fwd), len(bck)
 
-    N_gamma_eff = N_gamma
-    aug_mask = np.ones(N_gamma, dtype=bool) if N_gamma > 0 else None
-
-    if N_gamma_eff == 0:
+    if n_f + n_b == 0:
         A_aug = A
-        n_aug = n
     else:
-        D_mat = np.diag(kappa)
-        z_gg = np.zeros((N_gamma_eff, N_gamma_eff))
         A_aug = np.block(
             [
-                [A, B_f, B_b],
-                [C, -D_mat, z_gg],
-                [-C, z_gg, D_mat],
+                [A, B[:, fwd], B[:, bck]],
+                [C[fwd], -np.diag(kappa[fwd]), np.zeros((n_f, n_b))],
+                [-C[bck], np.zeros((n_b, n_f)), np.diag(kappa[bck])],
             ]
         )
-        n_aug = n + 2 * N_gamma_eff
+    n_aug = n + n_f + n_b
 
-    return A_aug, N_gamma_eff, aug_mask, n_aug
+    return A_aug, fwd, bck, n_aug
 
 
 def _expm(M):
@@ -581,40 +601,43 @@ def _log_row_norm(row, exponents):
     return log_r + math.log(np.linalg.norm(r))
 
 
-def _boundary_rows(EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug):
+def _boundary_rows(EN_cathode, mod, p, T, fwd, bck, n_aug):
     """
     The two halves of the boundary-condition matrix Q.
 
     Returns ``(Q0, S)``: Q0 holds the cathode conditions on θ(0) (electron
     emission, no negative ions, no forward photons), and S selects the
     components that vanish at the anode (positive ions, backward photons),
-    so that Q = [Q0; S M].  *mod* must already be polarity-resolved.
+    so that Q = [Q0; S M].  *fwd* and *bck* are the groups whose forward and
+    backward streams θ carries (:func:`photon_streams`); only the backward
+    ones reach the cathode, so only they eject photoelectrons.  *mod* must
+    already be polarity-resolved.
     """
     n = len(mod.SPECIES)
+    n_f, n_b = len(fwd), len(bck)
 
     Pi_e = mod.get_Pi_e()
     Pi_plus = mod.get_Pi_plus()
     Pi_minus = mod.get_Pi_minus()
     gplus = mod.get_gamma_plus(EN_cathode, p, T)
 
-    if N_gamma_eff == 0:
+    if n_f + n_b == 0:
         Q0_e = Pi_e + gplus[np.newaxis, :] @ Pi_plus
         return np.vstack([Q0_e, Pi_minus]), Pi_plus
 
-    z_gamma = np.zeros((Pi_e.shape[0], 2 * N_gamma_eff))
-    z_plus = np.zeros((Pi_plus.shape[0], 2 * N_gamma_eff))
-    z_minus = np.zeros((Pi_minus.shape[0], 2 * N_gamma_eff))
+    z_gamma = np.zeros((Pi_e.shape[0], n_f + n_b))
+    z_plus = np.zeros((Pi_plus.shape[0], n_f + n_b))
+    z_minus = np.zeros((Pi_minus.shape[0], n_f + n_b))
     Pi_e_aug = np.hstack([Pi_e, z_gamma])
     Pi_plus_aug = np.hstack([Pi_plus, z_plus])
     Pi_minus_aug = np.hstack([Pi_minus, z_minus])
 
-    Pi_fwd = np.zeros((N_gamma_eff, n_aug))
-    Pi_bck = np.zeros((N_gamma_eff, n_aug))
-    for j in range(N_gamma_eff):
-        Pi_fwd[j, n + j] = 1.0
-        Pi_bck[j, n + N_gamma_eff + j] = 1.0
+    Pi_fwd = np.zeros((n_f, n_aug))
+    Pi_bck = np.zeros((n_b, n_aug))
+    Pi_fwd[np.arange(n_f), n + np.arange(n_f)] = 1.0
+    Pi_bck[np.arange(n_b), n + n_f + np.arange(n_b)] = 1.0
 
-    g_Psi = mod.get_gamma_Psi(EN_cathode, p, T)[aug_mask]
+    g_Psi = mod.get_gamma_Psi(EN_cathode, p, T)[bck]
 
     Q0_e = Pi_e_aug + gplus[np.newaxis, :] @ Pi_plus_aug - g_Psi[np.newaxis, :] @ Pi_bck
     Q0 = np.vstack([Q0_e, Pi_minus_aug, Pi_fwd])
@@ -687,9 +710,7 @@ def _det_Q_compound(exponents, Q0, S):
     return float(sign) * math.exp(min(max(log_det, -644.0), 690.0))
 
 
-def _det_Q(
-    exponents, EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug, resolve=False
-):
+def _det_Q(exponents, EN_cathode, mod, p, T, fwd, bck, n_aug, resolve=False):
     """
     Row-normalised det Q for the propagator M = ∏ exp(Ω_i).
 
@@ -715,7 +736,7 @@ def _det_Q(
     Must be called inside a numpy errstate(over='ignore', invalid='ignore')
     block.  Returns NaN if the requested routes cannot evaluate it.
     """
-    Q0, S = _boundary_rows(EN_cathode, mod, p, T, N_gamma_eff, aug_mask, n_aug)
+    Q0, S = _boundary_rows(EN_cathode, mod, p, T, fwd, bck, n_aug)
 
     # Direct route.  M is carried with a running scale so it cannot overflow;
     # a positive scalar on M does not change the row-normalised determinant.
@@ -828,7 +849,7 @@ def inception_det(
         det Q(λ).  Inception threshold: det Q = 0.
     """
     with np.errstate(over="ignore", invalid="ignore"):
-        exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug = _discretise(
+        exponents, EN_cathode, eff, fwd, bck, n_aug = _discretise(
             EN_ref,
             pd,
             mod,
@@ -849,8 +870,8 @@ def inception_det(
             eff,
             p,
             T,
-            N_gamma_eff,
-            aug_mask,
+            fwd,
+            bck,
             n_aug,
             resolve,
         )
@@ -874,7 +895,7 @@ def _discretise(
     """
     Step exponents across the gap and the boundary data both criteria need.
 
-    Returns ``(exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug)``:
+    Returns ``(exponents, EN_cathode, eff, fwd, bck, n_aug)``:
     the step exponents Ω_i from cathode to anode (one exact exponent for a
     uniform field; the midpoint or Magnus grid otherwise), the reduced field
     at the cathode, the polarity-resolved mechanism, and the photon
@@ -898,9 +919,7 @@ def _discretise(
     # the single exponent A_aug·d into substeps, but that split is exact
     # (exp(Ω) = exp(Ω/m)^m), not a quadrature.
     if field_dist.is_uniform:
-        A_aug, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
-            EN_ref, d, eff, p, T, lam=lam
-        )
+        A_aug, fwd, bck, n_aug = _build_A_aug(EN_ref, d, eff, p, T, lam=lam)
         with np.errstate(over="ignore", invalid="ignore"):
             if diag_list is not None:
                 diag_list.append(
@@ -920,7 +939,7 @@ def _discretise(
                         ],
                     }
                 )
-            return [A_aug * d], EN_ref, eff, N_gamma_eff, aug_mask, n_aug
+            return [A_aug * d], EN_ref, eff, fwd, bck, n_aug
 
     f = field_dist.build(d)
     # Initial segments that follow the field, in code coordinates (0 at the
@@ -941,12 +960,10 @@ def _discretise(
         return A_aug
 
     # Extract augmented-system metadata once from the first step midpoint.
-    # Photon structure (aug_mask, N_gamma_eff) is assumed constant across the gap.
+    # Photon structure (fwd, bck) is assumed constant across the gap.
     xi_mid0 = 0.5 * (x_edges[0] + x_edges[1]) / d
     xi_first = (1.0 - xi_mid0) if positive_polarity else xi_mid0
-    _, N_gamma_eff, aug_mask, n_aug = _build_A_aug(
-        EN_ref * f(xi_first), d, eff, p, T, lam=lam
-    )
+    _, fwd, bck, n_aug = _build_A_aug(EN_ref * f(xi_first), d, eff, p, T, lam=lam)
     exponents = []
 
     with np.errstate(over="ignore", invalid="ignore"):
@@ -984,7 +1001,7 @@ def _discretise(
 
         xi_cathode = 1.0 if positive_polarity else 0.0
         EN_cathode = EN_ref * f(xi_cathode)
-        return exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug
+        return exponents, EN_cathode, eff, fwd, bck, n_aug
 
 
 # Largest condition number of one Riccati substep's propagator.  The linear
@@ -1206,7 +1223,7 @@ def riccati_criterion(
         (above inception).
     """
     with np.errstate(over="ignore", invalid="ignore"):
-        exponents, EN_cathode, eff, N_gamma_eff, aug_mask, n_aug = _discretise(
+        exponents, EN_cathode, eff, fwd, bck, n_aug = _discretise(
             EN_ref,
             pd,
             mod,
@@ -1221,7 +1238,7 @@ def riccati_criterion(
             propagator,
             diag_list,
         )
-        Q0, S = _boundary_rows(EN_cathode, eff, p, T, N_gamma_eff, aug_mask, n_aug)
+        Q0, S = _boundary_rows(EN_cathode, eff, p, T, fwd, bck, n_aug)
         return _riccati_g(exponents, Q0, S)
 
 
