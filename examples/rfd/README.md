@@ -8,9 +8,11 @@ backward photon group, with every coefficient fitted to GEANT4 simulations
 in that paper. Nothing is emitted at either end of the region, so the
 feedback closes entirely in the gas.
 
-The region has no electrodes: its two ends are open, nothing enters, and
-whatever leaves is lost, which Incept1D expresses as a gap with every
-emission yield zero. Its horizontal radius `R` enters only through the
+The region lies between two layers of opposite charge inside the cloud,
+which are the gap's electrodes: they set the field and the voltage, but
+particles pass through them and are lost beyond, where the field is too weak
+to multiply them. In this model that is an electrode that absorbs
+everything and emits nothing: a gap with every emission yield zero. Its horizontal radius `R` enters only through the
 photon attenuation lengths, fitted by the authors for `R` = 5 km (which the
 paper calls R ≫ L) and 100 m; the two are the configurations in
 `mechanisms/air/rfd/radius.json`, so one command produces both curves. The

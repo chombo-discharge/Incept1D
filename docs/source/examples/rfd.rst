@@ -20,19 +20,30 @@ self-sustained condition is the inception condition of ``Incept1D`` with
 every electrode yield zero, so ``incept1d pdiv`` computes
 :math:`E_\mathrm{s}(L)` directly.
 
-Open ends, not electrodes
--------------------------
+Charge layers as electrodes
+---------------------------
 
-There are no electrodes here.  The gap is the high-field region itself,
-:math:`0 \le x \le L`, with the runaway electrons drifting toward
-:math:`+x`; outside it the field is too weak for them to multiply, so
-whatever leaves the region is lost and nothing comes in.  Those are exactly
-the boundary conditions of :ref:`Chap:SecondaryEmission` with every yield
-zero: at :math:`x = 0` no runaway electrons and no forward photons enter,
-at :math:`x = L` no positrons and no backward photons.  The output keeps
-the names of a gap: ``d`` is :math:`L`, :math:`pd` is the density times
-:math:`L`, and the voltage is :math:`E_\mathrm{s} L`, the potential drop
-across the region.
+The high-field region lies between two layers of opposite charge inside the
+thundercloud, a vertical distance :math:`L` apart [Faerder2026b]_; the
+ground plays no part.  The electrodes of the gap, :math:`x = 0` and
+:math:`x = L`, stand for those layers.  They set the field and the voltage
+as electrodes do: the voltage in the output is :math:`E_\mathrm{s} L`, the
+potential difference between the layers, ``d`` is :math:`L`, and
+:math:`pd` is the density times :math:`L`.
+
+Unlike a metal, a charge layer does not stop the particles: runaway
+electrons and forward photons leave through the layer at :math:`x = L`,
+positrons and backward photons through the one at :math:`x = 0`, and beyond
+the layers the field is too weak for them to multiply, so they are lost and
+nothing comes back.  In this model that is the same as an electrode that
+absorbs whatever reaches it and emits nothing, because every species moves
+one way at a fixed velocity, without diffusion: whatever crosses a boundary
+never returns.  The boundary conditions are therefore those of
+:ref:`Chap:SecondaryEmission` with every yield zero, which is the paper's
+condition that nothing enters: no runaway electrons and no forward photons
+at :math:`x = 0`, no positrons and no backward photons at :math:`x = L`.
+Neither model returns anything from beyond the layers, such as photons
+scattered back into the region.
 
 The model is one-dimensional, as the paper's is.  The horizontal radius
 :math:`R` of the region enters only through the photon attenuation lengths,
