@@ -139,6 +139,11 @@ class Mechanism:
     def get_kappa(self, p, T):
         return self._mod.get_kappa(p, T)
 
+    # Read on use: init_photoionization may rebuild the groups after loading.
+    @property
+    def PHOTON_DIRECTIONS(self):
+        return getattr(self._mod, "PHOTON_DIRECTIONS", None)
+
     def get_gamma_plus(self, EN, p, T):
         return self._mod.get_gamma_plus_with(
             EN,
@@ -183,6 +188,12 @@ REQUIRED_ATTRS = [
     "get_kappa",
     "get_gamma_Psi",
 ]
+
+#: Attributes a mechanism module may expose.  ``PHOTON_DIRECTIONS`` lists,
+#: per photon group, the direction it radiates in (``"both"``, ``"forward"``
+#: or ``"backward"``, see :func:`incept1d.solver.photon_streams`); without it
+#: every group radiates both ways.
+OPTIONAL_ATTRS = ["alpha", "eta", "PHOTON_DIRECTIONS"]
 
 
 def read_json_configs(json_paths):

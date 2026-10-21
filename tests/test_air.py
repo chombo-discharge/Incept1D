@@ -270,7 +270,7 @@ class TestGrowthRate:
         fd = FieldDistribution("sphere-plane", 50e-3)
         f = fd.build(d)
         EN = 1.5 * 77.82
-        Q0, S = _boundary_rows(EN * f(1.0), air, p, T, 0, None, n)
+        Q0, S = _boundary_rows(EN * f(1.0), air, p, T, (), (), n)
 
         def exponents(lam, N):
             A_func = lambda x: _build_A_aug(  # noqa: E731

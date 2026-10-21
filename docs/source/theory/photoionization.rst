@@ -87,6 +87,35 @@ feedback off entirely.  It is exposed as ``cone_angle`` in the JSON
 configuration (:ref:`Chap:Configuration`); ``mechanisms/air/pancheshnyi/see.json`` contains a
 ready-made sensitivity sweep over it.
 
+Directional emission
+....................
+
+:eq:`eq_two_stream` gives every group both streams: a group is emitted and
+absorbed alike in the two directions.  Radiation that is not — from fast
+particles beamed along their motion, say — is described by groups that
+radiate in one direction only.  Group :math:`j` carries the streams of a
+set :math:`\mathcal{D}_j`, which is :math:`\{+,-\}`, :math:`\{+\}` or
+:math:`\{-\}`; the stream equations of :eq:`eq_two_stream` hold for
+:math:`\pm \in \mathcal{D}_j`, the others are absent, and the production
+per unit volume and time is
+
+.. math::
+   :label: eq_two_stream_directional
+
+   \sum_j\vec{\beta}_j\xi_j\kappa_j\sum_{\pm\in\mathcal{D}_j}\Psi_j^\pm .
+
+Source, absorption, products and photoemission yield all stay properties of
+the group.  Radiation that differs between the two directions in any of
+them is two groups, one per direction, each with its own data; a group that
+radiates both ways is exactly the pair of one-way groups with its data
+(the streams of a group interact only through the species).  Of the
+:math:`N_\gamma` groups, :math:`N_\gamma^+` radiate forward and
+:math:`N_\gamma^-` backward, so the gap carries
+:math:`N_\gamma^+ + N_\gamma^-` photon fluxes, :math:`2N_\gamma` when every
+group radiates both ways.  A forward
+group never reaches the cathode, so it ejects no photoelectrons
+(:ref:`Chap:SecondaryEmission`).
+
 After the eigenvalue substitution :math:`\vec{\Psi}(x,t) \to
 \vec{\Psi}(x)e^{\lambda t}`, :eq:`eq_two_stream` becomes
 
@@ -97,10 +126,10 @@ After the eigenvalue substitution :math:`\vec{\Psi}(x,t) \to
 
 which supplies the :math:`\bm{C}` and :math:`\bm{D}` blocks of the
 augmented matrix :eq:`eq_augmented_ode`, while the absorption term
-:math:`\sum_j\vec{\beta}_j\xi_j\kappa_j(\Psi_j^+ + \Psi_j^-)` in
-:eq:`eq_flux_ode` supplies :math:`\bm{B}`.  The :math:`\lambda/c` term is
-retardation; it is negligible at inception (:math:`\lambda = 0`) but is kept
-for the growth-rate calculation in :ref:`Chap:Lambda`.
+:eq:`eq_two_stream_directional` in :eq:`eq_flux_ode` supplies
+:math:`\bm{B}`.  The :math:`\lambda/c` term is retardation; it is
+negligible at inception (:math:`\lambda = 0`) but is kept for the
+growth-rate calculation in :ref:`Chap:Lambda`.
 
 .. admonition:: Code
 
@@ -116,6 +145,10 @@ for the growth-rate calculation in :ref:`Chap:Lambda`.
      multiplies by :math:`\bm{V}^{-1}` (:func:`incept1d.solver._build_A_aug`);
    * ``get_gamma_Psi(EN, p, T)`` → photoemission yields, see
      :ref:`Chap:SecondaryEmission`.
+
+   An optional ``PHOTON_DIRECTIONS`` lists :math:`\mathcal{D}_j` per group,
+   as ``"both"``, ``"forward"`` or ``"backward"``; without it every group
+   radiates both ways (:func:`incept1d.solver.photon_streams`).
 
    A mechanism without photoionization returns zero-width arrays
    (:math:`N_\gamma = 0`).

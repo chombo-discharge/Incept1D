@@ -108,6 +108,16 @@ class TestMechanismWrapper:
         raw_B = mod._mod.get_B(300.0, 1.0, 293.0)
         assert mod.get_B(300.0, 1.0, 293.0).shape == raw_B.shape
 
+    def test_photon_directions_pass_through(self, toy_path):
+        """M8c: PHOTON_DIRECTIONS is read from the module on use, or None."""
+        mod = load_mechanism(toy_path)
+        assert mod.PHOTON_DIRECTIONS is None
+        mod._mod.PHOTON_DIRECTIONS = ["backward"]
+        try:
+            assert mod.resolve(True).PHOTON_DIRECTIONS == ["backward"]
+        finally:
+            del mod._mod.PHOTON_DIRECTIONS
+
     def test_gamma_override_is_applied(self, toy_path):
         """M8b: gamma0 from the configuration reaches get_gamma_plus."""
         mod = load_mechanism(toy_path, {"gamma0": 0.25})

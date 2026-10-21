@@ -11,10 +11,12 @@ Boundary conditions at the electrodes
 -------------------------------------
 
 The gap carries :math:`N_s` charged-species fluxes :math:`\vec{y}`
-(:ref:`Chap:Transport`) and :math:`2N_\gamma` photon fluxes
-:math:`\vec{\Psi}^\pm` (:ref:`Chap:Photoionization`), each governed by a
-first-order equation in :math:`x`.  Pinning the solution down therefore takes
-:math:`N_s + 2N_\gamma` conditions, split between the two electrodes.
+(:ref:`Chap:Transport`) and :math:`N_\gamma^+ + N_\gamma^-` photon fluxes
+:math:`\vec{\Psi}^\pm` (:ref:`Chap:Photoionization`; :math:`2N_\gamma`
+when every group radiates both ways), each governed by a first-order
+equation in :math:`x`.  Pinning the solution down therefore takes
+:math:`N_s + N_\gamma^+ + N_\gamma^-` conditions, split between the two
+electrodes.
 
 Each one says the same kind of thing: what crosses that electrode, and in
 which direction.
@@ -33,10 +35,10 @@ At the **anode** (:math:`x = d`):
 * Zero incoming backward photon flux, :math:`\Psi_j^-(d) = 0`.
 
 Counting: :math:`N_-` negative-ion conditions, :math:`1` electron condition,
-and :math:`N_\gamma` photon conditions at the cathode; :math:`N_+`
-positive-ion conditions and :math:`N_\gamma` photon conditions at the anode.
-With :math:`N_s = 1 + N_+ + N_-` this is exactly :math:`N_s + 2N_\gamma`
-conditions.  Every tracked species must therefore be classified as the
+and :math:`N_\gamma^+` photon conditions at the cathode; :math:`N_+`
+positive-ion conditions and :math:`N_\gamma^-` photon conditions at the
+anode.  With :math:`N_s = 1 + N_+ + N_-` this is exactly
+:math:`N_s + N_\gamma^+ + N_\gamma^-` conditions.  Every tracked species must therefore be classified as the
 electron, a positive ion, or a negative ion — this is what the row-selection
 matrices below encode.
 
@@ -100,7 +102,7 @@ For the six-species dry-air scheme
    ``Pi_fwd`` and ``Pi_bck`` (:math:`\bm{\Pi}_{\Psi^+}` and
    :math:`\bm{\Pi}_{\Psi^-}`), since they act on the photon part of the
    augmented state; their width is therefore the *augmented* dimension
-   :math:`N_s + 2N_\gamma` rather than :math:`N_s`.
+   :math:`N_s + N_\gamma^+ + N_\gamma^-` rather than :math:`N_s`.
 
 The secondary-emission condition
 --------------------------------
@@ -121,7 +123,10 @@ entry per photon group).  The emitted electron flux is
 The minus sign on the ion term comes from the coordinate convention: the
 positive-ion flux at the cathode is negative (ions move towards
 :math:`-x`), while the emitted electron flux is positive.  The backward
-photon flux :math:`\vec{\Psi}^-(0)` is positive by definition.
+photon flux :math:`\vec{\Psi}^-(0)` is positive by definition.  Only groups that
+radiate backward have a stream reaching the cathode
+(:eq:`eq_two_stream_directional`); the yield of a group that radiates
+forward only does not enter.
 
 Combining the three cathode constraints into a block system
 :math:`\bm{Q}_0\vec{\theta}_0 = \vec{0}` gives

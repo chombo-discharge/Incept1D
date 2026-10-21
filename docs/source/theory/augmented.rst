@@ -57,6 +57,15 @@ absorption producing charged species; :math:`\bm{C}` is electron impact
 producing photons; and :math:`\bm{D}` is photon absorption plus the
 retardation term :math:`\lambda/c`.
 
+With directional emission (:eq:`eq_two_stream_directional`)
+:math:`\vec{\Psi}^+` holds only the streams of the groups that radiate
+forward and :math:`\vec{\Psi}^-` only those of the groups that radiate
+backward.  A superscript :math:`\pm` on a block keeps the columns (of
+:math:`\bm{B}`), rows (of :math:`\bm{C}`) or both (of :math:`\bm{D}`) of
+those groups; when every group radiates both ways,
+:math:`\bm{B}^\pm = \bm{B}`, :math:`\bm{C}^\pm = \bm{C}` and
+:math:`\bm{D}^\pm = \bm{D}`.
+
 The augmented ODE
 -----------------
 
@@ -70,14 +79,15 @@ With those, :eq:`eq_flux_ode` and :eq:`eq_two_stream` are one system:
    =
    \underbrace{
    \begin{bmatrix}
-     \bm{A} & \bm{B} & \bm{B} \\
-     \bm{C} & -\bm{D} & \bm{0} \\
-     -\bm{C} & \bm{0} & \bm{D}
+     \bm{A} & \bm{B}^+ & \bm{B}^- \\
+     \bm{C}^+ & -\bm{D}^+ & \bm{0} \\
+     -\bm{C}^- & \bm{0} & \bm{D}^-
    \end{bmatrix}
    }_{\bm{\mathcal{A}}}
    \begin{bmatrix} \vec{y} \\ \vec{\Psi}^+ \\ \vec{\Psi}^- \end{bmatrix},
    \qquad
-   \dim\bm{\mathcal{A}} = (N_s + 2N_\gamma)\times(N_s + 2N_\gamma).
+   \dim\bm{\mathcal{A}} = (N_s + N_\gamma^+ + N_\gamma^-)
+     \times(N_s + N_\gamma^+ + N_\gamma^-).
 
 The sign pattern in the lower blocks is the two-stream structure: the
 forward and backward photon populations see the same source and the same
@@ -92,7 +102,9 @@ and :math:`\lambda`.  When the mechanism has no photon groups
 
    :func:`incept1d.solver._build_A_aug` assembles :math:`\bm{\mathcal{A}}` for a
    given :math:`E/N`, :math:`p`, :math:`T`, and :math:`\lambda` from the
-   mechanism's ``get_R``, ``get_V``, ``get_B``, ``get_C``, and ``get_kappa``.
+   mechanism's ``get_R``, ``get_V``, ``get_B``, ``get_C``, and ``get_kappa``,
+   keeping the streams ``PHOTON_DIRECTIONS`` declares
+   (:func:`incept1d.solver.photon_streams`).
    Note that the mechanism returns :math:`\bm{C}` *without* the
    :math:`\bm{V}^{-1}` factor (it acts on densities); the solver applies
    :math:`\bm{V}^{-1}` itself.  Every photon group is carried explicitly,

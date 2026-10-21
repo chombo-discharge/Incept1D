@@ -105,8 +105,14 @@ and the reflection operator is carried across it by
    \bm{P} \leftarrow \bm{R}_l + \bm{T}_b\,\bm{P}\,
                      (\bm{I} - \bm{R}_r\bm{P})^{-1}\,\bm{T}_f .
 
-These four matrices are formed directly only for a thin substep whose
-propagator has a condition number below :math:`10^{12}`.  A whole step is
+These four matrices are formed directly only for a thin substep: one
+whose propagator has a condition number below :math:`10^{12}`, and whose
+exponent has norm :math:`\|\bm\Omega/m\| < \ln 2`.  The second bound
+makes the substep subcritical on its own: :math:`\|\bm{E} - \bm{I}\| \le
+e^{\|\bm\Omega/m\|} - 1 < 1` keeps :math:`\bm{E}_{ff}` invertible for
+every thickness up to the substep's, so its reflection and transmission are
+those of the physical branch.  Without it, a step that sustains itself is
+formed directly and its pole goes unseen (see `Poles`_).  A whole step is
 built from such substeps by the adding–doubling method
 (:func:`incept1d.solver._slab_scattering`): two identical slabs combine by
 the Redheffer star product (:func:`incept1d.solver._star`), so a step of
@@ -141,7 +147,10 @@ crosses too — which far above inception happens within one step.
 
 Inception can therefore show in two ways: as a zero of :math:`g`, or,
 when the cathode contributes little, as the pole at which :math:`g` jumps
-from about :math:`+1` to :math:`-1`.  Both are crossings from :math:`+` to
+from about :math:`+1` to :math:`-1`.  When the cathode contributes nothing
+— no secondary emission, so :math:`\bm{Q}_{0,b} = \bm{0}` and
+:math:`g = 1` identically below inception — the pole is the only signal,
+and the substep bound above is what guarantees it is seen.  Both are crossings from :math:`+` to
 :math:`-` in increasing :math:`E/N`, and the root finders accept exactly
 those (:ref:`Chap:Numerics:RootFinding`).  In :math:`\lambda`, :math:`g`
 rises monotonically — every loop gain falls as :math:`\lambda` grows — so
@@ -154,7 +163,9 @@ Verification
 below and just above every root found and reports whether it changes
 sign.  The test suite checks the criterion against the exact
 :math:`\det\bm{Q}` of a uniform gap computed in high-precision arithmetic,
-against :math:`\det\bm{Q}` on matched grids in non-uniform gaps, and
+against :math:`\det\bm{Q}` on matched grids in non-uniform gaps,
+against the closed-form threshold of a gap whose feedback closes in the gas
+(where only the pole signals inception), and
 against an independent discretisation of the time-dependent equations
 whose fastest mode must equal the growth rate :math:`\lambda^*`.
 

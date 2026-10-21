@@ -48,6 +48,19 @@ The shipped dry-air mechanism is held to the same standard:
 must then satisfy :eq:`eq_standard_paschen` using its own tabulated
 :math:`\alpha`, :math:`\eta` and :math:`\gamma`.
 
+Feedback that closes in the gas, with nothing emitted at the cathode, is
+checked against a closed form of its own (``tests/test_feedback_in_gas.py``):
+a component travelling toward the anode and one travelling back that
+regenerates it, whose threshold is :math:`[e^{\bm{\mathcal{A}}d}]_{bb} = 0`
+for a :math:`2\times2` matrix.  Both criteria must reproduce it to
+:math:`10^{-8}`, once with two species and once with electrons and a photon
+group that radiates backward only (:eq:`eq_two_stream_directional`).  The
+reflection criterion sees this threshold only as a pole
+(:ref:`Chap:Numerics:Riccati`).  The same file checks that a group
+radiating both ways gives the criteria of a forward and a backward group
+with its data, and that a forward group's photoemission yield does not
+enter.
+
 **Unit tests** of the building blocks:
 
 * :mod:`incept1d.reactions` — parsing rules, stoichiometry, multiplier
@@ -60,7 +73,9 @@ must then satisfy :eq:`eq_standard_paschen` using its own tabulated
 * The propagators — ``magnus2`` reduces to the midpoint rule for constant
   :math:`\bm{\mathcal{A}}`; composed propagators reproduce a single
   ``expm``; the uniform-field shortcut agrees with the stepped path; every
-  photon group is propagated, however optically thick;
+  photon group is propagated, however optically thick; a group carries
+  only the streams it radiates into, and declaring every group ``"both"``
+  changes nothing;
 * The two criteria — the reflection criterion and :math:`\det\bm{Q}`
   change sign at the same :math:`E/N` and :math:`\lambda`; both match
   :math:`\det\bm{Q}` computed in high-precision arithmetic, including

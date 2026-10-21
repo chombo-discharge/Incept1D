@@ -32,7 +32,7 @@ homogeneous linear system
 
    \bm{Q}(\lambda)\,\vec{\theta}_0 =
    \begin{bmatrix}\bm{Q}_0\\ \bm{Q}_d\end{bmatrix}\vec{\theta}_0 = \vec{0},
-   \qquad \dim\bm{Q} = (N_s + 2N_\gamma)\times(N_s + 2N_\gamma).
+   \qquad \dim\bm{Q} = \dim\bm{\mathcal{A}} .
 
 The determinant criterion
 -------------------------
