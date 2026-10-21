@@ -1,0 +1,36 @@
+{
+    "format": "incept1d-mechanism/1",
+    "description": "Classical Townsend model behind Paschen's law: alpha/p = A exp(-B p/E), no attachment, no photons, gamma electrons per arriving ion. A and B are Raizer, Gas Discharge Physics (1991), Table 4.1; the defaults are air.",
+    "parameters": {
+        "A": 15.0,
+        "_A": "Townsend A [cm^-1 Torr^-1]",
+        "B": 365.0,
+        "_B": "Townsend B [V cm^-1 Torr^-1]",
+        "gamma0": 0.01,
+        "_gamma0": "Ion-induced secondary emission yield of the cathode",
+        "mu_e_N": 4e23,
+        "_mu_e_N": "Electron mobility times N [(m V s)^-1]",
+        "mu_ion_N": 2e21,
+        "_mu_ion_N": "Ion mobility times N [(m V s)^-1]"
+    },
+    "definitions": {
+        "A_SI": "A*100*750.061682704",
+        "_A_SI": "A in [m^-1 bar^-1]",
+        "B_SI": "B*100*750.061682704",
+        "_B_SI": "B in [V m^-1 bar^-1]",
+        "v_e": "mu_e_N*EN*1e-21",
+        "_v_e": "Electron drift speed [m/s]"
+    },
+    "alpha": "A_SI*p*exp(-B_SI*p/E)",
+    "eta": "0",
+    "species": [
+        {"name": "e", "charge": -1, "mobility": "mu_e_N"},
+        {"name": "M+", "charge": 1, "mobility": "mu_ion_N"}
+    ],
+    "reactions": [
+        {"reaction": "e -> 2e + M+", "rate": "alpha*v_e"}
+    ],
+    "emission": {
+        "ions": {"M+": "gamma0"}
+    }
+}

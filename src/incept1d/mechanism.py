@@ -20,6 +20,7 @@ import importlib.util
 import json
 import os
 
+from incept1d.declarative import load_json_mechanism
 from incept1d.reactions import unknown_multiplier_keys
 
 _HELPERS = {}
@@ -225,14 +226,16 @@ def read_json_configs(json_paths):
 
 def load_mechanism(path, config_dict=None):
     """
-    Load a reaction mechanism module from a Python source file.
+    Load a reaction mechanism from a Python source file or a JSON description.
 
-    The module must expose the standard interface defined in REQUIRED_ATTRS.
+    A ``.py`` module must expose the standard interface defined in
+    REQUIRED_ATTRS; a ``.json`` file is compiled into it by
+    :func:`incept1d.declarative.load_json_mechanism`.
 
     Parameters
     ----------
     path : str
-        Absolute or relative path to the mechanism .py file.
+        Absolute or relative path to the mechanism .py or .json file.
     config_dict : dict or None
         Raw configuration dict (e.g. parsed from JSON).  If given, a Config
         object is constructed from it by the companion config.py that lives
@@ -246,6 +249,8 @@ def load_mechanism(path, config_dict=None):
     mech_dir = os.path.dirname(abs_path)
     if not os.path.isfile(abs_path):
         raise FileNotFoundError(f"Mechanism file not found: {abs_path}")
+    if abs_path.endswith(".json"):
+        return load_json_mechanism(abs_path, config_dict)
 
     # Discover config.py in the same directory as the mechanism.
     cfg_py = os.path.join(mech_dir, "config.py")

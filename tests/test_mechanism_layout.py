@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from incept1d.declarative import is_mechanism_file
 from incept1d.mechanism import load_mechanism, read_json_configs
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,7 +54,12 @@ def test_one_mechanism_per_directory(mech_dir):
 
 @pytest.mark.parametrize(
     "json_path, mech_dir",
-    [_param(j, d) for d in MECH_DIRS for j in sorted(d.glob("*.json"))],
+    [
+        _param(j, d)
+        for d in MECH_DIRS
+        for j in sorted(d.glob("*.json"))
+        if not is_mechanism_file(str(j))
+    ],
 )
 def test_every_config_loads_with_its_own_mechanism(json_path, mech_dir):
     """L2: each shipped configuration is accepted by the mechanism beside it."""
