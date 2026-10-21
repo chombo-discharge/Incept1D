@@ -145,6 +145,26 @@ class TestGammaDependence:
         assert volts[0] > volts[1], "a better emitter must break down sooner"
 
 
+class TestPolarity:
+    @pytest.mark.parametrize("positive, gamma", [(True, 0.01), (False, 0.1)])
+    def test_a_one_polarity_override_reaches_the_solve(self, positive, gamma):
+        """
+        A 'negative' override changes the cathode for that polarity only: each
+        polarity gives Paschen's law with its own gamma, through the full
+        solver (resolve, boundary rows, criterion root).
+        """
+        mod = _load("Air", negative={"gamma0": 0.1})
+        assert mod.has_polarity_overrides
+        det = functools.partial(
+            riccati_criterion, field_dist=UNIFORM, positive_polarity=positive
+        )
+        p, T, pd = 1.0, 293.0, 1e-3
+        r = find_all_breakdown_EN(pd, mod, p, T, first_only=True, det_fn=det)
+        assert _voltage(r[0], pd, T) == pytest.approx(
+            paschen_voltage(pd, *_coefficients("Air", gamma)), rel=1e-9
+        )
+
+
 class TestMechanismData:
     @pytest.mark.parametrize(
         "gas, A, B",

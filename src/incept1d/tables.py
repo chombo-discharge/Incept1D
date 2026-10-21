@@ -104,16 +104,19 @@ def read_table(path, fmt):
     return _CACHE[key]
 
 
-def _rows(lines, start):
+def _rows(path, lines, start):
     """Numeric rows from *start* up to the first blank or non-numeric line."""
     rows = []
-    for ln in lines[start:]:
+    for number, ln in enumerate(lines[start:], start=start + 1):
         vals = ln.split()
         if not vals or not vals[0].lstrip("-").isdigit():
             break
-        rows.append([float(v) for v in vals])
+        try:
+            rows.append([float(v) for v in vals])
+        except ValueError:
+            raise TableError(f"{path}: line {number} is not numeric: {ln!r}") from None
     if len({len(r) for r in rows}) > 1:
-        raise TableError(f"rows of unequal length after line {start}")
+        raise TableError(f"{path}: rows of unequal length after line {start}")
     return np.array(rows)
 
 
@@ -156,7 +159,7 @@ def _read_bolsig(path, table):
     if head is None:
         raise TableError(f"{path}: no transport section ('R#  E/N (Td)  A1 ...')")
     labels = lines[head].split("E/N (Td)", 1)[1].split()
-    data = _rows(lines, head + 1)
+    data = _rows(path, lines, head + 1)
     _check_width(path, "transport", data, 2 + len(labels))
     for k, label in enumerate(labels):
         table._columns[label] = (data[:, 1], data[:, 2 + k])
@@ -174,7 +177,7 @@ def _read_bolsig(path, table):
     for i in range(start + 1, len(lines)):
         ln = lines[i]
         if ln.startswith("R#") and "E/N" in ln:
-            data = _rows(lines, i + 1)
+            data = _rows(path, lines, i + 1)
             _check_width(path, "rate coefficient", data, 3)
             break
         parts = ln.split()

@@ -434,11 +434,21 @@ def test_resolve_keeps_the_multipliers():
     assert m.get_gamma_plus(120.0, 1.0, 300.0)[0] == 0.1
 
 
-def test_a_truncated_table_is_named(tmp_path):
-    """D27: a malformed BOLSIG+ file is a TableError naming it, not an IndexError."""
+@pytest.mark.parametrize(
+    "rows, why",
+    [
+        ("1  10.0  1.5\n2  20.0  2.5\n", "header names"),
+        ("1  10.0  1.5  3.0\n2  20.0  2.5\n", "unequal length"),
+        ("1  10.0  1.5  3.0\n2  20.0  2.5  3.0x\n", "not numeric"),
+        ("\n", "no data rows"),
+    ],
+    ids=["short", "ragged", "non-numeric", "empty"],
+)
+def test_a_malformed_table_is_named(tmp_path, rows, why):
+    """D27: a malformed BOLSIG+ file is a TableError naming it and the fault."""
     from incept1d.tables import TableError, read_table
 
-    bad = tmp_path / "bad.txt"
-    bad.write_text("R#    E/N (Td)      A1          A2\n1  10.0  1.5\n2  20.0  2.5\n")
-    with pytest.raises(TableError, match="bad.txt"):
+    bad = tmp_path / f"bad_{why.split()[0]}.txt"
+    bad.write_text("R#    E/N (Td)      A1          A2\n" + rows)
+    with pytest.raises(TableError, match=f"bad_{why.split()[0]}.txt.*{why}"):
         read_table(str(bad), "bolsig+")
