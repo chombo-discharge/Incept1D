@@ -68,6 +68,49 @@ between 22 and 24 m, where the paper places it.  The curve has two limits:
 A region 100 m across needs a slightly higher field than a wide one,
 because photons escape it sideways; the difference is a few per cent.
 
+Comparison with the paper
+-------------------------
+
+The figure above checks the solver against its own model.  The paper's
+published results are a separate check: the authors' code and data are on
+Zenodo, `doi:10.5281/zenodo.22983026
+<https://doi.org/10.5281/zenodo.22983026>`_ (CC-BY 4.0), and are not
+distributed with this repository.  With the archive unpacked,
+
+.. code-block:: bash
+
+   python3 examples/rfd/paper_comparison.py \
+       PATH/TO/Faerder2026b_openresearch/selfsustainend-rfd-threshold-by-nme \
+       examples/rfd/paper.dat
+
+reads two kinds of their results, solves the same thresholds with
+``Incept1D`` at the same :math:`L`, and writes both to one table:
+
+* **Normal modes** (wide region): the steady-state threshold of the same
+  model, found on a 100 V/m grid of fields.  ``Incept1D`` agrees with it to
+  within that grid, 0.05 kV/m or :math:`1.5\times10^{-4}`, for every
+  :math:`L` from 10 m to 5 km; beyond that their minimum of the determinant
+  is too flat to resolve as finely, and the difference stays below
+  :math:`6\times10^{-4}`.  This is the like-for-like comparison, and the test
+  suite asserts it when ``paper.dat`` is present.
+* **Time-dependent fluid model** (both radii): the authors' simulation, with
+  the threshold found by bisection on whether the runaway density keeps
+  growing.  It lies 0.1–2 % below ``Incept1D``, as it does below their own
+  normal modes.  Beyond about 5 km it falls to the avalanche threshold
+  :math:`E_\mathrm{t}`, which their normal modes do not; their growth tests
+  judge a finite simulation, in which a single avalanche across so long a
+  region already grows strongly, and the steady-state threshold cannot
+  lie below the 305.4 kV/m where positrons start to feed back.
+
+The comparison figure is not built with the documentation, because the data
+is not in the repository; with ``paper.dat`` in place,
+
+.. code-block:: bash
+
+   make -C docs/figures rfdpaper
+
+writes ``docs/source/figures/rfdpaper.pdf`` and ``.png``.
+
 Altitude
 --------
 

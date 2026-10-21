@@ -135,6 +135,23 @@ def test_nothing_enters_and_photons_are_one_way():
     assert V[0] > 0.0 > V[1] and V[0] == -V[1]
 
 
+PAPER = ROOT / "examples" / "rfd" / "paper.dat"
+
+
+@pytest.mark.skipif(not PAPER.exists(), reason="examples/rfd/paper.dat not supplied")
+def test_threshold_matches_the_papers_normal_modes():
+    """
+    RFD9: the paper's own normal-mode E_s(L), from the authors' archive
+    (examples/rfd/README.md), to within its 100 V/m search grid.  Only the
+    paper's column is read; ours is solved here.  Beyond 5 km their minimum of
+    |det|^2 is too flat to resolve to one grid step.
+    """
+    mod = _load(_radius_configs()["R >> L"])
+    data = np.loadtxt(PAPER)
+    for L, theirs in data[data[:, 0] <= 5e3][:, [0, 3]]:
+        assert abs(_threshold(mod, L) / 1e3 - theirs) <= 0.1, f"L = {L} m"
+
+
 def test_unknown_configuration_keys_are_refused():
     """RFD8: a configuration for another mechanism is not solved as this one."""
     with pytest.raises(ValueError, match="gamma0"):

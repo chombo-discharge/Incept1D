@@ -40,7 +40,8 @@ export PD_NUM
 FIGURES := paschen zheleznyakfit coaxial rfd
 
 # Opt-in figures.  These compare against IEC 60052 and CIGRE ELECTRA reference
-# tables that are copyrighted and therefore not part of this repository (see
+# tables that are copyrighted, and against the published RFD results of
+# Faerder et al., none of which are part of this repository (see
 # examples/*/README.md), so by default they would plot the computed curves
 # with nothing to compare them against.  They are also by far the most
 # expensive: the eight IEC sphere diameters alone are ~75 % of the total
@@ -48,7 +49,7 @@ FIGURES := paschen zheleznyakfit coaxial rfd
 #
 #     make -C docs/figures iec60052
 #
-OPTIONAL_FIGURES := iec60052 electra
+OPTIONAL_FIGURES := iec60052 electra rfdpaper
 
 ALL_FIGURES := $(FIGURES) $(OPTIONAL_FIGURES)
 DIAMS   := 10 15 25 50 75 100 150 200
@@ -143,6 +144,15 @@ $(BUILD)/rfd/sim.dat: $(SOLVER_DEPS)
 	    --no-plot \
 	    --write-to-file $@
 
+# The paper comparison has nothing to show without the paper's results, so
+# paper.dat is required: the reader writes it with examples/rfd/paper_comparison.py
+# from the authors' archive (examples/rfd/README.md).
+$(BUILD)/rfdpaper/paper.dat: $(ROOT)/examples/rfd/paper.dat
+	@mkdir -p $(dir $@) && cp $< $@
+
+$(ROOT)/examples/rfd/paper.dat:
+	@echo "examples/rfd/paper.dat not found: see examples/rfd/README.md, 'Comparison with the paper'" >&2; exit 1
+
 $(BUILD)/rfd/normal_modes.dat: $(ROOT)/examples/rfd/normal_modes.py $(SOLVER_DEPS)
 	@mkdir -p $(dir $@)
 	cd $(ROOT) && python3 examples/rfd/normal_modes.py $@
@@ -186,6 +196,7 @@ DATA_zheleznyakfit := $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat
 DATA_paschen      := $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat
 DATA_coaxial      := $(COAX_SIM)
 DATA_rfd          := $(BUILD)/rfd/sim.dat $(BUILD)/rfd/normal_modes.dat
+DATA_rfdpaper     := $(BUILD)/rfdpaper/paper.dat
 
 # One rule set per figure: tex + data -> PDF in the build dir -> PDF/PNG in OUT.
 define FIGURE_RULES

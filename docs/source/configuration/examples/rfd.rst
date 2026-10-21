@@ -192,7 +192,8 @@ are scaled or ordered.  ``normal_mode_threshold`` in the mechanism module
 evaluates it, and is what the example compares the solver against
 (:ref:`Chap:Examples:RFD`).  The :math:`(3,3)` entry is written from the
 model equations; it is :math:`-\lambda_{\mathrm{a}\uparrow}^{-1}`, as the
-forward photons are attenuated.
+forward photons are attenuated, and so it is in the authors' own
+normal-mode code.
 
 Limits of the mapping
 ---------------------

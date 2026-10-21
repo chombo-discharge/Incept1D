@@ -46,6 +46,27 @@ escape it sideways.
 `make -C docs/figures rfd` runs both and builds the documentation figure
 (Examples → *Relativistic feedback discharge*).
 
+## Comparison with the paper
+
+The figure above checks the solver against its own model. To compare with
+the paper's published results, get them from the authors: their code and
+data are on Zenodo, [doi:10.5281/zenodo.22983026](https://doi.org/10.5281/zenodo.22983026)
+(CC-BY 4.0), and are not part of this repository. Unpack the archive and
+run
+
+```bash
+python3 examples/rfd/paper_comparison.py \
+    PATH/TO/Faerder2026b_openresearch/selfsustainend-rfd-threshold-by-nme \
+    examples/rfd/paper.dat
+```
+
+which reads their normal-mode `E_s(L)` (wide region) and their
+time-dependent fluid-model results (both radii), solves the same thresholds
+with Incept1D at the same `L`, and writes both side by side. Then
+`make -C docs/figures rfdpaper` builds the comparison figure, and the test
+suite checks Incept1D against their normal modes. `paper.dat` is listed in
+`.gitignore`: please keep it that way.
+
 ## Things to try
 
 * **Altitude.** Lower `--p`: every coefficient scales with density, so the

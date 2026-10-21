@@ -45,6 +45,7 @@ env/
 examples/**/sim*.dat
 examples/paschen/closed_form.dat
 examples/rfd/normal_modes.dat
+examples/rfd/paper.dat
 examples/fieldline/line_*.csv
 
 # Field-line exports dropped in the repository root while testing.  They are

@@ -24,8 +24,18 @@ import numpy as np
 import scipy.optimize
 
 
-def mode_matrix(inv_lam, P_bb, P_cp_up, P_cp_down, P_pp, inv_lam_pos, P_br_up,
-                P_br_down, inv_lam_up, inv_lam_down):
+def mode_matrix(
+    inv_lam,
+    P_bb,
+    P_cp_up,
+    P_cp_down,
+    P_pp,
+    inv_lam_pos,
+    P_br_up,
+    P_br_down,
+    inv_lam_up,
+    inv_lam_down,
+):
     """
     M of dn/dz = M n for n = (n_r, n_pos, n_up, n_down), per metre.
 
