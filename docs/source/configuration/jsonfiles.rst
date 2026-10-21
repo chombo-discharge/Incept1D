@@ -1,18 +1,18 @@
 .. _Chap:Configuration:
 
-JSON configuration files
-========================
+Configuration files
+===================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-Every solver command accepts JSON configuration files after the mechanism
-path.  A configuration changes the *parameters* of a mechanism — which data
-it reads, how strongly a reaction contributes, what the electrode surface
-does — without editing the Python file, and several configurations can be
-run and plotted side by side in one invocation.  This is how a sensitivity
-study is set up: one file, one curve per entry.
+Every solver command accepts configuration files after the mechanism.  A
+configuration changes the *parameters* of a mechanism — which data it reads,
+how strongly a reaction contributes, what the electrode surface does —
+without editing the mechanism, and several configurations can be run and
+plotted side by side in one invocation.  This is how a sensitivity study is
+set up: one file, one curve per entry.
 
 File format
 -----------
@@ -30,8 +30,12 @@ objects, or, the usual form, a list under a ``"configurations"`` key:
        {
          "label": "No detachment",
          "reaction_multipliers": {
-           "A- + M -> e + A + M": 0.0
+           "B- + M -> e + B + M": 0.0
          }
+       },
+       {
+         "label": "High yield",
+         "gamma0": 1e-2
        }
      ]
    }
@@ -46,60 +50,57 @@ is run.  That makes a file a reusable set rather than a whole study: one
 file holding the cross-section variants and another holding the surface
 variants can be combined on the command line without editing either.
 
-What the keys mean
-------------------
+What a configuration can set
+----------------------------
 
-A configuration file is not validated against a fixed schema.  It is handed
-to the mechanism directory's ``config.py``, which decides what each key
-means (:ref:`Chap:ConfigPy`) and whether a key it does not know is an error.
-A configuration file belongs to one mechanism, and a ``config.py`` that
-rejects unknown keys makes a file written for another mechanism fail loudly
-instead of solving a different problem than it describes.  Reaction
-multipliers are checked by the loader itself: a key that names no reaction
-of the mechanism is an error.
-
-One key is universal:
-
-``label``
-   The string shown in legends, terminal tables and output-file headers.
-   There is one curve per configuration, so it should be short and
-   distinguishing.
-
-The rest are the mechanism's own.  A set of conventional names has
-nevertheless established itself, because these map directly onto the
-parameters :class:`~incept1d.mechanism.Mechanism` applies:
+For a mechanism file (:ref:`Chap:MechanismFiles`), a configuration may
+contain exactly these keys:
 
 .. list-table::
    :header-rows: 1
    :widths: 26 74
 
    * - Key
-     - Conventional meaning
+     - Meaning
+   * - ``label``
+     - The string shown in legends, terminal tables and output-file headers.
+       There is one curve per configuration, so it should be short and
+       distinguishing.
+   * - any parameter
+     - Replaces the value the mechanism file gives that parameter: a number
+       for a number, a file name for a file.
    * - ``reaction_multipliers``
-     - Dictionary ``{reaction string: factor}``.  ``0.0`` disables a
-       reaction, ``2.0`` doubles it.  See :ref:`Chap:ModifyingReactions`.
-   * - ``xi_photo``, ``xi_emit``
-     - Scale factors on the photoionization coupling and the photoemission
-       yields (:ref:`Chap:Photoionization`,
-       :ref:`Chap:SecondaryEmission`).
-   * - ``gamma0``, ``gamma1``, ``eref``, ``beta``
-     - Parameters of the ion-induced secondary-emission yield.
+     - ``{reaction string: factor}``.  ``0.0`` disables a reaction, ``2.0``
+       doubles it.  See :ref:`Chap:ModifyingReactions`.
    * - ``positive``, ``negative``
-     - Nested objects overriding any of the above for one polarity only.
+     - Parameters for one polarity only; see below.
 
-A new mechanism should use these names for these meanings rather than
-inventing its own, so that a reader who knows one mechanism can read the
-configurations of another.  Anything genuinely specific to a mechanism —
-which data file to read, which gas to select — is named by that mechanism
-and documented with it.
+Anything else is an error, and so is a multiplier for a reaction the
+mechanism does not have.  A configuration therefore belongs to one
+mechanism: one written for another, or one with a misspelt parameter, fails
+when it is loaded instead of solving a different problem than it describes.
+What can be configured is exactly the mechanism's ``parameters`` block, so
+the mechanism file is also the list of every key its configurations may use,
+with its default.
+
+A relative file name in a configuration is looked for beside the
+configuration file first, and then beside the mechanism file, so a
+configuration can bring its own data:
+
+.. code-block:: json
+
+   {
+     "label": "My cross sections",
+     "cross_sections": "my_swarm_data.txt"
+   }
 
 Per-polarity overrides
 ----------------------
 
 In a gap that is not symmetric, the cathode is a different electrode in the
 two polarities, so the surface parameters need not be the same.  A nested
-``positive`` or ``negative`` object overrides the top-level values for that
-polarity alone:
+``positive`` or ``negative`` object overrides parameters for that polarity
+alone:
 
 .. code-block:: json
 
@@ -109,18 +110,16 @@ polarity alone:
      "negative": { "gamma0": 2e-3 }
    }
 
-This works because :meth:`~incept1d.mechanism.Mechanism.resolve` is called
-once per polarity, after the module has been executed.  A parameter read
-while the module executes — a data file name, say — is fixed for the whole
-run and therefore cannot be overridden this way;
-:ref:`Chap:ConfigPy` explains which parameters fall on which side of that
-line.
+Any parameter may be overridden this way; nothing else may.  The polarity
+is the sign of the electrode at :math:`\xi = 0` of the field profile
+(:ref:`Chap:FieldDistributions`); in a symmetric gap with no overrides the
+two polarities are the same problem and are solved once.
 
-How configurations are applied
-------------------------------
+Python mechanisms
+-----------------
 
-A configuration file is inert on its own: the mechanism directory's
-``config.py`` is what turns it into overrides.  That interface is described
-in :ref:`Chap:ConfigPy`, and the two worked examples,
-:ref:`Chap:PaschenMechanism` and :ref:`Chap:AirScheme`, show the keys each
-of those mechanisms actually defines.
+A configuration for a Python mechanism (:ref:`Chap:NewMechanisms`) has the
+same file format, but what its keys mean is decided by the mechanism
+directory's ``config.py`` (:ref:`Chap:ConfigPy`), which should refuse keys
+it does not know.  The conventional names — ``reaction_multipliers``,
+``gamma0``, ``positive``, ``negative`` — mean the same there.

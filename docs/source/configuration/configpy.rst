@@ -158,14 +158,58 @@ it.
 The test suite exercises exactly this shape in ``tests/toy/config.py``, so it
 is a working starting point rather than an illustration.
 
+How a Python mechanism is loaded
+--------------------------------
+
+:func:`incept1d.mechanism.load_mechanism` is the only place these files meet.
+Given a module path and a raw dictionary, it takes five steps:
+
+1. Look for ``config.py`` next to the module.  If present, build
+   ``Config.from_dict(raw, mech_dir)``; if absent and a dictionary was
+   supplied, raise.
+2. Inject ``config.pre_exec_vars()`` into the module namespace **before** the
+   module body runs, so module-level constants can be overridden.
+3. Execute the module and check it against
+   :data:`incept1d.mechanism.REQUIRED_ATTRS`, naming anything missing.
+4. Call ``config.post_exec_init(mod)`` for work that needs the executed
+   module — fitting a photoionization model, for instance.
+5. Wrap the result in a :class:`~incept1d.mechanism.Mechanism` with
+   ``config.mechanism_params()``, which bakes rate multipliers, scale factors
+   and per-polarity overrides into the accessors.  If the module declares
+   ``REACTIONS``, a multiplier naming a reaction it does not define is an
+   error: the configuration was written for a different mechanism.
+
+.. code-block:: text
+
+   raw JSON dict ──► Config.from_dict ──► Config
+                                           │
+                    pre_exec_vars() ───────┤ injected before exec
+                                           │
+   <gas>_<scheme>.py ──► exec ──► module ──┤ post_exec_init(mod)
+                                           │
+                    mechanism_params() ────┴──► Mechanism ──► the solver
+
+Everything downstream sees only the :class:`~incept1d.mechanism.Mechanism`.
+By the time a solver calls ``mod.get_R(EN, p, T)`` the multipliers have
+already been applied, so no other part of the code has to know that
+configurations exist.
+
+.. important::
+
+   Mechanism modules are **executed, not imported as a package**.  They are
+   ordinary Python files run by ``importlib`` with override variables injected
+   into their namespace.  That is what makes ``pre_exec_vars`` possible, and
+   it is why a mechanism resolves its data files against ``__file__`` rather
+   than relying on the import system.
+
 Worked examples
 ---------------
 
-:ref:`Chap:PaschenMechanism` shows the protocol at its simplest: one key
-selects the gas, which has to be known before the module body runs because it
-fixes the coefficients at module level.
+:ref:`Chap:RFDScheme` shows the protocol at its simplest: three keys, all
+needed before the module body runs, and every other key refused.
 
-:ref:`Chap:AirScheme` shows it carrying a realistic load: a choice of
-cross-section database, four cathode-yield parameters, per-reaction
-multipliers, photon scale factors, and separate surface parameters for the two
-polarities of an asymmetric gap.
+The Python form of :ref:`Chap:AirScheme`, ``air_pancheshnyi.py`` with the
+shared ``mechanisms/air/air_config.py``, shows it carrying a realistic load:
+a choice of cross-section database, four cathode-yield parameters,
+per-reaction multipliers, photon scale factors, and separate surface
+parameters for the two polarities of an asymmetric gap.

@@ -13,149 +13,78 @@ quickly they drift, how many electrons a returning ion releases from the
 cathode — is supplied to it, from files outside the package under
 ``mechanisms/``.  The solver never derives a rate, fits a coefficient or
 assumes a reaction; it reads what a mechanism gives it and solves the system
-that results.  This chapter
-describes those files and the interfaces they must satisfy.
+that results.  This chapter describes those files.
 
-The unit is a **mechanism directory**.  One directory holds one mechanism,
-its configuration class, and the configuration files written for it; the
-variants of that mechanism are configurations within it.  Mechanisms for the
-same gas sit side by side under a common gas directory, which also holds
-what they share:
+Two kinds of file
+-----------------
 
-.. code-block:: text
+A **mechanism file** describes a gas: a JSON file listing its species,
+reactions, rate coefficients, photoionization model and electrode yields,
+each coefficient a formula, and the parameters that may be changed with
+their defaults (:ref:`Chap:MechanismFiles`).  It is checked when it is
+loaded, so a misspelt name or a reaction that does not conserve charge is
+reported before anything is solved.
 
-   mechanisms/air/
-   ├── pancheshnyi/
-   │   ├── air_pancheshnyi.py    the mechanism module      (required)
-   │   ├── config.py             the configuration class   (optional)
-   │   ├── baseline.json         configuration files       (optional)
-   │   ├── nodetachment.json
-   │   └── paschen.json
-   ├── lxcat/                    data the modules read     (optional)
-   │   ├── lisbon.txt
-   │   └── o2m_mobility.txt
-   ├── air_config.py             code the modules share    (optional)
-   └── zheleznyak.py
+A **configuration file** sets that mechanism's parameters — another
+cross-section database, a different cathode yield, a reaction switched off
+— and names the result (:ref:`Chap:Configuration`).  A file may hold many
+configurations, one curve each.
 
-A configuration file belongs to the mechanism in its directory: reaction
-multipliers are keyed by that mechanism's reaction strings, and its
-``config.py`` decides which keys mean anything.
-
-A run names the module, and optionally one or more configuration files:
+A run names the mechanism, and optionally configuration files:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/databases.json
+   incept1d pdiv gas.json studies.json --p 1.0
 
-Which files are needed
-----------------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 22 14 64
-
-   * - File
-     - Required
-     - Role
-   * - ``<gas>_<scheme>.py``
-     - **yes**
-     - The mechanism module.  Defines the species list and the functions the
-       solver calls to build :math:`\bm{R}`, :math:`\bm{V}`, the photon
-       coupling and the secondary-emission yields.  Must expose the interface
-       in :ref:`Chap:NewMechanisms`.
-   * - ``config.py``
-     - No
-     - A ``Config`` class that turns a JSON dictionary into overrides for the
-       module.  Needed only if the mechanism is to accept configuration files
-       at all; see :ref:`Chap:ConfigPy`.
-   * - ``*.json``
-     - No
-     - Named parameter sets — cross-section database, rate multipliers,
-       photoionization and SEE settings.  See :ref:`Chap:Configuration`.
-   * - data files
-     - No
-     - Whatever the module chooses to read: BOLSIG+ swarm output, LXCat
-       mobility tables, fitted absorption curves.  The package never opens
-       them; the module does, relative to its own location.  Data and code
-       shared by several mechanisms can live one level up, and shared code is
-       loaded with :func:`incept1d.mechanism.load_helper`.
-
-A mechanism with no ``config.py`` and no JSON is perfectly valid — it is then
-a fixed gas with no adjustable parameters.  Passing a configuration file to
-such a mechanism is an error rather than a silent no-op, so a mistyped path
-cannot quietly leave the defaults in place.
-
-How the three fit together
---------------------------
-
-:func:`incept1d.mechanism.load_mechanism` is the only place these files meet.
-Given a module path and a raw dictionary, it takes five steps:
-
-1. Look for ``config.py`` next to the module.  If present, build
-   ``Config.from_dict(raw, mech_dir)``; if absent and a dictionary was
-   supplied, raise.
-2. Inject ``config.pre_exec_vars()`` into the module namespace **before** the
-   module body runs, so module-level constants can be overridden.
-3. Execute the module and check it against
-   :data:`incept1d.mechanism.REQUIRED_ATTRS`, naming anything missing.
-4. Call ``config.post_exec_init(mod)`` for work that needs the executed
-   module — fitting a photoionization model, for instance.
-5. Wrap the result in a :class:`~incept1d.mechanism.Mechanism` with
-   ``config.mechanism_params()``, which bakes rate multipliers, scale factors
-   and per-polarity overrides into the accessors.  If the module declares
-   ``REACTIONS``, a multiplier naming a reaction it does not define is an
-   error: the configuration was written for a different mechanism.
+Mechanisms live one per directory, with the configurations written for
+them; mechanisms of the same gas sit side by side under a gas directory,
+which also holds the data they share:
 
 .. code-block:: text
 
-   raw JSON dict ──► Config.from_dict ──► Config
-                                           │
-                    pre_exec_vars() ───────┤ injected before exec
-                                           │
-   <gas>_<scheme>.py ──► exec ──► module ──┤ post_exec_init(mod)
-                                           │
-                    mechanism_params() ────┴──► Mechanism ──► the solver
+   mechanisms/<gas>/
+   ├── <scheme>/
+   │   ├── <gas>_<scheme>.json   the mechanism file
+   │   ├── baseline.json         configuration files
+   │   └── sensitivity.json
+   └── data/                     tables the mechanisms read
 
-Everything downstream sees only the :class:`~incept1d.mechanism.Mechanism`.
-By the time a solver calls ``mod.get_R(EN, p, T)`` the multipliers have
-already been applied, so no other part of the code has to know that
-configurations exist.
+Python mechanisms
+-----------------
 
-.. important::
-
-   Mechanism modules are **executed, not imported as a package**.  They are
-   ordinary Python files run by ``importlib`` with override variables injected
-   into their namespace.  That is what makes ``pre_exec_vars`` possible, and
-   it is why a mechanism resolves its data files against ``__file__`` rather
-   than relying on the import system.
+Some models do not fit the format: a rate that changes form at a threshold,
+a photon coupling that is not a source times an absorption, a model that is
+not a list of reactions at all.  Such a mechanism is a Python module
+instead, exposing the matrices the solver needs as functions
+(:ref:`Chap:NewMechanisms`), with an optional ``config.py`` that turns
+configuration files into its parameters (:ref:`Chap:ConfigPy`).  The solver
+sees both kinds the same way, and a run names a ``.py`` mechanism exactly as
+it names a ``.json`` one.  Use it when the mechanism file cannot say what
+the model needs, and not otherwise: a Python mechanism is executed, so
+running someone else's means trusting their code, and nothing in it is
+checked beyond the shapes the solver receives.
 
 Where to go next
 ----------------
 
-* :ref:`Chap:NewMechanisms` — The module interface, function by function,
-  and how to write one for a new gas.
-* :ref:`Chap:ConfigPy` — The ``Config`` protocol.
-* :ref:`Chap:Configuration` — The JSON format and the keys the air family
-  understands.
-* :ref:`Chap:ModifyingReactions` — The declarative reaction strings and how
-  multipliers select them.
+* :ref:`Chap:MechanismFiles` — The mechanism file, block by block.
+* :ref:`Chap:Configuration` — Configuration files: parameters, reaction
+  multipliers, per-polarity overrides.
+* :ref:`Chap:ModifyingReactions` — Scaling, changing, adding and removing
+  reactions.
+* :ref:`Chap:NewMechanisms` and :ref:`Chap:ConfigPy` — Python mechanisms.
 
-Two complete mechanisms are documented as worked examples:
-
-* :ref:`Chap:PaschenMechanism` — The smallest mechanism that does
-  anything: two species, one reaction, no data files, and an answer that can
-  be checked in closed form.
-* :ref:`Chap:AirScheme` — The reference dry-air scheme: six species, a
-  declarative reaction table, multigroup photoionization and a family of
-  ready-made configurations.
+Three complete mechanisms are documented as worked examples
+(:ref:`Chap:ExampleConfigurations`): the classical Townsend model, a
+six-species scheme for dry air with photoionization, and relativistic
+feedback in a thundercloud, which is a Python mechanism.
 
 API reference
 -------------
 
-:mod:`incept1d.mechanism` is what reads all three file types: it executes
-the mechanism module, applies the ``Config`` protocol and returns a
-:class:`~incept1d.mechanism.Mechanism` with the configuration baked in.
-Every command starts here.
+:func:`incept1d.mechanism.load_mechanism` reads either kind of mechanism
+with one configuration and returns what the solver uses; every command
+starts here.
 
 .. automodule:: incept1d.mechanism
    :members:

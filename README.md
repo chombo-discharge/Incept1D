@@ -69,7 +69,7 @@ for pytest, pre-commit, black and flake8.
 
 ```bash
 # Inception curve for dry air at 1 bar, uniform gap
-incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py --p 1 --pd-min 1e-2 --pd-max 1e3
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json --p 1 --pd-min 1e-2 --pd-max 1e3
 ```
 
 ```
@@ -99,7 +99,7 @@ A gap geometry is chosen with `--field`, and JSON configuration files may follow
 the mechanism to overlay sensitivity variants in one figure:
 
 ```bash
-incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/databases.json \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/databases.json \
     --field sphere-plane 50 --d 20
 ```
 
@@ -111,7 +111,7 @@ profile enters the solve, so the field units of the file never reach the
 answer, and the arc length fixes the gap:
 
 ```bash
-incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json \
     --field fieldline line.csv mm --fieldline-voltage 100
 ```
 

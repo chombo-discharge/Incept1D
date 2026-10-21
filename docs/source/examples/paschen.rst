@@ -10,7 +10,7 @@ The classical Paschen curve
 Every other example in this chapter compares ``Incept1D`` against measurements.
 This one compares it against algebra.
 
-The mechanism ``mechanisms/paschen/paschen.py`` is the textbook Townsend model:
+The mechanism ``mechanisms/paschen/paschen.json`` is the textbook Townsend model:
 one ionizing reaction, no attachment, no detachment, no photoionization, and
 electrons released from the cathode only by arriving positive ions.  That is
 exactly the reduced model whose inception condition is
@@ -104,7 +104,7 @@ invocation produces all three curves:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json \
+   incept1d pdiv mechanisms/paschen/paschen.json mechanisms/paschen/gases.json \
        --p 1.0 \
        --pd-min 3e-3 --pd-max 1e2 --pd-num 120 \
        --write-to-file examples/paschen/sim.dat

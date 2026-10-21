@@ -11,8 +11,10 @@ build, which runs much later.  These tests close that gap without needing
 Sphinx or the built figures, which are git-ignored build products.
 """
 
+import json
 import re
 import shlex
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -168,3 +170,33 @@ def test_docs_page_shows_the_main_command(example):
         f"{page.relative_to(ROOT)} does not show the main command of "
         f"examples/{example.name}/README.md"
     )
+
+
+#: Pages whose JSON code blocks show complete mechanism files.
+_MECHANISM_PAGES = ["configuration/mechanisms.rst"]
+
+
+def _json_blocks(rst):
+    """The bodies of the ``.. code-block:: json`` directives of a page."""
+    blocks, lines = [], (SOURCE / rst).read_text().splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == ".. code-block:: json":
+            body = []
+            for nxt in lines[i + 1 :]:
+                if nxt.strip() and not nxt.startswith(" "):
+                    break
+                body.append(nxt)
+            blocks.append(textwrap.dedent("\n".join(body)))
+    return blocks
+
+
+@pytest.mark.parametrize("rst", _MECHANISM_PAGES)
+def test_mechanism_file_examples_load(rst):
+    """D6: a complete mechanism file shown in the docs compiles as written."""
+    from incept1d.declarative import FORMAT, DeclarativeMechanism
+
+    complete = [b for b in _json_blocks(rst) if FORMAT in b]
+    assert complete, f"{rst} shows no complete mechanism file"
+    for block in complete:
+        mech = DeclarativeMechanism(json.loads(block))
+        assert mech.get_R(120.0, 1.0, 300.0).shape == (len(mech.SPECIES),) * 2

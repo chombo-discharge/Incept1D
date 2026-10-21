@@ -96,7 +96,7 @@ def add_arguments(parser):
     """Register the command-line arguments on *parser*."""
     parser.add_argument(
         "mechanism",
-        help="Path to mechanism Python file (e.g. Air/Air_Hosl.py).",
+        help="Mechanism file (.json) or Python mechanism (.py), e.g. mechanisms/air/pancheshnyi/air_pancheshnyi.json.",
     )
     parser.add_argument(
         "configs",

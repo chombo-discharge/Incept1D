@@ -61,9 +61,16 @@ into three layers:
      - Gap geometry: uniform / sphere-plane / sphere-sphere / hyperboloid-plane /
        coaxial / tabulated field line profiles :math:`f(\xi)` and the shared ``--field`` CLI parsing.
        See :ref:`Chap:FieldDistributions`.
+   * - :mod:`incept1d.declarative`
+     - Mechanism files: checks a JSON mechanism and compiles it into the
+       interface the solver uses.  See :ref:`Chap:MechanismFiles`.
+   * - :mod:`incept1d.expressions`, :mod:`incept1d.tables`,
+       :mod:`incept1d.zheleznyak`
+     - The formulas, swarm-data tables and photoionization fit of mechanism
+       files.  See :ref:`Chap:MechanismFiles`.
    * - :mod:`incept1d.reactions`
-     - Declarative reaction-string parser that assembles :math:`\bm{R}`.
-       Used by mechanism files.  See :ref:`Chap:Reactions`.
+     - Reaction-string parser that assembles :math:`\bm{R}`.  Used by
+       mechanism files and Python mechanisms.  See :ref:`Chap:Reactions`.
    * - :mod:`incept1d.constants`
      - Physical constants from ``scipy.constants``.  See :ref:`Chap:Constants`.
    * - :mod:`incept1d.output`
@@ -77,7 +84,7 @@ Call graph
 
 .. code-block:: text
 
-   mechanism file (+ config.py, *.json) ──► incept1d.mechanism.load_mechanism ──► Mechanism
+   mechanism (+ configurations) ──► incept1d.mechanism.load_mechanism ──► mechanism object
                                                                                     │
                         ┌───────────────────┬───────────────────┬───────────────────┤
                         ▼                   ▼                   ▼                   ▼
@@ -100,10 +107,11 @@ The four solver commands share the same first arguments and most options:
 
 .. code-block:: console
 
-   incept1d COMMAND MECHANISM.py [CONFIG.json ...] [options]
+   incept1d COMMAND MECHANISM [CONFIG.json ...] [options]
 
-``MECHANISM.py``
-   Path to a mechanism file, e.g. ``mechanisms/air/pancheshnyi/air_pancheshnyi.py``
+``MECHANISM``
+   Path to a mechanism file, e.g. ``mechanisms/air/pancheshnyi/air_pancheshnyi.json``
+   (:ref:`Chap:MechanismFiles`), or to a Python mechanism
    (:ref:`Chap:NewMechanisms`).
 
 ``CONFIG.json ...``

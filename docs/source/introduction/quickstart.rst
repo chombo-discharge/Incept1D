@@ -17,7 +17,7 @@ air:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json --p 1.0
+   incept1d pdiv mechanisms/paschen/paschen.json mechanisms/paschen/gases.json --p 1.0
 
 ``gases.json`` holds three configurations, one per gas, so all three curves
 are computed and plotted together.  A two-panel figure appears — the
@@ -59,7 +59,7 @@ criterion :math:`\int\max(\alpha-\eta,0)\,dx = 18`:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json \
        --pd-min 1 --pd-max 55 --pd-num 100 \
        --field sphere-sphere 50 --streamer-criterion 18
 
@@ -84,7 +84,7 @@ To keep the numbers instead of the figure:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json \
        --pd-min 1 --pd-max 55 --pd-num 100 \
        --field sphere-sphere 50 --streamer-criterion 18 \
        --no-plot --write-to-file air_sphere50.dat
@@ -96,14 +96,14 @@ configuration and polarity.
 Varying the physics
 -------------------
 
-Neither example edited a Python file.  A mechanism's parameters — which
+Neither example edited the mechanism file.  A mechanism's parameters — which
 cross-section database to use, which reactions to scale or switch off, the
 secondary-emission yield — are changed by passing JSON configuration files
 after the mechanism, and each becomes its own curve in the same figure:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/nodetachment.json \
        --p 1.0 --pd-min 1 --pd-max 1e3
 
 ``nodetachment.json`` holds the baseline and a variant with both

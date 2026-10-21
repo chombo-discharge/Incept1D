@@ -1,7 +1,7 @@
 # The classical Paschen curve
 
 A verification, not a prediction. The mechanism
-`mechanisms/paschen/paschen.py` is the textbook Townsend model — one
+`mechanisms/paschen/paschen.json` is the textbook Townsend model — one
 ionizing reaction with `α/p = A exp(−Bp/E)`, no attachment, no
 photoionization, and electrons released from the cathode only by arriving
 positive ions. That reduced model has a closed-form inception condition,
@@ -19,7 +19,7 @@ Nothing third-party is involved.
 From the repository root:
 
 ```bash
-incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json \
+incept1d pdiv mechanisms/paschen/paschen.json mechanisms/paschen/gases.json \
     --p 1.0 \
     --pd-min 3e-3 --pd-max 1e2 --pd-num 120 \
     --write-to-file examples/paschen/sim.dat

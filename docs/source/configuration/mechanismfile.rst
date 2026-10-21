@@ -1,13 +1,20 @@
 .. _Chap:NewMechanisms:
 
-Creating a new mechanism
-========================
+Python mechanisms
+=================
 
 .. contents:: On this page
    :local:
    :depth: 1
 
-A *mechanism file* is a plain Python module that describes one gas: its
+.. note::
+
+   A mechanism is normally a JSON file (:ref:`Chap:MechanismFiles`), which
+   is shorter, is checked when it is loaded, and runs no code.  A Python
+   mechanism is the route for a model the JSON format cannot express; the
+   solver treats the two alike.
+
+A *Python mechanism* is a plain Python module that describes one gas: its
 tracked species, reactions, transport coefficients, photoionization data,
 and cathode yields.  It is not imported as a package — :func:`incept1d.mechanism.load_mechanism`
 executes it with ``importlib`` after injecting configuration variables into
@@ -15,10 +22,10 @@ its namespace — so it must be self-contained and must locate its own data
 files relative to ``__file__``.
 
 This page is the interface: what a module must expose, and what each function
-must return.  It deliberately does not describe any particular gas.  Two
-mechanisms are documented as worked examples — a minimal one in
-:ref:`Chap:PaschenMechanism` and a complete one in :ref:`Chap:AirScheme` —
-and either is a reasonable starting point to copy.
+must return.  It deliberately does not describe any particular gas.
+:ref:`Chap:RFDScheme` is a Python mechanism because its model does not fit
+a mechanism file, and a reasonable starting point to copy; the Python form
+of :ref:`Chap:AirScheme` shows a complete gas-discharge scheme.
 
 Required interface
 ------------------

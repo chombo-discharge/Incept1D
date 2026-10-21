@@ -45,7 +45,7 @@ Inputs
 
 .. code-block:: console
 
-   incept1d pdiv MECHANISM.py [CONFIG.json ...]
+   incept1d pdiv MECHANISM [CONFIG.json ...]
        [--p P [P ...]] [--d D [D ...]] [--T T]
        [--pd-min PD] [--pd-max PD] [--pd-num N]
        [--field SPEC] [--protrusion SHAPE ...] [--reverse-field]
@@ -146,27 +146,27 @@ Uniform-field inception curve at three pressures, all branches:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py --p 0.1 1 10 --all-branches --plot-separate-branches
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json --p 0.1 1 10 --all-branches --plot-separate-branches
 
 Fixed 10 mm gap, varying pressure, comparing the four cross-section
 databases:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/databases.json --d 10 --pd-min 0.1 --pd-max 200
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/databases.json --d 10 --pd-min 0.1 --pd-max 200
 
 Sphere-plane gap (50 mm sphere), both polarities, second-order Magnus
 propagator on a fixed 40-step grid:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py --field sphere-plane 50 --method magnus2 --dx 40 40
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json --field sphere-plane 50 --method magnus2 --dx 40 40
 
 Inception curve with the growth-rate contour :math:`\lambda = 10^{8}` s\ :sup:`-1`:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py --lam 1e8
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json --lam 1e8
 
 Outputs
 -------

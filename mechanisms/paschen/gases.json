@@ -1,18 +1,25 @@
 {
+    "_comment": "Townsend coefficients of Raizer, Gas Discharge Physics (1991), Table 4.1: A [cm^-1 Torr^-1], B [V cm^-1 Torr^-1], valid over the E/p range given [V cm^-1 Torr^-1].",
     "configurations": [
         {
             "label": "Helium",
-            "gas": "helium",
+            "A": 3.0,
+            "B": 34.0,
+            "_validity": "E/p 20 - 150",
             "gamma0": 0.01
         },
         {
             "label": "Argon",
-            "gas": "argon",
+            "A": 12.0,
+            "B": 180.0,
+            "_validity": "E/p 100 - 600",
             "gamma0": 0.01
         },
         {
             "label": "Air",
-            "gas": "air",
+            "A": 15.0,
+            "B": 365.0,
+            "_validity": "E/p 100 - 800",
             "gamma0": 0.01
         }
     ]

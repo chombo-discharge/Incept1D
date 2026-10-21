@@ -7,14 +7,15 @@ Example: A minimal scheme for dry air
    :local:
    :depth: 1
 
-The mechanism shipped as ``mechanisms/air/pancheshnyi/air_pancheshnyi.py`` is the
-reference dry-air scheme used in the examples, and the worked example of
-everything in this chapter: a species list, a declarative reaction table, a
-``config.py`` exposing the parameters worth varying, and a set of JSON
-configurations built on it.  Where :ref:`Chap:PaschenMechanism`
-shows the smallest mechanism that does anything, this one shows a complete
-one.  It tracks electrons and five ion
-species,
+The mechanism file ``mechanisms/air/pancheshnyi/air_pancheshnyi.json`` is
+the reference dry-air scheme used in the examples, and the worked example of
+everything in this chapter: species, a reaction table, swarm data read from
+BOLSIG+ output, multigroup photoionization, field-dependent cathode yields,
+the parameters worth varying, and a set of configurations built on it.
+Where :ref:`Chap:PaschenMechanism` shows the smallest mechanism that does
+anything, this one shows a complete one.  (The same scheme is also the
+Python module ``air_pancheshnyi.py``, which ``incept1d chombo`` reads.)  It
+tracks electrons and five ion species,
 
 .. math::
 
@@ -353,48 +354,56 @@ Both are uncertain by orders of magnitude; ``mechanisms/air/pancheshnyi/see.json
 :math:`\gamma_0` over :math:`10^{-4}`–:math:`10^{-2}` so the sensitivity can
 be read off directly.
 
+The mechanism file
+------------------
+
+.. literalinclude:: ../../../../mechanisms/air/pancheshnyi/air_pancheshnyi.json
+   :language: json
+
+How it says what the sections above describe:
+
+* **Swarm data.**  The ``bolsig`` table gives the mean energy and the
+  electron mobility (columns ``A1``, ``A2``) and the rates :math:`k_1, k_2,
+  k_3`, each summed over every ionization or attachment process of its
+  target in the file.  Which file is a parameter, ``cross_sections``.
+* **Ion mobilities.**  Constants for the cations and O\ :sup:`-`;
+  tabulated :math:`K_0` for O\ :sub:`2`:sup:`-` and O\ :sub:`3`:sup:`-`,
+  converted to :math:`\mu N` with the Loschmidt number.
+* **Rates.**  Each reaction's ``rate`` is its coefficient in SI units; the
+  loader multiplies in the neutral densities the string names, so
+  ``e + 2O2 -> O2- + O2`` is multiplied by :math:`(x_{\mathrm{O}_2}N)^2`.
+  The three-body coefficient uses the electron temperature defined from
+  the mean energy.
+* **Photoionization.**  Three groups (``ngroups``) from the Zheleznyak fit,
+  absorbed by O\ :sub:`2`; emitted in proportion to the two ionization
+  rates times the cone fraction, the excitation efficiency 0.6 and the
+  quenching factor :math:`p_q/(p + p_q)`; each absorbed photon makes an
+  electron and an O\ :sub:`2`:sup:`+` with efficiency 0.1.
+
 Modifying this scheme
 ---------------------
 
-The reaction strings, which are the keys ``reaction_multipliers`` matches
-against (:ref:`Chap:ModifyingReactions`), are:
+The reaction strings are the keys ``reaction_multipliers`` matches against
+(:ref:`Chap:ModifyingReactions`).  A rate coefficient is changed by editing
+its ``rate`` formula, and one that a study varies is better made a
+parameter.  Three checks catch most mistakes:
 
-.. code-block:: text
-
-   e + N2 -> 2e + N2+
-   e + O2 -> 2e + O2+
-   e + O2 -> O- + O
-   e + 2O2 -> O2- + O2
-   O2- + O2 -> e + O2 + O2
-   O- + N2 -> e + N2O
-   O- + O2 -> O + O2-
-   O- + O2 + M -> O3- + M
-
-Each is paired with a callable that folds in the neutral densities, so the
-rate coefficients themselves stay in small named functions ``k1`` … ``k8``
-that can be edited one at a time:
-
-.. literalinclude:: ../../../../mechanisms/air/pancheshnyi/air_pancheshnyi.py
-   :language: python
-   :pyobject: k5
-
-Three checks catch most mistakes:
-
-* ``python3 mechanisms/air/pancheshnyi/air_pancheshnyi.py`` — Plots the entries of
-  :math:`\bm{R}` against :math:`E/N`.
-* ``incept1d eigenvalues mechanisms/air/pancheshnyi/air_pancheshnyi.py`` — Shows whether
-  the leading eigenvalue still crosses zero where expected.
-* ``incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/paschen.json``
+* ``incept1d eigenvalues mechanisms/air/pancheshnyi/air_pancheshnyi.json`` —
+  Loads and checks the file, then shows whether the leading eigenvalue still
+  crosses zero where expected.
+* ``incept1d chombo`` on the Python module — Tabulates every rate
+  coefficient over :math:`E/N`, so one that has gone to zero or to infinity
+  is obvious.
+* ``incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/paschen.json``
   — Must still reproduce the classical Paschen curve, unchanged if only the
   detachment or conversion chemistry was touched.
 
 Configuration keys
 ------------------
 
-``mechanisms/air/pancheshnyi/config.py`` accepts the following keys, and
-rejects any other (:ref:`Chap:Configuration` describes the file format).
-The class itself is ``mechanisms/air/air_config.py``, shared with the other
-air mechanisms:
+A configuration may set any parameter of the file, and ``label``,
+``reaction_multipliers``, ``positive`` and ``negative``
+(:ref:`Chap:Configuration`); anything else is refused:
 
 .. list-table::
    :header-rows: 1
@@ -412,29 +421,24 @@ air mechanisms:
        :math:`k_1, k_2, k_3`.  Shipped in ``mechanisms/air/lxcat/``:
        ``lisbon.txt``, ``phelps.txt``, ``biagi.txt``, ``trinity.txt``,
        ``morgan.txt``.  A relative path is resolved first against the
-       directory of the JSON file, then against the mechanism directory, so
-       the shipped files are named ``"../lxcat/lisbon.txt"``.
+       directory of the configuration file, then against the mechanism
+       directory, so the shipped files are named ``"../lxcat/lisbon.txt"``.
    * - ``x_n2``, ``x_o2``
-     - from the table
+     - 0.79, 0.21
      - Mole fractions of N\ :sub:`2` and O\ :sub:`2` for the neutral
-       densities (both or neither).  They must match the mixture the
-       transport data were computed for: if the BOLSIG+ file records its
-       mixture (``Mole fraction`` lines, as in ``lisbon.txt``: 0.79/0.21),
-       that mixture is the default and a value that differs by more than
-       :math:`10^{-3}` is an error.  ``x_n2 + x_o2`` must be 1 (within
-       :math:`10^{-3}`), since the mechanisms contain no other neutrals.  The
-       LXCat-generated files (``phelps.txt``, ``biagi.txt``, ``trinity.txt``,
-       ``morgan.txt``) do not record it; then the mechanism's own values are
-       used (0.8/0.2 in ``air_pancheshnyi.py``, 0.79/0.21 in
-       ``air_2body.py``), with a warning, unless ``x_n2`` and ``x_o2`` are set.
-       The shipped ``conservative.json`` (Biagi), ``databases.json``
-       (Trinity) and the 2body ``example_config.json`` (Phelps) therefore
-       warn; this is expected.  A gas temperature that differs from the
+       densities.  They must match the mixture the transport data were
+       computed for: ``lisbon.txt`` records its mixture (0.79/0.21), and a
+       mixture that differs from a recorded one by more than :math:`10^{-3}`
+       is refused.  The LXCat-generated files (``phelps.txt``, ``biagi.txt``,
+       ``trinity.txt``, ``morgan.txt``) record none, so a configuration that
+       uses one should set the mixture; otherwise the defaults are used with
+       a warning.  The shipped ``databases.json`` and ``conservative.json``
+       set 0.8/0.2 for them.  A gas temperature that differs from the
        table's by more than 20 K also gives a warning.
    * - ``reaction_multipliers``
      - ``{}``
-     - Dictionary ``{reaction string: factor}``, keyed by the strings
-       listed under `Modifying this scheme`_.
+     - Dictionary ``{reaction string: factor}``, keyed by the reaction
+       strings of the file.
    * - ``ngroups``
      - ``3``
      - Number of two-stream photon groups in the Zheleznyak fit.
@@ -448,14 +452,14 @@ air mechanisms:
      - Scale factors on the photoionization coupling :math:`\bm{B}` and on
        the photoemission yields :math:`\vec{\gamma}_\Psi`.
    * - ``gamma0``, ``gamma1``, ``eref``, ``beta``
-     - ``1e-3``, ``0``, ``1.7e9``, ``1``
+     - ``1e-3``, ``0``, ``1.7e8``, ``1``
      - Ion-induced secondary-emission yield
        :math:`\gamma = \gamma_0 + \gamma_1\exp(-E_\mathrm{ref}/\beta E)`,
        with :math:`E_\mathrm{ref}` in V/m.
    * - ``positive``, ``negative``
      - —
-     - Nested objects overriding ``xi_photo``, ``xi_emit``, ``gamma0``,
-       ``gamma1``, ``eref`` or ``beta`` for one polarity only.
+     - Nested objects overriding any of the parameters for one polarity
+       only.
 
 Ready-made configuration sets
 -----------------------------

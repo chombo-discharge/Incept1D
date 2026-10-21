@@ -7,7 +7,9 @@
 A configuration file belongs to the mechanism in its directory.  These tests
 check that every shipped configuration loads with that mechanism, and that
 the loader refuses one written for another mechanism instead of silently
-solving a different problem.
+solving a different problem.  A mechanism is a JSON file (a mechanism file)
+or a Python module; while one is being migrated, its directory may hold both,
+under the same name.
 """
 
 import os
@@ -22,17 +24,22 @@ from incept1d.mechanism import load_mechanism, read_json_configs
 ROOT = Path(__file__).resolve().parent.parent
 MECHANISMS = ROOT / "mechanisms"
 
-#: Every directory with a config.py is a mechanism directory.
-MECH_DIRS = sorted(p.parent for p in MECHANISMS.rglob("config.py"))
+
+def _mechanism_files(mech_dir):
+    """The mechanism of *mech_dir*, as a module and / or a mechanism file."""
+    py = [p for p in mech_dir.glob("*.py") if p.name != "config.py"]
+    js = [p for p in mech_dir.glob("*.json") if is_mechanism_file(str(p))]
+    return sorted(py + js)
+
+
+#: Every directory holding a mechanism module or file.
+MECH_DIRS = sorted(
+    {p.parent for p in MECHANISMS.rglob("config.py")}
+    | {p.parent for p in MECHANISMS.rglob("*.json") if is_mechanism_file(str(p))}
+)
 
 #: Mechanisms that read swarm tables at load time, which takes a while.
 _SLOW = {"pancheshnyi", "2body"}
-
-
-def _mechanism_file(mech_dir):
-    files = [p for p in mech_dir.glob("*.py") if p.name != "config.py"]
-    assert len(files) == 1, f"{mech_dir} holds {len(files)} mechanism files"
-    return files[0]
 
 
 def _param(path, mech_dir):
@@ -48,8 +55,11 @@ def test_there_are_mechanism_directories():
 
 @pytest.mark.parametrize("mech_dir", MECH_DIRS, ids=lambda d: d.name)
 def test_one_mechanism_per_directory(mech_dir):
-    """L1: a directory is one mechanism, its config.py and its configs."""
-    _mechanism_file(mech_dir)
+    """L1: a directory is one mechanism (in one or both forms) and its configs."""
+    files = _mechanism_files(mech_dir)
+    assert (
+        files and len({f.stem for f in files}) == 1
+    ), f"{mech_dir} holds {[f.name for f in files]}"
 
 
 @pytest.mark.parametrize(
@@ -63,10 +73,10 @@ def test_one_mechanism_per_directory(mech_dir):
 )
 def test_every_config_loads_with_its_own_mechanism(json_path, mech_dir):
     """L2: each shipped configuration is accepted by the mechanism beside it."""
-    mech = _mechanism_file(mech_dir)
-    for cfg in read_json_configs([str(json_path)]):
-        mod = load_mechanism(str(mech), cfg)
-        assert mod.get_R(120.0, 1.0, 293.0).shape[0] == len(mod.SPECIES)
+    for mech in _mechanism_files(mech_dir):
+        for cfg in read_json_configs([str(json_path)]):
+            mod = load_mechanism(str(mech), cfg)
+            assert mod.get_R(120.0, 1.0, 293.0).shape[0] == len(mod.SPECIES)
 
 
 AIR = MECHANISMS / "air"
@@ -88,6 +98,18 @@ AIR = MECHANISMS / "air"
             "does not define",
             marks=pytest.mark.slow,
             id="2body-reactions-for-pancheshnyi",
+        ),
+        pytest.param(
+            AIR / "pancheshnyi" / "air_pancheshnyi.json",
+            AIR / "2body" / "example_config.json",
+            "does not define",
+            id="2body-reactions-for-pancheshnyi-json",
+        ),
+        pytest.param(
+            MECHANISMS / "paschen" / "paschen.json",
+            AIR / "pancheshnyi" / "see.json",
+            "unknown key",
+            id="air-config-for-paschen",
         ),
     ],
 )

@@ -28,12 +28,10 @@ from incept1d.expressions import Expression, ExpressionError
 from incept1d.fields import FieldDistribution
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism
-from incept1d.solver import _build_A_aug, inception_det, riccati_criterion
+from incept1d.solver import _build_A_aug, riccati_criterion
 
 ROOT = Path(__file__).resolve().parent.parent
-PASCHEN_PY = str(ROOT / "mechanisms" / "paschen" / "paschen.py")
 PASCHEN_JSON = str(ROOT / "mechanisms" / "paschen" / "paschen.json")
-GASES = {"helium": (3.0, 34.0), "argon": (12.0, 180.0), "air": (15.0, 365.0)}
 
 
 # --- expressions -------------------------------------------------------------
@@ -165,6 +163,7 @@ def test_selectors_and_velocities_follow_the_charges():
             "untracked",
         ),
         (lambda s: s["reactions"][0].update(rate="k_ion"), "unknown name"),
+        (lambda s: s["reactions"].append(dict(s["reactions"][1])), "appears twice"),
         (lambda s: s["emission"]["ions"].clear(), "no yield"),
         (lambda s: s.update(gas={"N2": "0.8", "O2": "0.3"}), "sum to 1"),
         (lambda s: s["parameters"].update({"2x": 1.0}), "start with a letter"),
@@ -218,7 +217,7 @@ def test_polarity_overrides_are_parameters_of_one_polarity():
         _mech(config={"positive": {"label": "x"}})
 
 
-# --- equivalence with the Python Paschen mechanism ---------------------------
+# --- loading -----------------------------------------------------------------
 
 
 def test_loader_dispatches_on_the_file():
@@ -226,49 +225,6 @@ def test_loader_dispatches_on_the_file():
     assert is_mechanism_file(PASCHEN_JSON)
     assert not is_mechanism_file(str(ROOT / "mechanisms" / "paschen" / "gases.json"))
     assert isinstance(load_mechanism(PASCHEN_JSON), DeclarativeMechanism)
-
-
-@pytest.mark.parametrize("gas", sorted(GASES))
-@pytest.mark.parametrize("lam", [0.0, 1e6])
-def test_paschen_json_builds_the_same_augmented_matrix(gas, lam):
-    """D12: A_aug of the JSON and the Python Paschen mechanism agree to round-off."""
-    A, B = GASES[gas]
-    py = load_mechanism(PASCHEN_PY, {"gas": gas, "gamma0": 3e-3})
-    js = load_mechanism(PASCHEN_JSON, {"A": A, "B": B, "gamma0": 3e-3})
-    for EN in (30.0, 150.0, 800.0):
-        for p, T in ((1.0, 293.0), (0.2, 350.0)):
-            a = _build_A_aug(EN, 1e-3, py, p, T, lam)[0]
-            b = _build_A_aug(EN, 1e-3, js, p, T, lam)[0]
-            np.testing.assert_allclose(b, a, rtol=1e-14, atol=0.0)
-            assert js.get_gamma_plus(EN, p, T) == pytest.approx(
-                py.get_gamma_plus(EN, p, T)
-            )
-
-
-@pytest.mark.parametrize("criterion", [riccati_criterion, inception_det])
-def test_paschen_json_gives_the_same_inception_field(criterion):
-    """D13: the same root, with multipliers and a polarity override."""
-    cfg_py = {
-        "gas": "argon",
-        "reaction_multipliers": {"e -> 2e + M+": 0.9},
-        "neg_override": {"gamma0": 0.05},
-    }
-    cfg_js = {
-        "A": 12.0,
-        "B": 180.0,
-        "reaction_multipliers": {"e -> 2e + M+": 0.9},
-        "negative": {"gamma0": 0.05},
-    }
-    py, js = load_mechanism(PASCHEN_PY, cfg_py), load_mechanism(PASCHEN_JSON, cfg_js)
-    for positive in (True, False):
-        det = functools.partial(
-            criterion,
-            field_dist=FieldDistribution("uniform"),
-            positive_polarity=positive,
-        )
-        a = find_all_breakdown_EN(0.01, py, 1.0, 293.0, first_only=True, det_fn=det)
-        b = find_all_breakdown_EN(0.01, js, 1.0, 293.0, first_only=True, det_fn=det)
-        assert b[0] == pytest.approx(a[0], rel=1e-12)
 
 
 # --- tables, mixture, photoionization ----------------------------------------

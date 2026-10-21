@@ -27,7 +27,7 @@ python3 examples/fieldline/make_line.py examples/fieldline
 then solve along the line in engineering units:
 
 ```bash
-incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json \
     --field fieldline examples/fieldline/line_engineering.csv mm \
     --fieldline-voltage 100 \
     --pd-min 1 --pd-max 100 --pd-num 40 \

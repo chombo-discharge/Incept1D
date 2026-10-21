@@ -8,26 +8,23 @@ Example: The classical Townsend model
    :depth: 1
 
 ``mechanisms/paschen/`` is the smallest mechanism that does anything useful,
-and the easiest place to see the whole interface at once.  It implements the
-textbook Townsend model — one ionizing reaction, no attachment, no
-detachment, no photons, ion-induced emission at the cathode — for helium,
-argon and air.
-
-Everything it needs fits in three files:
+and the easiest place to see a whole mechanism file at once.  It implements
+the textbook Townsend model — one ionizing reaction, no attachment, no
+detachment, no photons, ion-induced emission at the cathode — and its
+configurations give the coefficients of helium, argon and air.
 
 .. code-block:: text
 
    mechanisms/paschen/
-   ├── paschen.py     the mechanism module
-   ├── config.py      selects the gas and the cathode yield
+   ├── paschen.json   the mechanism file
    └── gases.json     the three gases as three configurations
 
-There are no data files at all: the coefficients are functions, not tables.
+There are no data files: the coefficients are formulas, not tables.
 
-What the module defines
------------------------
+The mechanism file
+------------------
 
-Two species and one reaction:
+Two species and one reaction,
 
 .. math::
 
@@ -40,10 +37,36 @@ with the ionization coefficient in Townsend's two-parameter form
 .. math::
    :label: eq_townsend_two_parameter
 
-   \frac{\alpha}{p} = A\,\exp\left(-\frac{B p}{E}\right).
+   \frac{\alpha}{p} = A\,\exp\left(-\frac{B p}{E}\right),
 
-:math:`A` and :math:`B` are tabulated per gas [Raizer1991]_ and converted to
-SI inside the module:
+and the whole file is:
+
+.. literalinclude:: ../../../../mechanisms/paschen/paschen.json
+   :language: json
+
+Every part of :ref:`Chap:MechanismFiles` that this model needs, and
+nothing else:
+
+* **Parameters.**  :math:`A` and :math:`B` in the units they are tabulated
+  in, the cathode yield and the two mobilities; these are what a
+  configuration can set.
+* **Definitions.**  :math:`A` and :math:`B` converted to SI, and the
+  electron drift speed.
+* **The reaction.**  Its rate is :math:`\alpha v_\mathrm{e}`, in s\ :sup:`-1`,
+  since the string names no neutral partner.  Writing it through ``alpha``
+  makes the Townsend coefficient and the reaction one and the same, which is
+  what makes the closed form below exact.
+* **No photoionization block**, so there are no photon groups, and
+  ``eta = 0``.
+
+The configurations
+------------------
+
+:math:`A` and :math:`B` are tabulated per gas [Raizer1991]_, and each gas
+is one configuration:
+
+.. literalinclude:: ../../../../mechanisms/paschen/gases.json
+   :language: json
 
 .. list-table::
    :header-rows: 1
@@ -66,38 +89,9 @@ SI inside the module:
      - 365
      - 100 – 800
 
-The attachment coefficient returns zero, and the photon accessors return
-zero-width arrays — which is how a mechanism declares that it has no
-photoionization:
-
-.. code-block:: python
-
-   def get_B(EN, p=1.0, T=293.0):
-       """Photon absorption coupling, shape (2, 0)."""
-       return np.zeros((2, 0))
-
-Choosing between the two override paths
----------------------------------------
-
-This mechanism is a clean illustration of the rule in :ref:`Chap:ConfigPy`.
-
-The **gas** must be known before the module body runs, because selecting it
-fixes :math:`A` and :math:`B` at module level.  It therefore goes through
-``pre_exec_vars``:
-
-.. literalinclude:: ../../../../mechanisms/paschen/config.py
-   :language: python
-   :pyobject: Config.pre_exec_vars
-   :dedent:
-
-The cathode yield :math:`\gamma_0` travels the same way here, because the
-module reads it at import; a mechanism that evaluated it per call could
-equally have passed it through ``mechanism_params``.
-
-The configurations themselves are three lines each:
-
-.. literalinclude:: ../../../../mechanisms/paschen/gases.json
-   :language: json
+The cathode yield :math:`\gamma_0` is not a property of the gas but of the
+cathode, so each configuration sets it explicitly; 0.01 is representative of
+a metal.
 
 Why it is worth having
 ----------------------
@@ -106,12 +100,10 @@ Because the answer is known.  With :math:`\eta = \delta = 0` the criterion
 :eq:`eq_standard_paschen` collapses to
 :math:`\alpha d = \ln(1 + \gamma^{-1})`, and substituting
 :eq:`eq_townsend_two_parameter` gives Paschen's law in closed form together
-with its minimum.  The module exposes both as ordinary functions,
-``paschen_voltage(pd)`` and ``paschen_minimum()``, so a calculation can be
-compared against them directly.
+with its minimum.
 
-That is what :ref:`Chap:Examples:Paschen` does, and what the test suite
-asserts to a relative error below :math:`10^{-9}`.  When you write a
-mechanism for a new gas, reproducing a limit you can compute by hand is the
-fastest way to find out whether the interface has been implemented
-correctly — and this mechanism is a working template for doing so.
+That is what :ref:`Chap:Examples:Paschen` compares against, and what the
+test suite asserts to a relative error below :math:`10^{-9}`.  When you
+write a mechanism for a new gas, reproducing a limit you can compute by
+hand is the fastest way to find out whether it says what you meant — and
+this file is a working template for doing so.

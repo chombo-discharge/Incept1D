@@ -190,7 +190,7 @@ class DeclarativeMechanism:
         config = dict(config or {})
         _keys(config, _CONFIG_KEYS | set(self._parameters), f"{source}: configuration")
         self._cfg_dir = config.get("_cfg_dir", self._dir)
-        self.label = str(config.get("label", ""))
+        self.label = str(config.get("label", "Baseline"))
         self._configured = {k for k in config if k in self._parameters}
         self._values = dict(self._parameters)
         self._values.update(self._overrides(config, f"{source}: configuration"))
@@ -332,13 +332,20 @@ class DeclarativeMechanism:
         if not isinstance(reactions, list):
             raise MechanismFileError(f"{src}: 'reactions' must be a list")
         self._reactions = []
+        seen = set()
         for i, rx in enumerate(reactions):
             where = f"{src}: reactions[{i}]"
             _keys(rx, _REACTION_KEYS, where)
             _require(rx, _REACTION_KEYS, where)
-            self._reactions.append(
-                self._compile_reaction(rx, set(untracked), names, where)
-            )
+            compiled = self._compile_reaction(rx, set(untracked), names, where)
+            key = _normalize(compiled["reaction"])
+            if key in seen:
+                raise MechanismFileError(
+                    f"{where}: {compiled['reaction']!r} appears twice; the reaction "
+                    f"string is the reaction's name"
+                )
+            seen.add(key)
+            self._reactions.append(compiled)
 
         self._compile_photoionization(spec.get("photoionization"), names)
         self._compile_emission(spec.get("emission", {}), names)

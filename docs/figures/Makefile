@@ -65,7 +65,7 @@ SOLVER_DEPS := $(wildcard $(ROOT)/src/incept1d/*.py) $(ROOT)/src/incept1d/cli/pd
 # root, headless, into the build directory.  Keep the two in step: the README
 # is what a reader runs, this is what the figure shows.
 PDIV    := cd $(ROOT) && incept1d pdiv
-AIR     := mechanisms/air/pancheshnyi/air_pancheshnyi.py
+AIR     := mechanisms/air/pancheshnyi/air_pancheshnyi.json
 NODET   := mechanisms/air/pancheshnyi/nodetachment.json
 
 .PHONY: all clean data $(ALL_FIGURES)
@@ -127,7 +127,7 @@ $(BUILD)/electra/tablec2_air.dat: $(ROOT)/examples/electra/tablec2_air.dat
 
 $(BUILD)/paschen/sim.dat: $(SOLVER_DEPS)
 	@mkdir -p $(dir $@)
-	$(PDIV) mechanisms/paschen/paschen.py mechanisms/paschen/gases.json \
+	$(PDIV) mechanisms/paschen/paschen.json mechanisms/paschen/gases.json \
 	    --p 1.0 \
 	    --pd-min 3e-3 --pd-max 1e2 --pd-num $(or $(PD_NUM),120) \
 	    --no-plot \

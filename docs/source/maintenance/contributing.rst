@@ -70,10 +70,12 @@ New mechanisms
 --------------
 
 A new mechanism goes in its own directory, under its gas:
-``mechanisms/<gas>/<scheme>/<gas>_<scheme>.py`` + ``config.py`` + the JSON
-configurations written for it.  Data and code shared by the mechanisms of
-one gas sit in ``mechanisms/<gas>/`` and are loaded by path
-(:func:`incept1d.mechanism.load_helper`).  Follow :ref:`Chap:NewMechanisms`.
+``mechanisms/<gas>/<scheme>/<gas>_<scheme>.json`` + the configurations
+written for it, following :ref:`Chap:MechanismFiles`.  Data shared by the
+mechanisms of one gas sits in ``mechanisms/<gas>/``.  Only a model the
+mechanism file cannot express is a Python module with a ``config.py``
+(:ref:`Chap:NewMechanisms`); code it shares is loaded by path
+(:func:`incept1d.mechanism.load_helper`).
 Please include the swarm-data source, the literature reference for every
 rate, and a configuration file that reduces the scheme to the textbook
 limit for testing.
