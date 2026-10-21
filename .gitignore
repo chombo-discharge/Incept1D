@@ -44,6 +44,7 @@ env/
 # Example outputs (written by the commands in examples/*/README.md)
 examples/**/sim*.dat
 examples/paschen/closed_form.dat
+examples/rfd/paper.dat
 examples/fieldline/line_*.csv
 
 # Field-line exports dropped in the repository root while testing.  They are

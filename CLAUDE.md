@@ -88,7 +88,7 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`)
+### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`, `mechanisms/air/rfd/air_rfd.py`)
 
 Mechanism files live one per directory under `mechanisms/<gas>/<scheme>/`
 and are **data, not part of the package**: they are `exec`'d by
@@ -123,7 +123,9 @@ without it every group radiates both ways.  Source, absorption, coupling and
 photoemission yield stay per group: radiation that differs between the two
 directions is one group per direction, and the solver drops the stream a
 group does not radiate into.  A mechanism whose feedback closes in the gas with no cathode emission is
-the case where only the Riccati pole test sees inception.
+the case where only the Riccati pole test sees inception; `air_rfd.py`
+(relativistic feedback, [Faerder2026b]) is the shipped one, with its
+normal-mode closed form in `tests/closed_form_rfd.py`.
 
 When writing or editing a mechanism file, follow the coordinate convention
 documented at the top of `mechanisms/air/pancheshnyi/air_pancheshnyi.py` (cathode at

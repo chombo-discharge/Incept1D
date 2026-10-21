@@ -258,6 +258,7 @@ Examples
    examples/coaxial
    examples/iec60052
    examples/electra
+   examples/rfd
 
 Maintenance
 ***********

@@ -34,9 +34,11 @@ export PD_NUM
 
 # Figures built by default: self-contained and cheap.  `paschen` verifies the
 # solver against its own closed form; `zheleznyakfit` shows the quality of the
-# two-stream fit; `coaxial` shows corona inception on a wire in a cylinder.
+# two-stream fit; `coaxial` shows corona inception on a wire in a cylinder;
+# `rfd` shows relativistic feedback, and compares it with the paper's
+# published results when the reader has supplied them (examples/rfd/README.md).
 # Together they take about a minute.
-FIGURES := paschen zheleznyakfit coaxial
+FIGURES := paschen zheleznyakfit coaxial rfd
 
 # Opt-in figures.  These compare against IEC 60052 and CIGRE ELECTRA reference
 # tables that are copyrighted and therefore not part of this repository (see
@@ -78,6 +80,7 @@ IEC_SIM := $(foreach D,$(DIAMS),$(BUILD)/iec60052/sim_$(D)cm.dat)
 # supplied the files, in which case the figures show the computed curves alone
 # (each overlay in the .tex is guarded by \IfFileExists).
 IEC_REF     := $(patsubst $(ROOT)/examples/iec60052/%,$(BUILD)/iec60052/%,$(wildcard $(ROOT)/examples/iec60052/iec60052_*.dat))
+RFD_REF     := $(patsubst $(ROOT)/examples/rfd/%,$(BUILD)/rfd/%,$(wildcard $(ROOT)/examples/rfd/paper.dat))
 ELECTRA_REF := $(patsubst $(ROOT)/examples/electra/%,$(BUILD)/electra/%,$(wildcard $(ROOT)/examples/electra/tablec2_air.dat))
 
 # IEC 60052: sphere radius (mm) and pd_max (bar mm) per diameter (cm), matching
@@ -134,6 +137,19 @@ $(BUILD)/paschen/closed_form.dat: $(ROOT)/examples/paschen/closed_form.py $(SOLV
 	@mkdir -p $(dir $@)
 	cd $(ROOT) && python3 examples/paschen/closed_form.py $@
 
+$(BUILD)/rfd/sim.dat: $(SOLVER_DEPS)
+	@mkdir -p $(dir $@)
+	$(PDIV) mechanisms/air/rfd/air_rfd.py mechanisms/air/rfd/radius.json \
+	    --p 1.01371 --T 273.15 \
+	    --pd-min 1e4 --pd-max 1.2e7 --pd-num $(or $(PD_NUM),80) \
+	    --no-plot \
+	    --write-to-file $@
+
+# The paper's results are the reader's own: paper.dat is written by
+# examples/rfd/paper_comparison.py from the authors' archive.
+$(BUILD)/rfd/paper.dat: $(ROOT)/examples/rfd/paper.dat
+	@mkdir -p $(dir $@) && cp $< $@
+
 # Coaxial: three wires in a 10 mm cylinder, each from 0.1 to 10 bar, so the
 # pd range (bar mm) is the pressure range times b - a.  The table in
 # examples/coaxial/README.md lists the same numbers.
@@ -162,7 +178,8 @@ $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat: $(ROOT)/mechanisms/air/z
 
 # `data` covers the default figures only; the opt-in ones pull their own.
 data: $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat \
-      $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat $(COAX_SIM)
+      $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat $(COAX_SIM) \
+      $(BUILD)/rfd/sim.dat
 
 # ---- 2. pgfplots + 3. outputs ---------------------------------------------------
 
@@ -171,6 +188,7 @@ DATA_electra      := $(BUILD)/electra/sim.dat $(ELECTRA_REF)
 DATA_zheleznyakfit := $(BUILD)/zheleznyakfit/zheleznyak_absorption_curve.dat
 DATA_paschen      := $(BUILD)/paschen/sim.dat $(BUILD)/paschen/closed_form.dat
 DATA_coaxial      := $(COAX_SIM)
+DATA_rfd          := $(BUILD)/rfd/sim.dat $(RFD_REF)
 
 # One rule set per figure: tex + data -> PDF in the build dir -> PDF/PNG in OUT.
 define FIGURE_RULES

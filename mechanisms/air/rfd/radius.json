@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "label": "R = 5 km",
+            "photon_attenuation_fwd": 307.64,
+            "photon_attenuation_bck": 92.22
+        },
+        {
+            "label": "R = 100 m",
+            "photon_attenuation_fwd": 275.31,
+            "photon_attenuation_bck": 55.29
+        }
+    ]
+}

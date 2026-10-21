@@ -1,0 +1,99 @@
+% Relativistic feedback discharge: Incept1D, and the published results of Faerder et al.
+%
+% Data files (in the working directory when this is compiled):
+%   sim.dat     incept1d pdiv output from docs/figures/Makefile (examples/rfd/README.md)
+%   paper.dat   OPTIONAL: written by examples/rfd/paper_comparison.py from the
+%               authors' Zenodo archive -- their E_s(L) next to Incept1D's at
+%               the same L.  Their data is not distributed with this
+%               repository; see examples/rfd/README.md.  Everything that
+%               reads it is guarded by \IfFileExists, so without it the
+%               figure shows the computed curves alone.
+%
+% 0-based column indices (\thisrowno) into sim.dat; 1-based layout:
+%    3  d_mm[R = 5 km]       6  E_Vm[R = 5 km]
+%   13  d_mm[R = 100 m]   16  E_Vm[R = 100 m]
+% and into paper.dat (fields in kV/m):
+%   0  L (m)
+%   1  Incept1D [R = 5 km]                 2  Incept1D [R = 100 m]
+%   3  paper, normal modes [R = 5 km]
+%   4  paper, time-dependent [R = 5 km]    5  paper, time-dependent [R = 100 m]
+\documentclass[10pt]{article}
+\input{preamble.tex}
+\IfFileExists{paper.dat}{%
+  \usepackage[paperwidth=15cm,paperheight=13.4cm,margin=0in]{geometry}}{%
+  \usepackage[paperwidth=15cm,paperheight=9.4cm,margin=0in]{geometry}}
+
+\pgfplotsset{
+  solver/.style={very thick, no marks},
+  nme/.style={only marks, mark=o, mark size=2.0pt,
+              mark options={thin, fill=white, fill opacity=0.9}},
+  timedep/.style={thick, densely dotted, no marks},
+  panel/.style={
+    axis y line=left,
+    axis x line=bottom,
+    font=\small,
+    width=\figwidth,
+    grid=both,
+    minor grid style={very thin, densely dotted},
+    axis line style={thick, black},
+    xmin=10, xmax=1.2e4,
+    xtick={10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000},
+    log ticks with fixed point,
+  },
+}
+\setlength{\figwidth}{14cm}
+
+\begin{document}
+\centering
+\begin{tikzpicture}
+  \begin{axis}[
+      panel,
+      name=top,
+      xmode=log, ymode=log,
+      height=9cm,
+      ymin=250, ymax=8e3,
+      ytick={300, 500, 1000, 2000, 3000, 5000},
+      xlabel={$L$ (\si{\meter})},
+      ylabel={$E_\mathrm{s}$ (\si{\kilo\volt\per\meter})},
+      boxedlegend,
+      legend style={at={(0.97, 0.97)}, anchor=north east, legend columns=1},
+    ]
+    % Incept1D: lines, one colour per radius.  The paper: normal modes as
+    % open markers (wide region only), time-dependent model dotted.
+    \addplot[solver, blue] table[x expr=\thisrowno{2}/1000, y expr=\thisrowno{5}/1000] {sim.dat};
+    \addlegendentry{Incept1D, $R = \SI{5}{\kilo\meter}$};
+    \addplot[solver, red] table[x expr=\thisrowno{12}/1000, y expr=\thisrowno{15}/1000] {sim.dat};
+    \addlegendentry{Incept1D, $R = \SI{100}{\meter}$};
+    \IfFileExists{paper.dat}{%
+      \addplot[nme, black] table[x index=0, y index=3] {paper.dat};
+      \addlegendentry{paper, normal modes, $R = \SI{5}{\kilo\meter}$};
+      \addplot[timedep, blue, forget plot] table[x index=0, y index=4] {paper.dat};
+      \addplot[timedep, red, forget plot] table[x index=0, y index=5] {paper.dat};
+      \addplot[timedep, black] coordinates {(1e-9,1e-9)};
+      \addlegendentry{paper, time-dependent};}{}
+
+    % Runaway avalanche threshold and conventional breakdown.
+    \addplot[thick, dashed, gray, forget plot] coordinates {(10,284) (1.2e4,284)};
+    \addplot[thick, dotted, gray, forget plot] coordinates {(10,3000) (1.2e4,3000)};
+  \end{axis}
+
+  % The paper relative to Incept1D at the same L.
+  \IfFileExists{paper.dat}{%
+  \begin{axis}[
+      panel,
+      xmode=log,
+      at={(top.south west)},
+      anchor=north west,
+      yshift=-1.9cm,
+      height=4.5cm,
+      ymin=-8, ymax=1,
+      ytick={-8, -6, -4, -2, 0},
+      xlabel={$L$ (\si{\meter})},
+      ylabel={paper vs Incept1D (\si{\percent})},
+    ]
+    \addplot[nme, black] table[x index=0, y expr=100*(\thisrowno{3}/\thisrowno{1}-1)] {paper.dat};
+    \addplot[timedep, blue] table[x index=0, y expr=100*(\thisrowno{4}/\thisrowno{1}-1)] {paper.dat};
+    \addplot[timedep, red] table[x index=0, y expr=100*(\thisrowno{5}/\thisrowno{2}-1)] {paper.dat};
+  \end{axis}}{}
+\end{tikzpicture}
+\end{document}
