@@ -86,6 +86,8 @@ ELECTRON = "e"
 TOTAL_DENSITY = "M"
 #: Largest difference between the gas mixture and a table's recorded one.
 MIXTURE_TOL = 1e-3
+#: Largest difference between the sum of the mole fractions and 1.
+SUM_TOL = 1e-9
 #: Gas temperature difference [K] from a table's above which a warning is given.
 TEMPERATURE_TOL = 20.0
 
@@ -201,7 +203,8 @@ class DeclarativeMechanism:
                 _keys(config[side], set(self._parameters), where)
                 self._polarity[side] = self._overrides(config[side], where)
         self._compile()
-        self._multipliers = self._read_multipliers(config.get("reaction_multipliers"))
+        self._multiplier_config = config.get("reaction_multipliers")
+        self._multipliers = self._read_multipliers(self._multiplier_config)
         self._last = None
 
     # --- reading -------------------------------------------------------------
@@ -360,7 +363,7 @@ class DeclarativeMechanism:
         self._fractions = {c: e(self._constants) for c, e in self._gas.items()}
         if self._fractions:
             bad = {c: x for c, x in self._fractions.items() if not 0.0 <= x <= 1.0}
-            if bad or abs(sum(self._fractions.values()) - 1.0) > MIXTURE_TOL:
+            if bad or abs(sum(self._fractions.values()) - 1.0) > SUM_TOL:
                 raise MechanismFileError(
                     f"{src}: gas mole fractions {self._fractions} must lie in [0, 1] "
                     f"and sum to 1"
@@ -626,7 +629,12 @@ class DeclarativeMechanism:
     # --- evaluating ----------------------------------------------------------
 
     def _env(self, EN, p, T):
-        """All variables at (EN, p, T); the last one is kept."""
+        """
+        All variables at (EN, p, T).  The last set is kept and returned again
+        for the same (EN, p, T), shared: one cache per object, so an object
+        is not to be used from several threads at once (the solver's workers
+        are forked processes, each with its own copy).
+        """
         key = (EN, p, T)
         if self._last is not None and self._last[0] == key:
             return self._last[1]
@@ -698,7 +706,16 @@ class DeclarativeMechanism:
     def get_gamma_plus_with(
         self, EN, p, T, gamma0=None, gamma1=None, eref=None, beta=None
     ):
-        """As :meth:`get_gamma_plus`; per-polarity values come from :meth:`resolve`."""
+        """
+        As :meth:`get_gamma_plus`.  The yields of a mechanism file are its
+        formulas; values for one polarity come from :meth:`resolve`, so
+        passing any here is an error rather than silently ignored.
+        """
+        if any(v is not None for v in (gamma0, gamma1, eref, beta)):
+            raise TypeError(
+                "a mechanism file's yields are set by its parameters; use a "
+                "configuration ('positive' / 'negative') and resolve()"
+            )
         return self.get_gamma_plus(EN, p, T)
 
     # --- photons -------------------------------------------------------------
@@ -797,6 +814,6 @@ class DeclarativeMechanism:
         config = {k: self._values[k] for k in self._configured}
         config.update(self._polarity[side])
         config["label"] = self.label
-        resolved = DeclarativeMechanism(self._spec, config, self._source)
-        resolved._multipliers = self._multipliers
-        return resolved
+        if self._multiplier_config is not None:
+            config["reaction_multipliers"] = self._multiplier_config
+        return DeclarativeMechanism(self._spec, config, self._source)

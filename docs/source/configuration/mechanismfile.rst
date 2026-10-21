@@ -107,14 +107,11 @@ Optional interface
        group radiates in.  Radiation that differs between the two directions
        is one group per direction.  Omitted, every group radiates both ways
        (:eq:`eq_two_stream_directional`).
-   * - ``init_photoionization(ngroups, cone_angle_deg)``
-     - Called by ``Config.post_exec_init`` to (re)build the photon groups.
    * - ``REACTIONS``
      - The declarative reaction list; read by
        ``incept1d chombo`` to export raw rate coefficients.
-   * - ``ElectronMeanEnergy(EN)``, ``ElectronMobility(EN)``,
-       ``ElectronDiffusion(EN)``, ``<Ion>Mobility(EN)`` …
-     - Transport helpers used by ``incept1d chombo``.
+   * - ``ElectronMeanEnergy(EN)``
+     - Mean electron energy [eV]; read by ``incept1d chombo``.
 
 Configuration hooks
 -------------------

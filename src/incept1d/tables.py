@@ -112,7 +112,20 @@ def _rows(lines, start):
         if not vals or not vals[0].lstrip("-").isdigit():
             break
         rows.append([float(v) for v in vals])
+    if len({len(r) for r in rows}) > 1:
+        raise TableError(f"rows of unequal length after line {start}")
     return np.array(rows)
+
+
+def _check_width(path, section, data, columns):
+    """Raise TableError unless *data* has rows with at least *columns* columns."""
+    if data.ndim != 2 or len(data) == 0:
+        raise TableError(f"{path}: the {section} section has no data rows")
+    if data.shape[1] < columns:
+        raise TableError(
+            f"{path}: the {section} section has {data.shape[1]} columns, but its "
+            f"header names {columns}"
+        )
 
 
 def _read_bolsig(path, table):
@@ -144,6 +157,7 @@ def _read_bolsig(path, table):
         raise TableError(f"{path}: no transport section ('R#  E/N (Td)  A1 ...')")
     labels = lines[head].split("E/N (Td)", 1)[1].split()
     data = _rows(lines, head + 1)
+    _check_width(path, "transport", data, 2 + len(labels))
     for k, label in enumerate(labels):
         table._columns[label] = (data[:, 1], data[:, 2 + k])
 
@@ -161,6 +175,7 @@ def _read_bolsig(path, table):
         ln = lines[i]
         if ln.startswith("R#") and "E/N" in ln:
             data = _rows(lines, i + 1)
+            _check_width(path, "rate coefficient", data, 3)
             break
         parts = ln.split()
         if parts and parts[0].startswith("C") and parts[0][1:].isdigit():

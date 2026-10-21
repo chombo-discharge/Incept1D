@@ -388,3 +388,57 @@ def test_pancheshnyi_json_meets_the_air_reference_values(pd_mm, EN_expected):
         det_fn=det,
     )
     assert roots[0] == pytest.approx(EN_expected, rel=1e-5)
+
+
+# --- points from the review of #17 -------------------------------------------
+
+
+@pytest.mark.parametrize("text", ["exp(1, 2)", "min(1)", "max(1, 2, 3)", "sqrt()"])
+def test_a_call_with_the_wrong_number_of_arguments_is_refused(text):
+    """D22: arity is checked when the file is loaded, not at the first call."""
+    with pytest.raises(ExpressionError, match="argument"):
+        Expression(text, [])
+
+
+def test_mole_fractions_must_sum_to_one_exactly():
+    """D23: 1e-3 is for matching a table's recorded mixture, not for the sum."""
+    with pytest.raises(MechanismFileError, match="sum to 1"):
+        _air(config={"x_n2": 0.79, "x_o2": 0.2105})
+
+
+def test_multipliers_do_not_scale_the_photon_source():
+    """D24: photons follow the source reactions' rates before multipliers."""
+    key = "e + N2 -> 2e + N2+"
+    base, off = _air(), _air(config={"reaction_multipliers": {key: 0.0}})
+    EN, p, T = 150.0, 1.0, 300.0
+    np.testing.assert_array_equal(off.get_C(EN, p, T), base.get_C(EN, p, T))
+    assert off.get_R(EN, p, T)[1, 0] == 0.0 != base.get_R(EN, p, T)[1, 0]
+
+
+def test_yields_are_not_overridden_through_the_python_hook():
+    """D25: per-polarity yields come from resolve(), never silently ignored."""
+    m = _mech()
+    assert m.get_gamma_plus_with(100.0, 1.0, 300.0)[0] == 1e-3
+    with pytest.raises(TypeError, match="resolve"):
+        m.get_gamma_plus_with(100.0, 1.0, 300.0, gamma0=0.1)
+
+
+def test_resolve_keeps_the_multipliers():
+    """D26: a polarity override does not lose the configuration's multipliers."""
+    cfg = {
+        "reaction_multipliers": {"e + O2 -> O- + O": 0.0},
+        "negative": {"gamma0": 0.1},
+    }
+    m = _mech(config=cfg).resolve(False)
+    assert m.get_R(120.0, 1.0, 300.0)[2, 0] == 0.0
+    assert m.get_gamma_plus(120.0, 1.0, 300.0)[0] == 0.1
+
+
+def test_a_truncated_table_is_named(tmp_path):
+    """D27: a malformed BOLSIG+ file is a TableError naming it, not an IndexError."""
+    from incept1d.tables import TableError, read_table
+
+    bad = tmp_path / "bad.txt"
+    bad.write_text("R#    E/N (Td)      A1          A2\n1  10.0  1.5\n2  20.0  2.5\n")
+    with pytest.raises(TableError, match="bad.txt"):
+        read_table(str(bad), "bolsig+")

@@ -140,7 +140,7 @@ class Mechanism:
     def get_kappa(self, p, T):
         return self._mod.get_kappa(p, T)
 
-    # Read on use: init_photoionization may rebuild the groups after loading.
+    # Read on use, so a module may set it after loading.
     @property
     def PHOTON_DIRECTIONS(self):
         return getattr(self._mod, "PHOTON_DIRECTIONS", None)
@@ -167,10 +167,6 @@ class Mechanism:
 
     def get_Pi_minus(self):
         return self._mod.get_Pi_minus()
-
-    def init_photoionization(self, ngroups=3, cone_angle_deg=2.0):
-        if hasattr(self._mod, "init_photoionization"):
-            self._mod.init_photoionization(ngroups, cone_angle_deg)
 
 
 #: Attributes that every mechanism module must expose.

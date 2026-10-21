@@ -24,6 +24,12 @@ import ast
 
 import numpy as np
 
+#: How many arguments each function takes.
+ARITY = {
+    name: 1 for name in ("exp", "log", "log10", "sqrt", "abs", "tanh", "cos", "sin")
+}
+ARITY.update(min=2, max=2)
+
 #: Functions an expression may call, by name.
 FUNCTIONS = {
     "exp": np.exp,
@@ -149,6 +155,11 @@ def _check(node, allowed, used, callees, where, text):
         ):
             raise ExpressionError(
                 f"{where}: only {sorted(FUNCTIONS)} may be called, in {text!r}"
+            )
+        if len(node.args) != ARITY[node.func.id]:
+            raise ExpressionError(
+                f"{where}: {node.func.id} takes {ARITY[node.func.id]} argument(s), "
+                f"got {len(node.args)}, in {text!r}"
             )
         return
     if isinstance(node, ast.Name):

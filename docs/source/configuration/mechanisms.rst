@@ -121,12 +121,13 @@ Formulas
 A coefficient is a formula in a string, ``"1.24e-17*exp(-(259/(14.6 + EN))**2)"``,
 or a plain number.  A formula may use numbers, names, the operators
 ``+ - * / **``, parentheses, and the functions ``exp``, ``log``, ``log10``,
-``sqrt``, ``abs``, ``tanh``, ``cos``, ``sin``, ``min`` and ``max``.
-Nothing else is allowed — no comparisons, conditionals, attributes or other
-calls — so a formula computes a number and cannot do anything else; a
-threshold is written with ``max`` or ``min``.  Arithmetic follows IEEE
-floating point: a division by zero gives infinity and :math:`e^{-\infty}`
-gives zero, rather than an error.
+``sqrt``, ``abs``, ``tanh``, ``cos``, ``sin`` (one argument each), ``min``
+and ``max`` (two).  Nothing else is allowed — no comparisons, conditionals,
+attributes or other calls — so a formula computes a number and cannot do
+anything else; a threshold is written with ``max`` or ``min``.  Arithmetic
+follows IEEE floating point: a division by zero gives infinity and
+:math:`e^{-\infty}` gives zero, rather than an error, while an undefined
+result such as :math:`0/0` is NaN and is warned about.
 
 The names a formula may use are, in order of definition:
 
@@ -189,7 +190,8 @@ Gas
    "gas": {"A": "1 - x_b", "B": "x_b"}
 
 The mole fraction of each neutral component, as a formula of the
-parameters.  The fractions must lie in :math:`[0, 1]` and sum to 1.  Each
+parameters.  The fractions must lie in :math:`[0, 1]` and sum to 1 to within
+:math:`10^{-9}`.  Each
 defines ``x_<component>`` for the formulas, and the component names are
 what reactions use for neutral partners.
 
