@@ -26,6 +26,7 @@ import sys
 
 import numpy as np
 
+from incept1d.constants import kB
 from incept1d.fields import FieldDistribution
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
@@ -34,7 +35,9 @@ from incept1d.solver import riccati_criterion
 
 MECHANISM = "mechanisms/air/rfd/air_rfd.py"
 CONFIGS = "mechanisms/air/rfd/radius.json"
-P, T = 1.01325, 293.15  # the mechanism's sea-level reference: n~ = 1
+#: Sea level, n~ = 1, as in the paper: the authors' density 2.688e25 m^-3.
+T = 273.15
+P = 2.688e25 * kB * T / 1e5
 
 #: The archive's files: normal modes in V/m, time-dependent model in units of E_t.
 NME_WIDE = "eselfsus-vs-L-from-determinant-photons-and-positrons.npz"

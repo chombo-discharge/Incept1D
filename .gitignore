@@ -44,7 +44,6 @@ env/
 # Example outputs (written by the commands in examples/*/README.md)
 examples/**/sim*.dat
 examples/paschen/closed_form.dat
-examples/rfd/normal_modes.dat
 examples/rfd/paper.dat
 examples/fieldline/line_*.csv
 

@@ -12,12 +12,14 @@ again: that is the point.
 | `coaxial/`   | Corona inception on a wire in a cylinder                   | none needed (self-contained)              |
 | `iec60052/`  | Standard sphere gaps                                       | IEC 60052 tables (not included)           |
 | `electra/`   | Quasi-uniform gaps over five decades of `pd`               | Dakin et al., ELECTRA 32 (not included)   |
-| `rfd/`       | Relativistic feedback in a thundercloud                    | normal modes, computed alongside          |
+| `rfd/`       | Relativistic feedback in a thundercloud                    | Færder et al., Zenodo (not included)      |
 
 **The IEC 60052 and ELECTRA reference tables are not part of this
 repository.** They are copyrighted by the IEC and by CIGRE respectively.
-Each of those READMEs explains where to obtain them and what to name the
-file if you want the comparison overlay; the figures build without them.
+Nor are the published results of Færder et al. for `rfd/`, which their
+authors distribute themselves. Each of those READMEs explains where to
+obtain them and what to name the file if you want the comparison overlay;
+the figures build without them.
 
 The commands write their results (`sim*.dat`) into the example's own
 directory. Those files are outputs and are not committed.

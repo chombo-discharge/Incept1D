@@ -28,14 +28,14 @@ positron enters at x = d, and nothing is emitted at x = 0
 
 Field and density
 -----------------
-The paper gives every coefficient at the field magnitude E and the air
-density relative to sea level, n~, with every threshold field scaling as n~
-(E_t = 284 kV/m n~).  Here each coefficient is the paper's function of the
-sea-level-equivalent field E / n~, times n~, so that it depends only on E/N
-and the inception curve only on p d, as for every other mechanism.  At
-n~ = 1 this is the paper's expression exactly.  The sea-level number density
-N0 that sets n~ = N / N0, and with it the conversion between E/N and E,
-defaults to 1 atm and 293.15 K (``config.py``).
+The paper gives every coefficient at sea-level density, where all its
+results are, and scales only the avalanche thresholds with the air density
+relative to sea level, n~ (E_t = 284 kV/m n~).  Off sea level this module
+does what the authors' code does (doi:10.5281/zenodo.22983026): the
+avalanche length is U_R / (E - n~ E_d), and every other coefficient is its
+sea-level function of the field E itself, times n~.  The sea-level number
+density N0 that sets n~ = N / N0 is the authors' 2.688e25 m^-3
+(``config.py``); at it, n~ = 1 and every coefficient is the paper's.
 
 Coefficients [1/m, at n~ = 1; E in V/m]
 -----------------------------------------
@@ -69,7 +69,7 @@ PHOTON_DIRECTIONS = ["forward", "backward"]
 
 # Injected by config.py before this module executes.
 #: Sea-level number density [m^-3] that n~ = N / N0 is relative to.
-_N0 = globals().get("_N0", 101325.0 / (kB * 293.15))
+_N0 = globals().get("_N0", 2.688e25)
 #: Photon attenuation lengths at n~ = 1 [m], forward and backward (S7).
 _LAMBDA_A_FWD = globals().get("_LAMBDA_A_FWD", 307.64)
 _LAMBDA_A_BCK = globals().get("_LAMBDA_A_BCK", 92.22)
@@ -141,14 +141,14 @@ def relative_density(p=1.0, T=293.0):
     return _N(p, T) / _N0
 
 
-def sea_level_field(EN):
-    """E / n~ [V/m], the field at sea-level density with the same E/N."""
-    return EN * 1e-21 * _N0
-
-
 def E_field(EN, p=1.0, T=293.0):
     """Electric field [V/m] from the reduced field EN [Td]."""
     return EN * 1e-21 * _N(p, T)
+
+
+def _avalanche(E, n):
+    """1/lambda [1/m] at field E, density n: (E - n E_d) / U_R, branch at n E_t."""
+    return n * inv_avalanche_length(E / n)
 
 
 # --- interface ----------------------------------------------------------------
@@ -167,16 +167,12 @@ def get_R(EN, p=1.0, T=293.0, multipliers=None):
     positrons at P_bb; positrons are lost at 1/lambda_a,pos.
     """
     n = relative_density(p, T)
-    E = sea_level_field(EN)
-    return (
-        C_TILDE
-        * n
-        * np.array(
-            [
-                [inv_avalanche_length(E), P_bb(E)],
-                [0.0, -inv_positron_attenuation(E)],
-            ]
-        )
+    E = E_field(EN, p, T)
+    return C_TILDE * np.array(
+        [
+            [_avalanche(E, n), n * P_bb(E)],
+            [0.0, -n * inv_positron_attenuation(E)],
+        ]
     )
 
 
@@ -186,7 +182,7 @@ def get_B(EN, p=1.0, T=293.0):
     positrons from the forward one by pair production.
     """
     n = relative_density(p, T)
-    E = sea_level_field(EN)
+    E = E_field(EN, p, T)
     return n * np.array([[P_cp_fwd(E), P_cp_bck(E)], [P_PP_FWD, 0.0]])
 
 
@@ -229,53 +225,3 @@ def get_gamma_plus_with(EN, p, T, gamma0=None, gamma1=None, eref=None, beta=None
 def get_gamma_Psi(EN, p=1.0, T=293.0):
     """No emission at x = 0 by arriving photons."""
     return np.zeros(2)
-
-
-# --- normal modes, for the documentation and the example ---------------------
-
-
-def mode_matrix(E, n=1.0):
-    """
-    M of dn/dz = M n for the steady state, n = (n_r, n_pos, n_up, n_down).
-
-    The model equations with the time derivatives dropped, in the paper's
-    density variables, at field E [V/m] and relative density n.
-    """
-    Er = E / n
-    return n * np.array(
-        [
-            [inv_avalanche_length(Er), P_bb(Er), P_cp_fwd(Er), P_cp_bck(Er)],
-            [0.0, inv_positron_attenuation(Er), -P_PP_FWD, 0.0],
-            [P_BR_FWD, 0.0, -1.0 / _LAMBDA_A_FWD, 0.0],
-            [-P_BR_BCK, 0.0, 0.0, 1.0 / _LAMBDA_A_BCK],
-        ]
-    )
-
-
-def normal_mode_threshold(L, n=1.0, E_lo=285e3, E_hi=6e6, n_scan=2000):
-    """
-    Self-sustained field E_s [V/m] of a region of length L [m], by normal modes.
-
-    The steady state is a sum of modes v_j e^{kappa_j z}.  With nothing
-    entering, n_r(0) = n_up(0) = n_pos(L) = n_down(L) = 0, which a
-    non-trivial combination satisfies where the determinant of the modes'
-    boundary values vanishes.  Divided by det [v_1 ... v_4] that determinant
-    is real and does not depend on how the modes are scaled or ordered.
-    Returns the lowest sign change in [E_lo, E_hi] (n~ E_lo ... n~ E_hi), or
-    NaN if there is none.
-    """
-    import scipy.optimize
-
-    def g(E):
-        kappa, W = np.linalg.eig(mode_matrix(E, n))
-        shift = np.maximum(kappa.real, 0.0) * L
-        s, at_L = np.exp(-shift), np.exp(kappa * L - shift)
-        A = np.vstack([W[0] * s, W[2] * s, W[1] * at_L, W[3] * at_L])
-        return float(np.real(np.linalg.det(A) / np.linalg.det(W)))
-
-    grid = n * np.linspace(E_lo, E_hi, n_scan)
-    values = [g(E) for E in grid]
-    for a, b, ga, gb in zip(grid, grid[1:], values, values[1:]):
-        if ga * gb < 0.0:
-            return scipy.optimize.brentq(g, a, b, xtol=1e-10, rtol=1e-14)
-    return float("nan")

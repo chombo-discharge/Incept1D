@@ -24,58 +24,30 @@ Running the calculation
 -----------------------
 
 The two radii of the high-field region in the paper are two configurations,
-so one invocation produces both curves.  At fixed pressure :math:`pd` is
-:math:`L`; the range is :math:`L` = 25 m to 5 km at sea level:
+so one invocation produces both curves.  The paper's results are all at sea
+level, which is the authors' sea-level density
+:math:`2.688\times10^{25}` m\ :sup:`-3`: ``--p 1.01371 --T 273.15``.  At
+fixed pressure :math:`pd` is :math:`L`; the range is :math:`L` = 10 m to
+12 km, as in the paper:
 
 .. code-block:: bash
 
    incept1d pdiv mechanisms/air/rfd/air_rfd.py mechanisms/air/rfd/radius.json \
-       --p 1.01325 --T 293.15 \
-       --pd-min 2.5e4 --pd-max 5e6 --pd-num 60 \
+       --p 1.01371 --T 273.15 \
+       --pd-min 1e4 --pd-max 1.2e7 --pd-num 80 \
        --write-to-file examples/rfd/sim.dat
 
-``examples/rfd/normal_modes.py`` tabulates the normal-mode solution of the
-same model (:eq:`eq_rfd_normal_modes`) from the same coefficients, so the
-comparison checks the solver against the model rather than the model against
-anything else.
-
-Result
-------
-
-.. _fig_rfd:
-
-.. figure:: ../figures/rfd.*
-   :width: 100%
-   :align: center
-
-   Self-sustained field of relativistic feedback against the length of the
-   high-field region, at sea-level density.  Lines are the ``Incept1D``
-   solution; circles are the normal-mode solution of the same model.
-   Dashed: the runaway avalanche threshold :math:`E_\mathrm{t}`; dotted:
-   conventional breakdown, 3 MV/m.
-
-The two agree to solver tolerance; the test suite asserts a relative error
-below :math:`10^{-8}` with both criteria, and that the field reaches 3 MV/m
-between 22 and 24 m, where the paper places it.  The curve has two limits:
-
-* **Short regions** need conventional breakdown fields: the loop has no
-  room to close, and :math:`E_\mathrm{s}` reaches 3 MV/m near
-  :math:`L = 23` m.
-* **Long regions** approach 305.4 kV/m, the field where positrons start to
-  make runaway electrons by Bhabha scattering, slightly above the avalanche
-  threshold :math:`E_\mathrm{t} = 284` kV/m.
-
-A region 100 m across needs a slightly higher field than a wide one,
-because photons escape it sideways; the difference is a few per cent.
+The test suite checks the solver against the normal-mode solution of the
+same model (:eq:`eq_rfd_normal_modes`), transcribed independently, to a
+relative error below :math:`10^{-8}` with both criteria.
 
 Comparison with the paper
 -------------------------
 
-The figure above checks the solver against its own model.  The paper's
-published results are a separate check: the authors' code and data are on
-Zenodo, `doi:10.5281/zenodo.22983026
-<https://doi.org/10.5281/zenodo.22983026>`_ (CC-BY 4.0), and are not
-distributed with this repository.  With the archive unpacked,
+The paper's published results are not distributed with this repository.
+The authors' code and data are on Zenodo, `doi:10.5281/zenodo.22983026
+<https://doi.org/10.5281/zenodo.22983026>`_ (CC-BY 4.0).  With the archive
+unpacked,
 
 .. code-block:: bash
 
@@ -84,7 +56,10 @@ distributed with this repository.  With the archive unpacked,
        examples/rfd/paper.dat
 
 reads two kinds of their results, solves the same thresholds with
-``Incept1D`` at the same :math:`L`, and writes both to one table:
+``Incept1D`` at the same :math:`L`, and writes both to one table.  With
+``paper.dat`` in place, the figure below adds their results and a panel
+with the difference; without it, the figure shows the ``Incept1D`` curves
+alone, as in the published documentation.
 
 * **Normal modes** (wide region): the steady-state threshold of the same
   model, found on a 100 V/m grid of fields.  ``Incept1D`` agrees with it to
@@ -102,18 +77,41 @@ reads two kinds of their results, solves the same thresholds with
   region already grows strongly, and the steady-state threshold cannot
   lie below the 305.4 kV/m where positrons start to feed back.
 
-The comparison figure is not built with the documentation, because the data
-is not in the repository; with ``paper.dat`` in place,
+Result
+------
 
-.. code-block:: bash
+.. _fig_rfd:
 
-   make -C docs/figures rfdpaper
+.. figure:: ../figures/rfd.*
+   :width: 100%
+   :align: center
 
-writes ``docs/source/figures/rfdpaper.pdf`` and ``.png``.
+   Self-sustained field of relativistic feedback against the length of the
+   high-field region, at sea-level density.  Lines are the ``Incept1D``
+   solution for both radii.  Dashed: the runaway avalanche threshold
+   :math:`E_\mathrm{t}`; dotted: conventional breakdown, 3 MV/m.  When the
+   reader has supplied the paper's results, circles are their normal modes,
+   dotted lines their time-dependent model, and the lower panel the
+   difference from ``Incept1D`` at the same :math:`L`.
+
+The field reaches 3 MV/m between 22 and 24 m, where the paper places it.
+The curve has two limits:
+
+* **Short regions** need conventional breakdown fields: the loop has no
+  room to close, and :math:`E_\mathrm{s}` reaches 3 MV/m near
+  :math:`L = 23` m.
+* **Long regions** approach 305.4 kV/m, the field where positrons start to
+  make runaway electrons by Bhabha scattering, slightly above the avalanche
+  threshold :math:`E_\mathrm{t} = 284` kV/m.
+
+A region 100 m across needs a slightly higher field than a wide one,
+because photons escape it sideways; the difference is a few per cent.
 
 Altitude
 --------
 
-Every coefficient scales with the air density, so at altitude the field at
-threshold scales with the density too, and :math:`E/N` against :math:`pd` is
-the same curve.  Lowering ``--p`` shows it.
+Lowering ``--p`` lowers the relative density :math:`\tilde{n}`.  The model
+is then the authors' (:ref:`Chap:RFDScheme`): the avalanche thresholds scale
+with :math:`\tilde{n}`, and every other coefficient is its sea-level
+function of the field times :math:`\tilde{n}`.  The paper publishes
+sea-level results only, so nothing off sea level is checked against it.

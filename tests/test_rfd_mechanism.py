@@ -8,8 +8,10 @@ The relativistic feedback discharge mechanism, ``mechanisms/air/rfd/``.
 Feedback closes entirely in the gas: nothing is emitted at either end, one
 photon group radiates forward and one backward, and positrons carry the rest
 back.  The threshold is checked against the normal-mode solution of the
-same model (:mod:`closed_form_rfd`, independent of the solver), against the
-numbers the paper states, and against the invariants of the model.
+same model (:mod:`closed_form_rfd`, independent of the solver), at sea level
+and with the authors' scaling off it, against the numbers the paper states,
+against the paper's published results when supplied, and against the
+invariants of the model.
 """
 
 import functools
@@ -19,6 +21,7 @@ import numpy as np
 import pytest
 
 import closed_form_rfd as cf
+from incept1d.constants import kB
 from incept1d.fields import FieldDistribution
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism, read_json_configs
@@ -28,7 +31,9 @@ ROOT = Path(__file__).resolve().parent.parent
 RFD = ROOT / "mechanisms" / "air" / "rfd"
 MECHANISM = str(RFD / "air_rfd.py")
 UNIFORM = FieldDistribution("uniform")
-P0, T0 = 1.01325, 293.15  # the default sea-level reference: n~ = 1
+#: Sea level, n~ = 1: the authors' density 2.688e25 m^-3, the mechanism's default.
+T0 = 273.15
+P0 = 2.688e25 * kB * T0 / 1e5
 
 
 def _load(cfg=None):
@@ -47,25 +52,30 @@ def _threshold(mod, L, p=P0, T=T0, criterion=riccati_criterion):
     return mod._mod.E_field(roots[0], p, T)
 
 
-def _reference(mod, L):
-    """Normal-mode threshold [V/m] from the mechanism's coefficients, at n~ = 1."""
+def _reference(mod, L, n=1.0):
+    """
+    Normal-mode threshold [V/m] at relative density n, scaled as the authors'
+    code does: avalanche length U_R / (E - n E_d) with the branch at n E_t,
+    every other coefficient its sea-level function of E, times n.
+    """
     m = mod._mod
 
     def M_of_E(E):
+        E_d = 276e3 if E >= 284e3 * n else 320e3
         return cf.mode_matrix(
-            m.inv_avalanche_length(E),
-            m.P_bb(E),
-            m.P_cp_fwd(E),
-            m.P_cp_bck(E),
-            m.P_PP_FWD,
-            m.inv_positron_attenuation(E),
-            m.P_BR_FWD,
-            m.P_BR_BCK,
-            1.0 / m._LAMBDA_A_FWD,
-            1.0 / m._LAMBDA_A_BCK,
+            (E - n * E_d) / 7.3e6,
+            n * m.P_bb(E),
+            n * m.P_cp_fwd(E),
+            n * m.P_cp_bck(E),
+            n * m.P_PP_FWD,
+            n * m.inv_positron_attenuation(E),
+            n * m.P_BR_FWD,
+            n * m.P_BR_BCK,
+            n / m._LAMBDA_A_FWD,
+            n / m._LAMBDA_A_BCK,
         )
 
-    return cf.threshold(M_of_E, L, 285e3, 6e6, n_scan=2000)
+    return cf.threshold(M_of_E, L, 285e3 * n, 6e6, n_scan=2000)
 
 
 @pytest.mark.parametrize("label", ["R >> L", "R = 100 m"])
@@ -76,15 +86,6 @@ def test_threshold_matches_normal_modes(label, criterion, L):
     mod = _load(_radius_configs()[label])
     assert _threshold(mod, L, criterion=criterion) == pytest.approx(
         _reference(mod, L), rel=1e-8
-    )
-
-
-@pytest.mark.parametrize("L", [25.0, 300.0, 5000.0])
-def test_mechanism_normal_modes_match_the_reference(L):
-    """RFD2: the mechanism's own closed form, used by the example figure."""
-    mod = _load()
-    assert mod._mod.normal_mode_threshold(L) == pytest.approx(
-        _reference(mod, L), rel=1e-10
     )
 
 
@@ -114,14 +115,16 @@ def test_narrow_region_needs_a_slightly_higher_field():
         assert 1.0 < ratio < 1.05
 
 
-def test_threshold_depends_on_E_over_N_and_pd_only():
-    """RFD6: every coefficient scales with n~, so E/N at threshold is set by N d."""
+@pytest.mark.parametrize("L", [100.0, 1000.0])
+def test_off_sea_level_follows_the_authors_scaling(L):
+    """
+    RFD6: at half the sea-level density the solver gives the normal-mode
+    threshold of the model scaled as the authors' code scales it.
+    """
     mod = _load()
-    det = functools.partial(riccati_criterion, field_dist=UNIFORM)
-    pd = P0 * 200.0
-    sea = find_all_breakdown_EN(pd, mod, P0, T0, first_only=True, det_fn=det)
-    thin = find_all_breakdown_EN(pd, mod, 0.4, T0, first_only=True, det_fn=det)
-    assert thin[0] == pytest.approx(sea[0], rel=1e-9)
+    assert _threshold(mod, L, p=P0 / 2) == pytest.approx(
+        _reference(mod, L, n=0.5), rel=1e-8
+    )
 
 
 def test_nothing_enters_and_photons_are_one_way():

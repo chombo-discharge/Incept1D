@@ -19,7 +19,7 @@ feedback that closes entirely in the gas, with nothing emitted at either end.
 
    mechanisms/air/rfd/
    ├── air_rfd.py     the mechanism module
-   ├── config.py      attenuation lengths and the sea-level reference density
+   ├── config.py      attenuation lengths and the sea-level density
    └── radius.json    the two radii of the high-field region in the paper
 
 The model
@@ -103,16 +103,18 @@ only as a pole of the reflection operator (:ref:`Chap:Numerics:Riccati`).
 Field and density
 -----------------
 
-The paper gives every coefficient as a function of the field magnitude
-:math:`E` at sea-level density, scaled by the relative density
-:math:`\tilde{n}`, with every threshold field scaling as :math:`\tilde{n}`.
-The mechanism evaluates each one at the sea-level-equivalent field
-:math:`E/\tilde{n}` and multiplies by :math:`\tilde{n}`, which is the paper's
-expression at :math:`\tilde{n} = 1` and depends only on :math:`E/N`
-elsewhere, so the curve depends only on :math:`N d` like every other
-mechanism's.  The reference density :math:`N_0` with
-:math:`\tilde{n} = N/N_0` sets the conversion between :math:`E/N` and
-:math:`E`; it defaults to 1 atm and 293.15 K and is a configuration key.
+The paper gives every coefficient at sea-level density, where all its
+results are, and scales only the avalanche thresholds with the air density
+relative to sea level, :math:`\tilde{n}` (:math:`E_\mathrm{t} = 284\,
+\tilde{n}` kV/m).  Off sea level the mechanism does what the authors' code
+does [Faerder2026b]_: the avalanche length is
+:math:`U_\mathrm{R}/(E - \tilde{n}E_\mathrm{d})`, with the branch at
+:math:`\tilde{n}E_\mathrm{t}`, and every other coefficient is its sea-level
+function of the field :math:`E` itself, times :math:`\tilde{n}`.  The curve
+therefore depends on the pressure as well as on :math:`pd`.  The sea-level
+number density :math:`N_0` with :math:`\tilde{n} = N/N_0` is the authors'
+:math:`2.688\times10^{25}` m\ :sup:`-3`, a configuration key
+(``sea_level_density``); at it every coefficient is the paper's.
 
 Coefficients
 ------------
@@ -188,9 +190,9 @@ whose solutions are sums of modes :math:`\vec{v}_j e^{\kappa_j z}`,
 admit a non-trivial combination where the determinant of the modes'
 boundary values vanishes; divided by :math:`\det[\vec{v}_1 \cdots
 \vec{v}_4]`, that determinant is real and does not depend on how the modes
-are scaled or ordered.  ``normal_mode_threshold`` in the mechanism module
-evaluates it, and is what the example compares the solver against
-(:ref:`Chap:Examples:RFD`).  The :math:`(3,3)` entry is written from the
+are scaled or ordered.  ``tests/closed_form_rfd.py`` evaluates it,
+independently of the solver, and the test suite compares the solver against
+it (:ref:`Chap:Examples:RFD`).  The :math:`(3,3)` entry is written from the
 model equations; it is :math:`-\lambda_{\mathrm{a}\uparrow}^{-1}`, as the
 forward photons are attenuated, and so it is in the authors' own
 normal-mode code.
