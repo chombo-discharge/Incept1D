@@ -32,6 +32,8 @@ FUNCTIONS = {
     "sqrt": np.sqrt,
     "abs": np.abs,
     "tanh": np.tanh,
+    "cos": np.cos,
+    "sin": np.sin,
     "min": np.minimum,
     "max": np.maximum,
 }

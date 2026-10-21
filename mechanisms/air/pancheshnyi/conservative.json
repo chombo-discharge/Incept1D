@@ -3,12 +3,18 @@
     {
         "label": "Optimistic",
         "cross_sections": "../lxcat/phelps.txt",
+        "x_n2": 0.8,
+        "x_o2": 0.2,
+        "_mixture": "phelps.txt does not record its gas mixture; N2 0.8, O2 0.2 is assumed",
         "gamma0": 1E-3,
         "gamma1": 0.0
     },
     {
         "label": "Conservative",
         "cross_sections": "../lxcat/biagi.txt",
+        "x_n2": 0.8,
+        "x_o2": 0.2,
+        "_mixture": "biagi.txt does not record its gas mixture; N2 0.8, O2 0.2 is assumed",
         "gamma0": 1E-1,
         "gamma1": 0.1
     }

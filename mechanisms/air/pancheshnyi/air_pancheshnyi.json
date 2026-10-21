@@ -1,0 +1,96 @@
+{
+    "format": "incept1d-mechanism/1",
+    "description": "Air: electrons, N2+, O2+, O-, O2-, O3-, with electron transport and rates from BOLSIG+, ion conversion and detachment after Pancheshnyi, and two-stream photoionization fitted to the Zheleznyak absorption curve.  The reaction scheme is table tab_reactions of docs/source/configuration/examples/air.rst.",
+
+    "parameters": {
+        "cross_sections": "../lxcat/lisbon.txt",
+        "_cross_sections": "BOLSIG+ output with the electron transport and rate coefficients",
+        "x_n2": 0.79,
+        "x_o2": 0.21,
+        "_x_n2": "Mole fractions; must match the mixture the cross_sections table was computed for, when it records one",
+        "gamma0": 1e-3,
+        "gamma1": 0.0,
+        "eref": 170e6,
+        "beta": 1.0,
+        "_gamma0": "Ion-induced yield gamma0 + gamma1 exp(-eref/(beta E)), eref in V/m",
+        "ngroups": 3,
+        "cone_angle": 45.0,
+        "_cone_angle": "Half-opening angle [deg] of the emission cone; its solid-angle fraction (1 - cos)/2 scales the photon source",
+        "xi_photo": 1.0,
+        "_xi_photo": "Multiplier on the photoionization coupling",
+        "xi_emit": 1.0,
+        "_xi_emit": "Multiplier on the photoemission yield"
+    },
+
+    "gas": {"N2": "x_n2", "O2": "x_o2"},
+
+    "tables": {
+        "bolsig": {
+            "format": "bolsig+",
+            "file": "cross_sections",
+            "columns": {"mean_energy": "A1", "mu_e_N": "A2"},
+            "rates": {
+                "k_ion_N2": "N2 Ionization",
+                "k_ion_O2": "O2 Ionization",
+                "k_att_O2": "O2 Attachment"
+            }
+        },
+        "o2m": {"format": "lxcat", "file": "../lxcat/o2m_mobility.txt", "columns": {"K0_O2m": 1}},
+        "o3m": {"format": "lxcat", "file": "../lxcat/o3m_mobility.txt", "columns": {"K0_O3m": 1}}
+    },
+
+    "untracked": ["O", "N2O"],
+
+    "definitions": {
+        "Te": "2*mean_energy*qe/(3*kB)",
+        "_Te": "Electron temperature [K] from the mean energy, Maxwellian",
+        "v_e": "mu_e_N*EN*1e-21",
+        "k_3b_O2": "1.4e-29*(300/Te)*exp(-600/T)*exp(700*(Te - T)/(Te*T))*1e-12",
+        "_k_3b_O2": "Three-body attachment e + O2 + O2 [m^6/s], Kossyi et al.",
+        "N_loschmidt": "2.6868e25",
+        "pq": "30/750.064",
+        "_pq": "Quenching pressure [bar], 30 Torr"
+    },
+
+    "alpha": "(k_ion_N2*x_N2 + k_ion_O2*x_O2)*N/v_e",
+    "eta": "(k_att_O2*x_O2*N + k_3b_O2*(x_O2*N)**2)/v_e",
+
+    "species": [
+        {"name": "e",   "charge": -1, "mobility": "mu_e_N"},
+        {"name": "N2+", "charge":  1, "mobility": "5e21"},
+        {"name": "O2+", "charge":  1, "mobility": "5e21"},
+        {"name": "O-",  "charge": -1, "mobility": "1.2e22"},
+        {"name": "O2-", "charge": -1, "mobility": "K0_O2m*1e-4*N_loschmidt"},
+        {"name": "O3-", "charge": -1, "mobility": "K0_O3m*1e-4*N_loschmidt"}
+    ],
+
+    "reactions": [
+        {"reaction": "e + N2 -> 2e + N2+",      "rate": "k_ion_N2"},
+        {"reaction": "e + O2 -> 2e + O2+",      "rate": "k_ion_O2"},
+        {"reaction": "e + O2 -> O- + O",        "rate": "k_att_O2"},
+        {"reaction": "e + 2O2 -> O2- + O2",     "rate": "k_3b_O2"},
+        {"reaction": "O2- + O2 -> e + O2 + O2", "rate": "1.24e-17*exp(-(259/(14.6 + EN))**2)"},
+        {"reaction": "O- + N2 -> e + N2O",      "rate": "3.98e-17*(EN/43)**(2*-1.36)*exp(-(176/EN)**2)"},
+        {"reaction": "O- + O2 -> O + O2-",      "rate": "6.96e-17*exp(-(198/(5.6 + EN))**2)"},
+        {"reaction": "O- + O2 + M -> O3- + M",  "rate": "1.1e-42*exp(-(EN/65)**2)"}
+    ],
+
+    "photoionization": {
+        "absorption": {"model": "zheleznyak", "groups": "ngroups", "absorber": "O2"},
+        "source": {
+            "reactions": ["e + N2 -> 2e + N2+", "e + O2 -> 2e + O2+"],
+            "efficiency": "(1 - cos(cone_angle*pi/180))/2*0.6*pq/(p + pq)",
+            "_efficiency": "Cone fraction x excitation efficiency 0.6 x quenching, per ionization"
+        },
+        "products": {"e": "0.1*xi_photo", "O2+": "0.1*xi_photo"},
+        "_products": "Photoionization efficiency 0.1: one electron and one O2+ per absorbed photon",
+        "cathode yield": "0.1*xi_emit"
+    },
+
+    "emission": {
+        "ions": {
+            "N2+": "gamma0 + gamma1*exp(-eref/(beta*E))",
+            "O2+": "gamma0 + gamma1*exp(-eref/(beta*E))"
+        }
+    }
+}

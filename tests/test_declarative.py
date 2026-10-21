@@ -11,6 +11,8 @@ be refused when it is loaded, not discovered as a wrong curve.
 """
 
 import copy
+import json
+import warnings
 import functools
 from pathlib import Path
 
@@ -267,3 +269,171 @@ def test_paschen_json_gives_the_same_inception_field(criterion):
         a = find_all_breakdown_EN(0.01, py, 1.0, 293.0, first_only=True, det_fn=det)
         b = find_all_breakdown_EN(0.01, js, 1.0, 293.0, first_only=True, det_fn=det)
         assert b[0] == pytest.approx(a[0], rel=1e-12)
+
+
+# --- tables, mixture, photoionization ----------------------------------------
+
+AIR = ROOT / "mechanisms" / "air"
+PANCHESHNYI_PY = str(AIR / "pancheshnyi" / "air_pancheshnyi.py")
+PANCHESHNYI_JSON = str(AIR / "pancheshnyi" / "air_pancheshnyi.json")
+
+
+def _air_spec():
+    with open(PANCHESHNYI_JSON) as fh:
+        return json.load(fh)
+
+
+def _air(change=None, config=None):
+    spec = _air_spec()
+    if change is not None:
+        change(spec)
+    return DeclarativeMechanism(spec, config, source=PANCHESHNYI_JSON)
+
+
+def test_tables_give_columns_and_summed_rates():
+    """D14: a BOLSIG+ column by label, a rate summed over its legend entries."""
+    from incept1d.tables import read_table
+
+    table = read_table(str(AIR / "lxcat" / "lisbon.txt"), "bolsig+")
+    assert table.fractions == {"N2": 0.79, "O2": 0.21} and table.T_gas == 300.0
+    EN, k = table.rate("N2 Ionization")
+    assert len(EN) == len(k) and np.all(k >= 0) and k[-1] > 0
+    with pytest.raises(ValueError, match="no 'N2 Recombination'"):
+        table.rate("N2 Recombination")
+    with pytest.raises(ValueError, match="no column 'A99'"):
+        table.column("A99")
+
+
+def test_mixture_must_match_the_table_that_records_one():
+    """D15: lisbon.txt is 79/21; an 80/20 mixture with it is refused."""
+    with pytest.raises(MechanismFileError, match="differs from the one"):
+        _air(config={"x_n2": 0.8, "x_o2": 0.2})
+
+
+def test_a_table_without_a_mixture_warns_unless_one_is_configured():
+    """D16: the mixture cannot be checked; say so, unless the user set it."""
+    from incept1d import declarative
+
+    declarative._WARNED.clear()
+    with pytest.warns(UserWarning, match="does not record the gas mixture"):
+        _air(config={"cross_sections": "../lxcat/phelps.txt"})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _air(config={"cross_sections": "../lxcat/phelps.txt", "x_n2": 0.8, "x_o2": 0.2})
+
+
+def test_file_parameters_resolve_against_the_configuration_first(tmp_path):
+    """D17: a relative file in a configuration is looked for beside it first."""
+    import shutil
+
+    shutil.copy(AIR / "lxcat" / "phelps.txt", tmp_path / "mine.txt")
+    m = _air(
+        config={
+            "cross_sections": "mine.txt",
+            "x_n2": 0.8,
+            "x_o2": 0.2,
+            "_cfg_dir": str(tmp_path),
+        }
+    )
+    ref = _air(
+        config={"cross_sections": "../lxcat/phelps.txt", "x_n2": 0.8, "x_o2": 0.2}
+    )
+    np.testing.assert_array_equal(
+        m.get_R(120.0, 1.0, 300.0), ref.get_R(120.0, 1.0, 300.0)
+    )
+    with pytest.raises(MechanismFileError, match="expected a file name"):
+        _air(config={"cross_sections": 3.0})
+
+
+@pytest.mark.parametrize(
+    "change, match",
+    [
+        (
+            lambda s: s["photoionization"]["absorption"].update(model="bourdon"),
+            "unknown model",
+        ),
+        (
+            lambda s: s["photoionization"]["absorption"].update(absorber="Ar"),
+            "not a gas",
+        ),
+        (lambda s: s["parameters"].update(ngroups=2.5), "not a count"),
+        (
+            lambda s: s["photoionization"]["source"].update(
+                reactions=["e + N2 -> N2+"]
+            ),
+            "no reaction",
+        ),
+        (lambda s: s["photoionization"]["products"].update(Xe=1), "unknown key"),
+        (lambda s: s["photoionization"].update(direction="up"), "direction"),
+        (
+            lambda s: s["tables"]["bolsig"]["rates"].update(k_x="N2 Recombination"),
+            "no 'N2",
+        ),
+        (lambda s: s["tables"]["bolsig"].update(format="csv"), "unknown table format"),
+    ],
+)
+def test_photoionization_and_tables_are_checked(change, match):
+    """D18: the photoionization block and the tables follow the same rules."""
+    with pytest.raises(MechanismFileError, match=match):
+        _air(change)
+
+
+def test_photon_direction_is_declared_per_mechanism():
+    """D19: a direction gives PHOTON_DIRECTIONS, one entry per group."""
+    m = _air(lambda s: s["photoionization"].update(direction="backward"))
+    assert m.PHOTON_DIRECTIONS == ["backward"] * 3
+    assert _air().PHOTON_DIRECTIONS is None
+
+
+def _pancheshnyi_configs():
+    from incept1d.mechanism import read_json_configs
+
+    out = []
+    for path in sorted((AIR / "pancheshnyi").glob("*.json")):
+        if is_mechanism_file(str(path)):
+            continue
+        for cfg in read_json_configs([str(path)]):
+            out.append(pytest.param(cfg, id=f"{path.stem}:{cfg.get('label', '')}"))
+    return out
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("cfg", _pancheshnyi_configs())
+def test_pancheshnyi_json_builds_the_same_augmented_matrix(cfg):
+    """D20: every shipped configuration, both polarities, to round-off."""
+    py = load_mechanism(PANCHESHNYI_PY, dict(cfg))
+    js = load_mechanism(PANCHESHNYI_JSON, dict(cfg))
+    for positive in (True, False):
+        a, b = py.resolve(positive), js.resolve(positive)
+        for EN in (40.0, 110.0, 300.0):
+            for p, T in ((1.0, 300.0), (3.0, 293.0)):
+                for lam in (0.0, 1e7):
+                    A = _build_A_aug(EN, 1e-3, a, p, T, lam)[0]
+                    B = _build_A_aug(EN, 1e-3, b, p, T, lam)[0]
+                    np.testing.assert_allclose(B, A, rtol=1e-13, atol=0.0)
+                for f in ("get_gamma_plus", "get_gamma_Psi"):
+                    np.testing.assert_allclose(
+                        getattr(b, f)(EN, p, T), getattr(a, f)(EN, p, T), rtol=1e-14
+                    )
+                for f in ("alpha", "eta"):
+                    assert getattr(b, f)(EN, p, T) == pytest.approx(
+                        getattr(a, f)(EN, p, T), rel=1e-13
+                    )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "pd_mm, EN_expected", [(1.0, 175.4867), (10.0, 116.2765), (100.0, 100.711)]
+)
+def test_pancheshnyi_json_meets_the_air_reference_values(pd_mm, EN_expected):
+    """D21: the anchors of test_air A3, from the JSON mechanism."""
+    det = functools.partial(riccati_criterion, field_dist=FieldDistribution("uniform"))
+    roots = find_all_breakdown_EN(
+        pd_mm * 1e-3,
+        load_mechanism(PANCHESHNYI_JSON),
+        1.0,
+        293.0,
+        first_only=True,
+        det_fn=det,
+    )
+    assert roots[0] == pytest.approx(EN_expected, rel=1e-5)
