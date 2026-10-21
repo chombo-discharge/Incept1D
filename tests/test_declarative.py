@@ -28,7 +28,7 @@ from incept1d.expressions import Expression, ExpressionError
 from incept1d.fields import FieldDistribution
 from incept1d.inception import find_all_breakdown_EN
 from incept1d.mechanism import load_mechanism
-from incept1d.solver import _build_A_aug, riccati_criterion
+from incept1d.solver import riccati_criterion
 
 ROOT = Path(__file__).resolve().parent.parent
 PASCHEN_JSON = str(ROOT / "mechanisms" / "paschen" / "paschen.json")
@@ -230,7 +230,6 @@ def test_loader_dispatches_on_the_file():
 # --- tables, mixture, photoionization ----------------------------------------
 
 AIR = ROOT / "mechanisms" / "air"
-PANCHESHNYI_PY = str(AIR / "pancheshnyi" / "air_pancheshnyi.py")
 PANCHESHNYI_JSON = str(AIR / "pancheshnyi" / "air_pancheshnyi.json")
 
 
@@ -264,6 +263,38 @@ def test_mixture_must_match_the_table_that_records_one():
     """D15: lisbon.txt is 79/21; an 80/20 mixture with it is refused."""
     with pytest.raises(MechanismFileError, match="differs from the one"):
         _air(config={"x_n2": 0.8, "x_o2": 0.2})
+    _air(config={"x_n2": 0.7905, "x_o2": 0.2095})  # within 1e-3: the same mixture
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"x_n2": 0.8},
+        {"x_o2": 0.3},
+        {"x_n2": 1.2, "x_o2": -0.2},
+        {"x_n2": 0.5, "x_o2": 0.4},
+    ],
+)
+def test_a_mixture_that_is_not_one_is_refused(config):
+    """D15b: one fraction alone, fractions outside [0, 1], or a sum that is not 1."""
+    with pytest.raises(MechanismFileError, match="sum to 1"):
+        _air(config={"cross_sections": "../lxcat/phelps.txt", **config})
+
+
+def test_a_temperature_far_from_the_tables_warns_once():
+    """D15c: lisbon.txt is for 300 K; 400 K warns, once, and 310 K does not."""
+    from incept1d import declarative
+
+    declarative._WARNED.clear()
+    m = _air()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        m.get_R(120.0, 1.0, 310.0)
+    with pytest.warns(UserWarning, match="differs from the 300 K"):
+        m.get_R(120.0, 1.0, 400.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        m.get_R(130.0, 1.0, 400.0)
 
 
 def test_a_table_without_a_mixture_warns_unless_one_is_configured():
@@ -339,42 +370,6 @@ def test_photon_direction_is_declared_per_mechanism():
     m = _air(lambda s: s["photoionization"].update(direction="backward"))
     assert m.PHOTON_DIRECTIONS == ["backward"] * 3
     assert _air().PHOTON_DIRECTIONS is None
-
-
-def _pancheshnyi_configs():
-    from incept1d.mechanism import read_json_configs
-
-    out = []
-    for path in sorted((AIR / "pancheshnyi").glob("*.json")):
-        if is_mechanism_file(str(path)):
-            continue
-        for cfg in read_json_configs([str(path)]):
-            out.append(pytest.param(cfg, id=f"{path.stem}:{cfg.get('label', '')}"))
-    return out
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize("cfg", _pancheshnyi_configs())
-def test_pancheshnyi_json_builds_the_same_augmented_matrix(cfg):
-    """D20: every shipped configuration, both polarities, to round-off."""
-    py = load_mechanism(PANCHESHNYI_PY, dict(cfg))
-    js = load_mechanism(PANCHESHNYI_JSON, dict(cfg))
-    for positive in (True, False):
-        a, b = py.resolve(positive), js.resolve(positive)
-        for EN in (40.0, 110.0, 300.0):
-            for p, T in ((1.0, 300.0), (3.0, 293.0)):
-                for lam in (0.0, 1e7):
-                    A = _build_A_aug(EN, 1e-3, a, p, T, lam)[0]
-                    B = _build_A_aug(EN, 1e-3, b, p, T, lam)[0]
-                    np.testing.assert_allclose(B, A, rtol=1e-13, atol=0.0)
-                for f in ("get_gamma_plus", "get_gamma_Psi"):
-                    np.testing.assert_allclose(
-                        getattr(b, f)(EN, p, T), getattr(a, f)(EN, p, T), rtol=1e-14
-                    )
-                for f in ("alpha", "eta"):
-                    assert getattr(b, f)(EN, p, T) == pytest.approx(
-                        getattr(a, f)(EN, p, T), rel=1e-13
-                    )
 
 
 @pytest.mark.slow

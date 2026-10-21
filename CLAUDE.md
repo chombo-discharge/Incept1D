@@ -92,7 +92,7 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (`mechanisms/paschen/paschen.json`, `mechanisms/air/pancheshnyi/air_pancheshnyi.json`, `mechanisms/air/2body/air_2body.py`, `mechanisms/air/rfd/air_rfd.py`)
+### Mechanism files (`mechanisms/paschen/paschen.json`, `mechanisms/air/pancheshnyi/air_pancheshnyi.json`, `mechanisms/air/2body/air_2body.json`, `mechanisms/air/rfd/air_rfd.py`)
 
 A mechanism is normally a **JSON mechanism file** (issue #16), the
 user-facing format: documented in `docs/source/configuration/mechanisms.rst`,
@@ -101,9 +101,14 @@ compiled by `incept1d.declarative`, checked strictly when loaded.  Its
 Rate coefficients are formulas (`incept1d.expressions`); `alpha`/`eta` are
 given explicitly, never derived from the reactions (an ionization may run
 through a cascade with no single reaction to derive it from).  A Python
-module is the opt-in route for a model the format cannot express (RFD).
-`air_pancheshnyi.py` still exists beside its `.json` because `incept1d
-chombo` reads only Python mechanisms; `air_2body.py` is not yet converted.
+module is the opt-in route for a model the format cannot express; RFD is
+the only shipped one.  Each mechanism directory holds the mechanism and the
+JSON configurations written for it; what the mechanisms of one gas share
+(for air, the LXCat/BOLSIG+ data in `mechanisms/air/lxcat/`) lives in
+`mechanisms/<gas>/`.  A configuration belongs to one mechanism: keys that
+are not its parameters, and multipliers that name no reaction of it, are
+refused.  `incept1d chombo` exports either kind (`chombo.generate_declarative`
+for files: the file's alpha/eta and its `mean_energy` variable).
 
 Python mechanism modules live one per directory under `mechanisms/<gas>/<scheme>/`
 and are **data, not part of the package**: they are `exec`'d by
@@ -112,10 +117,7 @@ injecting override variables (`_GAMMA0`, `_EREF`, `BOLSIG_FILE`, ...) from
 the companion `config.py` in the same directory. Each directory also holds
 the JSON configurations written for that mechanism: a configuration belongs
 to one mechanism, and the loader rejects reaction multipliers that name no
-reaction of it. What the mechanisms of one gas share lives in
-`mechanisms/<gas>/` — for air, `air_config.py` (the configuration class each
-`config.py` subclasses, restricting the accepted keys), `zheleznyak.py`, and
-the LXCat data in `lxcat/` — and is loaded by path with
+reaction of it. Python code shared by mechanisms is loaded by path with
 `incept1d.mechanism.load_helper`, never via `sys.path`. They import the package normally
 (`from incept1d.constants import kB, Q`), so the package must be installed.
 A mechanism module must expose the fixed interface
@@ -142,9 +144,10 @@ the case where only the Riccati pole test sees inception; `air_rfd.py`
 (relativistic feedback, [Faerder2026b]) is the shipped one, with its
 normal-mode closed form in `tests/closed_form_rfd.py`.
 
-When writing or editing a mechanism file, follow the coordinate convention
-documented at the top of `mechanisms/air/pancheshnyi/air_pancheshnyi.py` (cathode at
-`x=0`, anode at `x=d`, sign convention for `V`). `config.py` implements the
+When writing a Python mechanism, follow the coordinate convention of
+`docs/source/configuration/mechanismfile.rst` (`get_V`: cathode at `x=0`,
+anode at `x=d`, `V_ii = -sgn(Z_i) mu_i |E|`); a mechanism file derives it
+from the charges. `config.py` implements the
 `pre_exec_vars()` / `post_exec_init()` / `mechanism_params()` protocol that
 `load_mechanism` expects — copy that pattern for a new mechanism rather
 than inventing a new config mechanism.

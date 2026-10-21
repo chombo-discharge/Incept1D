@@ -192,7 +192,7 @@ to :math:`\mathrm{O}_3^-` formation (reaction 8).
 
 .. admonition:: Code
 
-   ``mechanisms/air/2body/air_2body.py`` is an alternative mechanism that keeps
+   ``mechanisms/air/2body/air_2body.json`` is an alternative mechanism that keeps
    :math:`\mathrm{O}_2^{-*}` and :math:`\mathrm{O}_3^{-*}` as explicit
    tracked species (eight species in total) and represents the
    Bloch-Bradbury sequence with two-body reactions.  It accepts the same

@@ -18,9 +18,10 @@ eqs. S1-S9, where they were fitted to GEANT4 simulations).
 Species and photon groups
 -------------------------
 Two species, ``["rre", "e+"]``, and two photon groups, ``["forward",
-"backward"]`` (``PHOTON_DIRECTIONS``).  Coordinates follow
-``mechanisms/air/pancheshnyi/air_pancheshnyi.py``: x = 0 is where the RREs
-enter the high-field region (the paper's z = 0) and x = d its far end.  RREs
+"backward"]`` (``PHOTON_DIRECTIONS``).  Coordinates follow the Python
+interface (docs/source/configuration/mechanismfile.rst, get_V): x = 0 is the
+cathode, here where the RREs enter the high-field region (the paper's z = 0),
+and x = d its far end.  RREs
 drift toward +x at c~ = 0.89 c and positrons toward -x at c~, so the RRE is
 the "electron" of the interface and the positron its "positive ion": no
 positron enters at x = d, and nothing is emitted at x = 0

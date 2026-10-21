@@ -24,8 +24,7 @@ files relative to ``__file__``.
 This page is the interface: what a module must expose, and what each function
 must return.  It deliberately does not describe any particular gas.
 :ref:`Chap:RFDScheme` is a Python mechanism because its model does not fit
-a mechanism file, and a reasonable starting point to copy; the Python form
-of :ref:`Chap:AirScheme` shows a complete gas-discharge scheme.
+a mechanism file, and a reasonable starting point to copy.
 
 Required interface
 ------------------

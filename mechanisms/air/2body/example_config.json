@@ -29,7 +29,7 @@
       "reaction_multipliers": {
         "O2-(exc) -> e + O2":        0.0,
         "O2-(exc) + O2 -> O2- + O2": 0.0,
-        "O2- + O2 -> e + 2O2":       0.0
+        "O2- + M -> e + O2 + M":     0.0
       }
     }
   ]

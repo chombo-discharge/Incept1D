@@ -35,7 +35,7 @@ def load_helper(path):
     name.  Resolve the path against ``__file__`` in the caller::
 
         _HERE = os.path.dirname(os.path.abspath(__file__))
-        zheleznyak = load_helper(os.path.join(_HERE, "..", "zheleznyak.py"))
+        shared = load_helper(os.path.join(_HERE, "..", "shared.py"))
 
     Parameters
     ----------

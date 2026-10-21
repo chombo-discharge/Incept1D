@@ -205,11 +205,6 @@ configurations exist.
 Worked examples
 ---------------
 
-:ref:`Chap:RFDScheme` shows the protocol at its simplest: three keys, all
-needed before the module body runs, and every other key refused.
-
-The Python form of :ref:`Chap:AirScheme`, ``air_pancheshnyi.py`` with the
-shared ``mechanisms/air/air_config.py``, shows it carrying a realistic load:
-a choice of cross-section database, four cathode-yield parameters,
-per-reaction multipliers, photon scale factors, and separate surface
-parameters for the two polarities of an asymmetric gap.
+:ref:`Chap:RFDScheme` shows the protocol: three keys, all needed before the
+module body runs, and every other key refused.  ``tests/toy/config.py`` is a
+second, smaller one that the test suite exercises.

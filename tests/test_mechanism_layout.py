@@ -8,8 +8,7 @@ A configuration file belongs to the mechanism in its directory.  These tests
 check that every shipped configuration loads with that mechanism, and that
 the loader refuses one written for another mechanism instead of silently
 solving a different problem.  A mechanism is a JSON file (a mechanism file)
-or a Python module; while one is being migrated, its directory may hold both,
-under the same name.
+or, for a model the format cannot express, a Python module.
 """
 
 import os
@@ -38,8 +37,8 @@ MECH_DIRS = sorted(
     | {p.parent for p in MECHANISMS.rglob("*.json") if is_mechanism_file(str(p))}
 )
 
-#: Mechanisms that read swarm tables at load time, which takes a while.
-_SLOW = {"pancheshnyi", "2body"}
+#: Mechanisms that are slow to load.
+_SLOW = set()
 
 
 def _param(path, mech_dir):
@@ -86,24 +85,16 @@ AIR = MECHANISMS / "air"
     "mechanism, config, why",
     [
         pytest.param(
-            AIR / "2body" / "air_2body.py",
+            AIR / "2body" / "air_2body.json",
             AIR / "pancheshnyi" / "nodetachment.json",
             "does not define",
-            marks=pytest.mark.slow,
             id="pancheshnyi-reactions-for-2body",
-        ),
-        pytest.param(
-            AIR / "pancheshnyi" / "air_pancheshnyi.py",
-            AIR / "2body" / "example_config.json",
-            "does not define",
-            marks=pytest.mark.slow,
-            id="2body-reactions-for-pancheshnyi",
         ),
         pytest.param(
             AIR / "pancheshnyi" / "air_pancheshnyi.json",
             AIR / "2body" / "example_config.json",
             "does not define",
-            id="2body-reactions-for-pancheshnyi-json",
+            id="2body-reactions-for-pancheshnyi",
         ),
         pytest.param(
             MECHANISMS / "paschen" / "paschen.json",
