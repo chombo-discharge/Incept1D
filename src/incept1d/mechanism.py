@@ -6,10 +6,10 @@
 Mechanism loading: the ``Mechanism`` wrapper, JSON configuration files and
 ``load_mechanism``.
 
-A mechanism is a plain Python file (see
-``mechanisms/air/pancheshnyi/air_pancheshnyi.py``) that is executed by
-:func:`load_mechanism` and must expose the interface listed in
-:data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same directory
+A mechanism is normally a JSON mechanism file, compiled by
+:mod:`incept1d.declarative`.  A Python mechanism (see
+``mechanisms/air/rfd/air_rfd.py``) is executed by :func:`load_mechanism`
+and must expose the interface listed in :data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same directory
 (optional) implements the ``pre_exec_vars()`` / ``post_exec_init()`` /
 ``mechanism_params()`` protocol used to inject configuration parameters from
 JSON files.  Code that several mechanisms share is loaded by path with

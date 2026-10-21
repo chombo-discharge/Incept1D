@@ -99,3 +99,59 @@ class TestRawLoader:
     def test_loads_the_air_mechanism(self, raw):
         assert raw.SPECIES and hasattr(raw, "REACTIONS")
         assert callable(raw.get_V)
+
+
+@pytest.fixture(scope="module")
+def both(air_path_module):
+    """The Phelps table from the Python air mechanism and from its file."""
+    from incept1d.chombo import _load_modifier, generate_declarative
+    from incept1d.mechanism import load_mechanism, read_json_configs
+
+    cfg_file = air_path_module.replace("air_pancheshnyi.py", "databases.json")
+    cfg = [c for c in read_json_configs([cfg_file]) if c["label"] == "Phelps"][0]
+    cfg["reaction_multipliers"] = {"O- + N2 -> e + N2O": 0.5}
+    EN = np.logspace(0.0, 3.3, 40)
+    pre, _ = _load_modifier(cfg_file, "Phelps")
+    py = generate(
+        load_raw_mechanism(air_path_module, pre),
+        EN,
+        1.0,
+        300.0,
+        cfg["reaction_multipliers"],
+    )
+    mech = load_mechanism(air_path_module.replace(".py", ".json"), cfg)
+    return py, generate_declarative(mech, EN, 1.0, 300.0)
+
+
+class TestMechanismFile:
+    """The same table from the air mechanism file as from its Python form."""
+
+    def test_same_layout(self, both):
+        """K5: the same columns, in the same order."""
+        (py_cols, py_hdrs), (js_cols, js_hdrs) = both
+        assert len(js_cols) == len(py_cols)
+        for a, b in zip(py_hdrs[4:], js_hdrs[4:]):
+            assert a.split("[")[0] == b.split("[")[0]
+
+    def test_same_values(self, both):
+        """K6: every column to round-off, multipliers included."""
+        (py_cols, _), (js_cols, _) = both
+        for a, b in zip(py_cols, js_cols):
+            np.testing.assert_allclose(b, a, rtol=1e-13, atol=1e-300)
+
+    def test_a_file_without_a_mean_energy_is_refused(self, air_path_module):
+        """K7: the column is not invented when the file does not define it."""
+        import os
+
+        from incept1d.chombo import generate_declarative
+        from incept1d.declarative import MechanismFileError
+        from incept1d.mechanism import load_mechanism
+
+        root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(air_path_module)))
+        )
+        paschen = load_mechanism(
+            os.path.join(root, "mechanisms", "paschen", "paschen.json")
+        )
+        with pytest.raises(MechanismFileError, match="mean_energy"):
+            generate_declarative(paschen, np.logspace(1, 2, 3), 1.0, 300.0)

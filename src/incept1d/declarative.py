@@ -736,6 +736,52 @@ class DeclarativeMechanism:
             return np.zeros(0)
         return np.full(self._n_gamma, self._photo["yield"](self._env(EN, p, T)))
 
+    # --- inspection (for exports and diagnostics) ----------------------------
+
+    @property
+    def reaction_strings(self):
+        """The reactions, as written, in file order."""
+        return [rx["reaction"] for rx in self._reactions]
+
+    @property
+    def mole_fractions(self):
+        """{gas component: mole fraction}."""
+        return dict(self._fractions)
+
+    @property
+    def files(self):
+        """{parameter: resolved path} of the file parameters, as configured."""
+        return {k: v for k, v in self._values.items() if isinstance(v, str)}
+
+    def neutral_partners(self, index):
+        """{neutral reactant: multiplicity} of reaction *index* ('M' = all)."""
+        return dict(self._reactions[index]["neutral"])
+
+    def rate_coefficient(self, index, EN, p, T):
+        """Rate coefficient k of reaction *index*, SI, with its multiplier."""
+        rx = self._reactions[index]
+        return rx["rate"](self._env(EN, p, T)) * self._multipliers.get(index, 1.0)
+
+    def neutral_density_factor(self, index, EN, p, T):
+        """The product of the neutral densities reaction *index* is multiplied by."""
+        env = self._env(EN, p, T)
+        factor = 1.0
+        for name, count in self._reactions[index]["neutral"].items():
+            n = (
+                env["N"]
+                if name == TOTAL_DENSITY
+                else env[self._fraction_names[name]] * env["N"]
+            )
+            factor *= n**count
+        return factor
+
+    def variable(self, name, EN, p, T):
+        """The value of a variable of the file (parameter, column, definition)."""
+        env = self._env(EN, p, T)
+        if name not in env:
+            raise MechanismFileError(f"{self._source} defines no variable {name!r}")
+        return env[name]
+
     # --- polarity ------------------------------------------------------------
 
     @property

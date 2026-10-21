@@ -301,6 +301,86 @@ def generate(mod, EN_arr, p, T, reaction_multipliers):
     return columns, headers
 
 
+#: The variable of a mechanism file that the mean-energy column is read from.
+MEAN_ENERGY = "mean_energy"
+
+
+def generate_declarative(mech, EN_arr, p, T):
+    """
+    Evaluate a mechanism file over an E/N grid, in the layout of :func:`generate`.
+
+    The rate coefficients are the file's own, times their configured
+    multipliers; alpha/N and eta/N are the file's ``alpha`` and ``eta``
+    divided by N, not derived from the reactions; the mean energy is the
+    file's variable :data:`MEAN_ENERGY` [eV].
+
+    Parameters
+    ----------
+    mech : incept1d.declarative.DeclarativeMechanism
+        The mechanism, with its configuration.
+
+    Returns
+    -------
+    columns, headers : as :func:`generate`
+    """
+    from incept1d.declarative import TOTAL_DENSITY, MechanismFileError
+
+    for name in ("alpha", "eta"):
+        if not hasattr(mech, name):
+            raise MechanismFileError(
+                f"the chombo-discharge table needs {name} [1/m]; the mechanism "
+                f"file does not give it"
+            )
+    N = p * 1e5 / (kB * T)
+    DN_factor = kB * T / Q
+    n_species = len(mech.SPECIES)
+    energy = np.array([mech.variable(MEAN_ENERGY, en, p, T) for en in EN_arr])
+    muN = np.array(
+        [np.abs(np.diag(mech.get_V(en, p, T))) / (en * 1e-21) for en in EN_arr]
+    ).reshape(len(EN_arr), n_species)
+
+    columns = [
+        EN_arr.copy(),
+        np.array([mech.alpha(en, p, T) for en in EN_arr]) / N,
+        np.array([mech.eta(en, p, T) for en in EN_arr]) / N,
+        energy,
+    ]
+    headers = [
+        "E/N [Townsend]",
+        "Reduced Townsend ionization coefficient alpha/N [m^2], as the "
+        "mechanism file gives alpha",
+        "Reduced Townsend attachment coefficient eta/N [m^2], as the "
+        "mechanism file gives eta",
+        "Electron mean energy [eV]",
+    ]
+    for i, sp in enumerate(mech.SPECIES):
+        columns += [muN[:, i], muN[:, i] * DN_factor]
+        headers += [
+            f"mu*N for {sp} [m^-1 V^-1 s^-1]",
+            f"D*N for {sp} [m^-1 s^-1] (Einstein: D*N = mu*N * kB*T/Q, T={T} K)",
+        ]
+    fractions = mech.mole_fractions
+    for i, rxn in enumerate(mech.reaction_strings):
+        partners = mech.neutral_partners(i)
+        n_partners = sum(partners.values())
+        units = {0: "s^-1", 1: "m^3/s"}.get(n_partners, f"m^{3 * n_partners}/s")
+        desc = (
+            " * ".join(
+                ("N(p,T)" if X == TOTAL_DENSITY else f"(x{X}={fractions[X]}*N(p,T))")
+                + (f"^{c}" if c > 1 else "")
+                for X, c in partners.items()
+            )
+            or "1"
+        )
+        flag = "  [THREE-BODY]" if n_partners > 1 else ""
+        columns.append(np.array([mech.rate_coefficient(i, en, p, T) for en in EN_arr]))
+        headers.append(
+            f"Rate coefficient for '{rxn}' [{units}]{flag}  "
+            f"Multiply by {desc} to get volumetric rate [s^-1]."
+        )
+    return columns, headers
+
+
 def build_header(
     mech_path,
     modifier_path,
@@ -313,10 +393,15 @@ def build_header(
     EN_max=None,
     num_EN=None,
     species=None,
+    files=None,
 ):
-    """Assemble the full file header string."""
+    """Assemble the full file header string.
+
+    *files* ({parameter: path}) names the data files of a mechanism file;
+    for a Python mechanism the database is ``BOLSIG_FILE`` in
+    *pre_exec_vars*.
+    """
     N = p * 1e5 / (kB * T)
-    bolsig = (pre_exec_vars or {}).get("BOLSIG_FILE", "(module default)")
     lines = [
         "chombo-discharge transport coefficient table",
         f"Generated  : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -324,8 +409,12 @@ def build_header(
         f"Python     : {sys.version.split()[0]}",
         "",
         f"Mechanism  : {os.path.abspath(mech_path)}",
-        f"Database   : {bolsig}",
     ]
+    if files is not None:
+        lines += [f"Data file  : {k} = {v}" for k, v in files.items()]
+    else:
+        bolsig = (pre_exec_vars or {}).get("BOLSIG_FILE", "(module default)")
+        lines.append(f"Database   : {bolsig}")
     if modifier_path:
         lab = f" (label: {config_label})" if config_label else ""
         lines.append(f"Modifier   : {os.path.abspath(modifier_path)}{lab}")

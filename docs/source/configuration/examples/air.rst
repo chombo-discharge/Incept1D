@@ -13,9 +13,8 @@ everything in this chapter: species, a reaction table, swarm data read from
 BOLSIG+ output, multigroup photoionization, field-dependent cathode yields,
 the parameters worth varying, and a set of configurations built on it.
 Where :ref:`Chap:PaschenMechanism` shows the smallest mechanism that does
-anything, this one shows a complete one.  (The same scheme is also the
-Python module ``air_pancheshnyi.py``, which ``incept1d chombo`` reads.)  It
-tracks electrons and five ion species,
+anything, this one shows a complete one.  It tracks electrons and five ion
+species,
 
 .. math::
 
@@ -196,9 +195,9 @@ to :math:`\mathrm{O}_3^-` formation (reaction 8).
    ``mechanisms/air/2body/air_2body.py`` is an alternative mechanism that keeps
    :math:`\mathrm{O}_2^{-*}` and :math:`\mathrm{O}_3^{-*}` as explicit
    tracked species (eight species in total) and represents the
-   Bloch-Bradbury sequence with two-body reactions.  It shares the same
-   interface and configuration protocol and can be substituted for
-   ``air_pancheshnyi.py`` in every command.
+   Bloch-Bradbury sequence with two-body reactions.  It accepts the same
+   configuration keys and can be substituted for ``air_pancheshnyi.json``
+   in every command.
 
 Stability of :math:`\mathrm{O}_3^-`
 -----------------------------------
@@ -320,11 +319,11 @@ parameters are listed in :numref:`tab_photo_groups`.
 
 .. admonition:: Code
 
-   The fit is performed at import time of the mechanism by
-   ``mechanisms/air/zheleznyak.py`` (``fit_twostream(ngroups)``), called from
-   ``init_photoionization(ngroups, cone_angle_deg)`` in
-   ``mechanisms/air/pancheshnyi/air_pancheshnyi.py``.  The number of groups is the ``ngroups``
-   entry of the JSON configuration (default 3; six groups reproduce the
+   The fit is performed when the mechanism is loaded, by
+   :func:`incept1d.zheleznyak.fit_twostream` (once per number of groups and
+   process), as the ``zheleznyak`` absorption model of the mechanism file's
+   photoionization block.  The number of groups is the ``ngroups``
+   parameter (default 3; six groups reproduce the
    Zheleznyak curve to better than 1 %).  Absorption coefficients scale with the O\ :sub:`2` partial
    pressure, :math:`\kappa_j = (\kappa_j/p_{\mathrm{O}_2})\,x_{\mathrm{O}_2}\,p`.
    Running ``python3 mechanisms/air/zheleznyak.py`` standalone plots the fit;
