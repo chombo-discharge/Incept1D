@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "label": "R >> L",
+            "label": "R = 5 km",
             "photon_attenuation_fwd": 307.64,
             "photon_attenuation_bck": 92.22
         },

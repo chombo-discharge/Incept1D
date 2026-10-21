@@ -78,7 +78,7 @@ def _reference(mod, L, n=1.0):
     return cf.threshold(M_of_E, L, 285e3 * n, 6e6, n_scan=2000)
 
 
-@pytest.mark.parametrize("label", ["R >> L", "R = 100 m"])
+@pytest.mark.parametrize("label", ["R = 5 km", "R = 100 m"])
 @pytest.mark.parametrize("criterion", [riccati_criterion, inception_det])
 @pytest.mark.parametrize("L", [25.0, 100.0, 500.0, 5000.0])
 def test_threshold_matches_normal_modes(label, criterion, L):
@@ -109,7 +109,7 @@ def test_threshold_falls_toward_the_bhabha_onset():
 def test_narrow_region_needs_a_slightly_higher_field():
     """RFD5: photons escape a narrow region sooner; E_s rises, but only a little."""
     cfgs = _radius_configs()
-    wide, narrow = _load(cfgs["R >> L"]), _load(cfgs["R = 100 m"])
+    wide, narrow = _load(cfgs["R = 5 km"]), _load(cfgs["R = 100 m"])
     for L in (100.0, 300.0):
         ratio = _threshold(narrow, L) / _threshold(wide, L)
         assert 1.0 < ratio < 1.05
@@ -149,7 +149,7 @@ def test_threshold_matches_the_papers_normal_modes():
     paper's column is read; ours is solved here.  Beyond 5 km their minimum of
     |det|^2 is too flat to resolve to one grid step.
     """
-    mod = _load(_radius_configs()["R >> L"])
+    mod = _load(_radius_configs()["R = 5 km"])
     data = np.loadtxt(PAPER)
     for L, theirs in data[data[:, 0] <= 5e3][:, [0, 3]]:
         assert abs(_threshold(mod, L) / 1e3 - theirs) <= 0.1, f"L = {L} m"

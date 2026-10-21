@@ -8,7 +8,7 @@ Compare the self-sustained RFD field with the paper's own results, point by poin
 Færder et al. publish their code and results on Zenodo
 (doi:10.5281/zenodo.22983026, CC-BY 4.0).  Its folder
 ``selfsustainend-rfd-threshold-by-nme`` holds E_s(L) from their normal-mode
-expansion (wide region) and from their time-dependent fluid model (both
+expansion (R = 5 km) and from their time-dependent fluid model (both
 radii).  This script reads those three files from the unpacked archive,
 solves the same thresholds with Incept1D at the same L, and writes both to
 one table.  The paper's data is theirs and is not part of this repository;
@@ -60,10 +60,10 @@ def _read(folder, name):
 
 
 def _incept1d(L):
-    """Incept1D's E_s [kV/m] at each L [m], for the R >> L and R = 100 m cases."""
+    """Incept1D's E_s [kV/m] at each L [m], for the R = 5 km and R = 100 m cases."""
     cfgs = {c["label"]: c for c in read_json_configs([CONFIGS])}
     det = functools.partial(riccati_criterion, field_dist=FieldDistribution("uniform"))
-    cases = [load_mechanism(MECHANISM, cfgs[k]) for k in ("R >> L", "R = 100 m")]
+    cases = [load_mechanism(MECHANISM, cfgs[k]) for k in ("R = 5 km", "R = 100 m")]
 
     def task(i, previous):
         mod = cases[i // len(L)]
@@ -95,9 +95,9 @@ def main(folder, out_path):
             "Faerder et al. (2026), doi:10.5281/zenodo.22983026, CC-BY 4.0\n"
         )
         fh.write(
-            "# Columns: L (m)  E_s (kV/m): Incept1D [R >> L]  "
-            "Incept1D [R = 100 m]  paper normal modes [R >> L]  "
-            "paper time-dependent [R >> L]  paper time-dependent [R = 100 m]\n"
+            "# Columns: L (m)  E_s (kV/m): Incept1D [R = 5 km]  "
+            "Incept1D [R = 100 m]  paper normal modes [R = 5 km]  "
+            "paper time-dependent [R = 5 km]  paper time-dependent [R = 100 m]\n"
         )
         rows = zip(
             L, ours_wide, ours_narrow, nme_wide / 1e3, num_wide * E_T, num_narrow * E_T

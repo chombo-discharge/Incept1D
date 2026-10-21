@@ -145,7 +145,7 @@ fits to GEANT4 simulations in [Faerder2026b]_:
    * - :math:`\lambda_\mathrm{a,pos}^{-1}`
      - :math:`127/(E - 259.1\times10^{3})`
    * - :math:`\lambda_{\mathrm{a}\uparrow}`, :math:`\lambda_{\mathrm{a}\downarrow}`
-     - 307.64, 92.22 for a wide region; 275.31, 55.29 for a radius of 100 m
+     - 307.64, 92.22 for a radius of 5 km; 275.31, 55.29 for 100 m
 
 with
 
@@ -159,7 +159,8 @@ for :math:`E > E_\mathrm{d}` and zero below, :math:`E_\mathrm{d}` and
 :math:`E_\mathrm{s}` given in kV/m.  The photon attenuation lengths depend on
 the horizontal radius :math:`R` of the high-field region, because photons
 escape a narrow region sideways; ``radius.json`` holds both cases as two
-configurations.
+configurations, ``R = 5 km`` (which the paper calls :math:`R \gg L`) and
+``R = 100 m``.
 
 Below 305.4 kV/m there is no Bhabha production, so positrons feed nothing
 back and their attenuation does not matter; the mechanism holds

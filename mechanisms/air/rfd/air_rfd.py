@@ -48,7 +48,7 @@ Coefficients [1/m, at n~ = 1; E in V/m]
     P_pp,fwd      = 8.580e-5                                         (S5)
     P_br,fwd      = 1.442e-2,  P_br,bck = 9.666e-4                   (S6)
     1/lambda_a,pos = 127 V/m^2 / (E - 259.1 kV/m)                    (S9)
-    lambda_a,fwd  = 307.64 m,  lambda_a,bck = 92.22 m (R >> L)       (S7)
+    lambda_a,fwd  = 307.64 m,  lambda_a,bck = 92.22 m (R = 5 km)    (S7)
 
 with fit(E; P, s, E_d, E_s, r) = (P + s E)(1 - exp(-((E - E_d)/E_s)^r)).
 The photon attenuation lengths depend on the horizontal radius R of the

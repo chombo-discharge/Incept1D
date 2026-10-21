@@ -8,8 +8,11 @@ backward photon group, with every coefficient fitted to GEANT4 simulations
 in that paper. Nothing is emitted at either end of the region, so the
 feedback closes entirely in the gas.
 
-The two horizontal radii of the paper — a region much wider than it is
-long, and one 100 m across — are the two configurations in
+The region has no electrodes: its two ends are open, nothing enters, and
+whatever leaves is lost, which Incept1D expresses as a gap with every
+emission yield zero. Its horizontal radius `R` enters only through the
+photon attenuation lengths, fitted by the authors for `R` = 5 km (which the
+paper calls R ≫ L) and 100 m; the two are the configurations in
 `mechanisms/air/rfd/radius.json`, so one command produces both curves. The
 paper's results are all at sea level, which is the authors' sea-level
 density 2.688e25 m⁻³: `--p 1.01371 --T 273.15`. At fixed pressure, `pd` is
@@ -28,13 +31,13 @@ incept1d pdiv mechanisms/air/rfd/air_rfd.py mechanisms/air/rfd/radius.json \
 
 ## What you get
 
-`sim.dat` with the self-sustained field `E_Vm` in column 6 for the wide
-region and column 16 for the narrow one, and the gap `d_mm` in columns 3
+`sim.dat` with the self-sustained field `E_Vm` in column 6 for `R` = 5 km
+and column 16 for `R` = 100 m, and the gap `d_mm` in columns 3
 and 13.
 
 The field falls from conventional breakdown, 3 MV/m near `L` = 23 m,
 toward 305 kV/m at kilometre scale, where positrons start to make runaway
-electrons; a narrow region needs a slightly higher field, because photons
+electrons; the narrower region needs a slightly higher field, because photons
 escape it sideways.
 
 `make -C docs/figures rfd` runs the same command and builds the
@@ -53,7 +56,7 @@ python3 examples/rfd/paper_comparison.py \
     examples/rfd/paper.dat
 ```
 
-which reads their normal-mode `E_s(L)` (wide region) and their
+which reads their normal-mode `E_s(L)` (`R` = 5 km) and their
 time-dependent fluid-model results (both radii), solves the same thresholds
 with Incept1D at the same `L`, and writes both side by side. With
 `paper.dat` in place, `make -C docs/figures rfd` adds their results and the

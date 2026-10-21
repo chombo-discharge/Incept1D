@@ -20,6 +20,28 @@ self-sustained condition is the inception condition of ``Incept1D`` with
 every electrode yield zero, so ``incept1d pdiv`` computes
 :math:`E_\mathrm{s}(L)` directly.
 
+Open ends, not electrodes
+-------------------------
+
+There are no electrodes here.  The gap is the high-field region itself,
+:math:`0 \le x \le L`, with the runaway electrons drifting toward
+:math:`+x`; outside it the field is too weak for them to multiply, so
+whatever leaves the region is lost and nothing comes in.  Those are exactly
+the boundary conditions of :ref:`Chap:SecondaryEmission` with every yield
+zero: at :math:`x = 0` no runaway electrons and no forward photons enter,
+at :math:`x = L` no positrons and no backward photons.  The output keeps
+the names of a gap: ``d`` is :math:`L`, :math:`pd` is the density times
+:math:`L`, and the voltage is :math:`E_\mathrm{s} L`, the potential drop
+across the region.
+
+The model is one-dimensional, as the paper's is.  The horizontal radius
+:math:`R` of the region enters only through the photon attenuation lengths,
+which the authors fitted with GEANT4 to include the photons that escape
+sideways, for :math:`R` = 5 km and 100 m.  The paper calls the 5 km case
+:math:`R \gg L`; that holds for regions up to about a kilometre long, and
+the same attenuation lengths are used, by the paper and here, over the
+whole range of :math:`L`.
+
 Running the calculation
 -----------------------
 
@@ -61,7 +83,7 @@ reads two kinds of their results, solves the same thresholds with
 with the difference; without it, the figure shows the ``Incept1D`` curves
 alone, as in the published documentation.
 
-* **Normal modes** (wide region): the steady-state threshold of the same
+* **Normal modes** (:math:`R` = 5 km): the steady-state threshold of the same
   model, found on a 100 V/m grid of fields.  ``Incept1D`` agrees with it to
   within that grid, 0.05 kV/m or :math:`1.5\times10^{-4}`, for every
   :math:`L` from 10 m to 5 km; beyond that their minimum of the determinant
@@ -104,7 +126,7 @@ The curve has two limits:
   make runaway electrons by Bhabha scattering, slightly above the avalanche
   threshold :math:`E_\mathrm{t} = 284` kV/m.
 
-A region 100 m across needs a slightly higher field than a wide one,
+A region of 100 m radius needs a slightly higher field than one of 5 km,
 because photons escape it sideways; the difference is a few per cent.
 
 Altitude
