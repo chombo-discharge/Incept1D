@@ -93,7 +93,7 @@ Getting started
 
    git clone https://github.com/chombo-discharge/Incept1D.git
    cd Incept1D && pip install -e .
-   incept1d pdiv mechanisms/paschen/paschen.py mechanisms/paschen/gases.json --p 1
+   incept1d pdiv mechanisms/paschen/paschen.json mechanisms/paschen/gases.json --p 1
 
 :ref:`Chap:Installation` covers the install in full, and
 :ref:`Chap:QuickStart` walks through two complete calculations.
@@ -109,9 +109,9 @@ How this documentation is organised
 * **Numerics** — How the propagator is built, how the determinant is
   evaluated robustly, how roots are found and tracked, and what a
   calculation costs.
-* **Configuration files** — The mechanism module, the ``config.py``
-  protocol and the JSON format: what a gas needs and the interfaces it must
-  satisfy.
+* **Configuration files** — Mechanism files and configuration files: what
+  a gas needs and how to write it down, and Python mechanisms for models the
+  file format cannot express.
 * **Python modules** — What each module and command does, and its
   command-line interface.
 * **Examples** — Worked calculations: the classical Paschen curve, and
@@ -221,10 +221,11 @@ Configuration files
    :hidden:
 
    configuration/overview
-   configuration/mechanismfile
-   configuration/configpy
+   configuration/mechanisms
    configuration/jsonfiles
    configuration/reactions
+   configuration/mechanismfile
+   configuration/configpy
    configuration/examples/index
 
 Python modules

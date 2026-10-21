@@ -46,7 +46,7 @@ gap spacing varies.  Both the full scheme and the no-detachment variant
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/nodetachment.json \
        --pd-min 1 --pd-max 1000 --pd-num 100 \
        --field sphere-sphere 1000 \
        --streamer-criterion 18 \

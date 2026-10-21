@@ -32,22 +32,33 @@ Inputs
 
 .. code-block:: console
 
-   incept1d chombo MECHANISM.py
+   incept1d chombo MECHANISM
        [--modifier CONFIG.json] [--config-label LABEL]
        [--min-EN TD] [--max-EN TD] [--num-EN N]
        [--pressure BAR] [--temperature K] [--write-to-file FILE]
 
 Unlike the solver commands, ``incept1d chombo`` takes a single configuration through
-``--modifier`` (a JSON file in the same format as :ref:`Chap:Configuration`)
-and ``--config-label`` (which entry to use).  The :math:`E/N` grid defaults
-to 1–10\ :sup:`6` Td with 1000 log-spaced points.
+``--modifier`` (a configuration file, :ref:`Chap:Configuration`) and
+``--config-label`` (which entry to use; the first if not given).  The
+:math:`E/N` grid defaults to 1–10\ :sup:`6` Td with 1000 log-spaced points.
+
+For a mechanism file (:ref:`Chap:MechanismFiles`) the table is the file's
+own: the rate coefficients as its reactions give them, times the
+configuration's multipliers; ``alpha/N`` and ``eta/N`` from its ``alpha``
+and ``eta``; and the mean energy from its variable ``mean_energy`` [eV],
+typically a column of its BOLSIG+ table.  A file without ``alpha``,
+``eta`` or ``mean_energy`` cannot be exported, and is refused rather than
+given a made-up column.  For a Python mechanism the rates come from its
+``REACTIONS`` list, the mean energy from ``ElectronMeanEnergy``, and
+``alpha/N`` and ``eta/N`` are summed from the reactions the electron
+drives.
 
 Example
 ~~~~~~~
 
 .. code-block:: bash
 
-   incept1d chombo mechanisms/air/pancheshnyi/air_pancheshnyi.py \
+   incept1d chombo mechanisms/air/pancheshnyi/air_pancheshnyi.json \
        --modifier mechanisms/air/pancheshnyi/databases.json --config-label Phelps \
        --min-EN 1 --max-EN 2000 --num-EN 500 --write-to-file air_phelps.dat
 
@@ -77,8 +88,9 @@ and the units of every column:
    5-6    mu*N, D*N for e
    7-8    mu*N, D*N for the first ion species
    ...    (two columns per species, in SPECIES order)
-   next   Raw rate coefficient for each reaction, in REACTIONS order
-          (m^3/s for two-body, m^6/s for three-body; flagged in the header)
+   next   Raw rate coefficient for each reaction, in the mechanism's order
+          (s^-1, m^3/s or m^6/s by the number of neutral partners;
+          three-body reactions flagged in the header)
 
 Everything is reduced by the number density (``alpha/N``, ``mu*N``,
 ``D*N``), so one table serves every pressure the 3-D solver runs at.

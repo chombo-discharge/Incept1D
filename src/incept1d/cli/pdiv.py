@@ -81,7 +81,7 @@ def add_arguments(parser):
     """Register the ``pdiv`` command-line arguments on *parser*."""
     parser.add_argument(
         "mechanism",
-        help="Path to mechanism Python file (e.g. mechanisms/air/pancheshnyi/air_pancheshnyi.py).",
+        help="Mechanism file (.json) or Python mechanism (.py), e.g. mechanisms/air/pancheshnyi/air_pancheshnyi.json.",
     )
     parser.add_argument(
         "configs",

@@ -32,16 +32,19 @@ from incept1d.chombo import (
     _neutral_factor,
     build_header,
     generate,
+    generate_declarative,
     load_raw_mechanism,
 )
 from incept1d.constants import kB
+from incept1d.mechanism import load_mechanism, read_json_configs
 
 
-def plot_results(mod, EN_arr, columns, p, T, mech_path):
-    """Generate a 5-subplot transport coefficient figure."""
-    N = p * 1e5 / (kB * T)
-    n_species = len(mod.SPECIES)
-    species_set = set(mod.SPECIES)
+def plot_results(species, rates, EN_arr, columns, p, T, mech_path):
+    """
+    Generate a 5-subplot transport coefficient figure.
+
+    *rates* is a list of (reaction string, k * [neutrals] / N over E/N).
+    """
 
     fig = plt.figure(figsize=(14, 13))
     gs = fig.add_gridspec(3, 2, hspace=0.38, wspace=0.28)
@@ -58,24 +61,12 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
     # Three-body: k * xA^n * N^(n-1)   (scales with p^(n-1))            #
     # ------------------------------------------------------------------ #
     # col 0: EN, 1: alpha, 2: eta, 3: energy, 4..3+2n: mu/D, 4+2n..: ki
-    rate_col_start = 4 + 2 * n_species
-    for rxn_idx, (rxn_str, rate_fn) in enumerate(mod.REACTIONS):
-        raw_ki = columns[rate_col_start + rxn_idx]
-        nf = _neutral_factor(rxn_str, species_set, mod, N)
-        rate_to_plot = raw_ki * nf / N  # m^3/s
-
+    for rxn_str, rate_to_plot in rates:
         mask = rate_to_plot > 0
         if mask.any():
             ax_rates.loglog(EN_arr[mask], rate_to_plot[mask], label=rxn_str)
 
-    all_rates = np.concatenate(
-        [
-            columns[rate_col_start + i]
-            * _neutral_factor(rxn_str, species_set, mod, N)
-            / N
-            for i, (rxn_str, _) in enumerate(mod.REACTIONS)
-        ]
-    )
+    all_rates = np.concatenate([r for _, r in rates])
     y_max = all_rates[all_rates > 0].max() * 2.0
     y_min = y_max * 1e-10
 
@@ -93,7 +84,7 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
     # Subplot 2: Reduced mobilities  mu*N  [m^-1 V^-1 s^-1]              #
     # ------------------------------------------------------------------ #
     mu_col_start = 4
-    for i, sp in enumerate(mod.SPECIES):
+    for i, sp in enumerate(species):
         ax_mu.loglog(EN_arr, columns[mu_col_start + 2 * i], label=sp)
 
     ax_mu.set_xlim(EN_arr[0], EN_arr[-1])
@@ -107,7 +98,7 @@ def plot_results(mod, EN_arr, columns, p, T, mech_path):
     # Subplot 3: Reduced diffusion coefficients  D*N  [m^-1 s^-1]        #
     # ------------------------------------------------------------------ #
     dn_col_start = 5
-    for i, sp in enumerate(mod.SPECIES):
+    for i, sp in enumerate(species):
         ax_diff.loglog(EN_arr, columns[dn_col_start + 2 * i], label=sp)
 
     ax_diff.set_xlim(EN_arr[0], EN_arr[-1])
@@ -173,9 +164,12 @@ def add_arguments(parser):
     """Register the command-line arguments on *parser*."""
     parser.add_argument(
         "mechanism",
-        help="Path to mechanism Python file (e.g. mechanisms/air/pancheshnyi/air_pancheshnyi.py)",
+        help="Mechanism file (.json) or Python mechanism (.py), e.g. "
+        "mechanisms/air/pancheshnyi/air_pancheshnyi.json",
     )
-    parser.add_argument("--modifier", default=None, help="Path to modifier JSON file")
+    parser.add_argument(
+        "--modifier", default=None, help="Configuration file (JSON) to apply"
+    )
     parser.add_argument(
         "--config-label",
         default=None,
@@ -216,46 +210,80 @@ def add_arguments(parser):
     )
 
 
+def _configuration(path, label):
+    """One configuration from *path*: the one labelled *label*, else the first."""
+    configs = read_json_configs([path])
+    if label is None:
+        return configs[0]
+    matches = [c for c in configs if c.get("label") == label]
+    if not matches:
+        raise SystemExit(
+            f"No configuration with label {label!r} in {path}; "
+            f"available: {[c.get('label') for c in configs]}"
+        )
+    return matches[0]
+
+
 def run(args, parser):
     """Run the command with parsed *args*; *parser* is used for ``parser.error``."""
     write = args.write_to_file is not None
     args.output = args.write_to_file
-
-    pre_vars = {}
-    reaction_multipliers = {}
-    if args.modifier:
-        pre_vars, reaction_multipliers = _load_modifier(
-            args.modifier, args.config_label
-        )
-
-    mod = load_raw_mechanism(args.mechanism, pre_vars)
-
+    p, T = args.pressure, args.temperature
+    N = p * 1e5 / (kB * T)
     EN_arr = np.logspace(
         math.log10(args.min_EN),
         math.log10(args.max_EN),
         args.num_EN,
     )
 
-    columns, headers = generate(
-        mod, EN_arr, args.pressure, args.temperature, reaction_multipliers
-    )
+    if args.mechanism.endswith(".json"):
+        cfg = _configuration(args.modifier, args.config_label) if args.modifier else {}
+        mech = load_mechanism(args.mechanism, cfg)
+        columns, headers = generate_declarative(mech, EN_arr, p, T)
+        species, pre_vars, files = mech.SPECIES, {}, mech.files
+        first = 4 + 2 * len(species)
+        rates = [
+            (
+                rxn,
+                columns[first + i]
+                * np.array([mech.neutral_density_factor(i, en, p, T) for en in EN_arr])
+                / N,
+            )
+            for i, rxn in enumerate(mech.reaction_strings)
+        ]
+    else:
+        pre_vars, reaction_multipliers = {}, {}
+        if args.modifier:
+            pre_vars, reaction_multipliers = _load_modifier(
+                args.modifier, args.config_label
+            )
+        mod = load_raw_mechanism(args.mechanism, pre_vars)
+        columns, headers = generate(mod, EN_arr, p, T, reaction_multipliers)
+        species, files = mod.SPECIES, None
+        first = 4 + 2 * len(species)
+        species_set = set(species)
+        rates = [
+            (rxn, columns[first + i] * _neutral_factor(rxn, species_set, mod, N) / N)
+            for i, (rxn, _) in enumerate(mod.REACTIONS)
+        ]
 
     if write:
         header_str = build_header(
             args.mechanism,
             args.modifier,
             args.config_label,
-            args.pressure,
-            args.temperature,
+            p,
+            T,
             headers,
             pre_exec_vars=pre_vars,
             EN_min=args.min_EN,
             EN_max=args.max_EN,
             num_EN=args.num_EN,
-            species=mod.SPECIES,
+            species=species,
+            files=files,
         )
         data = np.column_stack(columns)
         np.savetxt(args.output, data, delimiter="\t", header=header_str)
         print(f"Written: {args.output}  ({len(EN_arr)} rows, {data.shape[1]} columns)")
 
-    plot_results(mod, EN_arr, columns, args.pressure, args.temperature, args.mechanism)
+    plot_results(species, rates, EN_arr, columns, p, T, args.mechanism)

@@ -6,10 +6,10 @@
 Mechanism loading: the ``Mechanism`` wrapper, JSON configuration files and
 ``load_mechanism``.
 
-A mechanism is a plain Python file (see
-``mechanisms/air/pancheshnyi/air_pancheshnyi.py``) that is executed by
-:func:`load_mechanism` and must expose the interface listed in
-:data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same directory
+A mechanism is normally a JSON mechanism file, compiled by
+:mod:`incept1d.declarative`.  A Python mechanism (see
+``mechanisms/air/rfd/air_rfd.py``) is executed by :func:`load_mechanism`
+and must expose the interface listed in :data:`REQUIRED_ATTRS`.  A companion ``config.py`` in the same directory
 (optional) implements the ``pre_exec_vars()`` / ``post_exec_init()`` /
 ``mechanism_params()`` protocol used to inject configuration parameters from
 JSON files.  Code that several mechanisms share is loaded by path with
@@ -20,6 +20,7 @@ import importlib.util
 import json
 import os
 
+from incept1d.declarative import load_json_mechanism
 from incept1d.reactions import unknown_multiplier_keys
 
 _HELPERS = {}
@@ -34,7 +35,7 @@ def load_helper(path):
     name.  Resolve the path against ``__file__`` in the caller::
 
         _HERE = os.path.dirname(os.path.abspath(__file__))
-        zheleznyak = load_helper(os.path.join(_HERE, "..", "zheleznyak.py"))
+        shared = load_helper(os.path.join(_HERE, "..", "shared.py"))
 
     Parameters
     ----------
@@ -139,7 +140,7 @@ class Mechanism:
     def get_kappa(self, p, T):
         return self._mod.get_kappa(p, T)
 
-    # Read on use: init_photoionization may rebuild the groups after loading.
+    # Read on use, so a module may set it after loading.
     @property
     def PHOTON_DIRECTIONS(self):
         return getattr(self._mod, "PHOTON_DIRECTIONS", None)
@@ -166,10 +167,6 @@ class Mechanism:
 
     def get_Pi_minus(self):
         return self._mod.get_Pi_minus()
-
-    def init_photoionization(self, ngroups=3, cone_angle_deg=2.0):
-        if hasattr(self._mod, "init_photoionization"):
-            self._mod.init_photoionization(ngroups, cone_angle_deg)
 
 
 #: Attributes that every mechanism module must expose.
@@ -225,14 +222,16 @@ def read_json_configs(json_paths):
 
 def load_mechanism(path, config_dict=None):
     """
-    Load a reaction mechanism module from a Python source file.
+    Load a reaction mechanism from a Python source file or a JSON description.
 
-    The module must expose the standard interface defined in REQUIRED_ATTRS.
+    A ``.py`` module must expose the standard interface defined in
+    REQUIRED_ATTRS; a ``.json`` file is compiled into it by
+    :func:`incept1d.declarative.load_json_mechanism`.
 
     Parameters
     ----------
     path : str
-        Absolute or relative path to the mechanism .py file.
+        Absolute or relative path to the mechanism .py or .json file.
     config_dict : dict or None
         Raw configuration dict (e.g. parsed from JSON).  If given, a Config
         object is constructed from it by the companion config.py that lives
@@ -246,6 +245,8 @@ def load_mechanism(path, config_dict=None):
     mech_dir = os.path.dirname(abs_path)
     if not os.path.isfile(abs_path):
         raise FileNotFoundError(f"Mechanism file not found: {abs_path}")
+    if abs_path.endswith(".json"):
+        return load_json_mechanism(abs_path, config_dict)
 
     # Discover config.py in the same directory as the mechanism.
     cfg_py = os.path.join(mech_dir, "config.py")

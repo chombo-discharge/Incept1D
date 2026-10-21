@@ -70,7 +70,7 @@ Inputs
 
 .. code-block:: console
 
-   incept1d growth MECHANISM.py [CONFIG.json ...]
+   incept1d growth MECHANISM [CONFIG.json ...]
        [--pressure P [P ...]] [--distance D [D ...]] [--T T]
        [--n-voltages N] [--v-max-factor F]
        [--field SPEC] [--protrusion SHAPE ...] [--reverse-field]
@@ -105,7 +105,7 @@ Example
 
 .. code-block:: bash
 
-   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.py --pressure 1 --distance 10 --n-voltages 30 --v-max-factor 1.5
+   incept1d growth mechanisms/air/pancheshnyi/air_pancheshnyi.json --pressure 1 --distance 10 --n-voltages 30 --v-max-factor 1.5
 
 Outputs
 -------

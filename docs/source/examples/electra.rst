@@ -44,7 +44,7 @@ grid budget is reduced (``--dx 5 25 0.05``) to keep the run short:
 
 .. code-block:: bash
 
-   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
+   incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/nodetachment.json \
        --pd-min 5E-3 --pd-max 500 --pd-num 100 \
        --field sphere-sphere 1000 \
        --streamer-criterion 18 \

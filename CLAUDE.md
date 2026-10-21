@@ -48,7 +48,7 @@ transported, then the photons, then the electrodes, then the assembly:
 
 The reaction schemes are inputs, not part of the derivation: they live in
 `docs/source/configuration/examples/` (`air.rst`, table `tab_reactions`, is
-the scheme implemented by `mechanisms/air/pancheshnyi/air_pancheshnyi.py`).
+the scheme of `mechanisms/air/pancheshnyi/air_pancheshnyi.json`).
 
 Code docstrings still cite "manuscript, eq. NNN" in places; those numbers
 refer to an external LaTeX source and have drifted. When code and docs
@@ -77,7 +77,11 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `reactions.py` | Declarative reaction-string parser (`"e + N2 -> 2e + N2+"`) that assembles the reaction-rate matrix `R` (`build_R` / the pre-compiled fast path `compile_reactions` + `build_R_from_compiled`). Used by mechanism files, not by the solvers directly. |
 | `fields.py` | Gap-geometry abstraction (`FieldDistribution`): uniform / sphere-plane / sphere-sphere / hyperboloid-plane / coaxial / tabulated field-line profiles `f(ξ)`, `ξ∈[0,1]`, normalised so `∫f dξ = 1`, optionally with a protrusion (`protrusions.py`) on the `ξ = 0` electrode (`--protrusion`; `d` measured from its tip, renormalised so the voltage is kept); `--reverse-field` reads any profile from the other electrode, `f(ξ) → f(1−ξ)`. Shared `--field` CLI parsing (`add_field_argument` / `field_from_args` → `parse_field_spec`, field-line units `parse_field_unit`), `field_header_lines` for results headers, and `field_following_edges` (with `FieldDistribution.nodes` / `grid_edges`): the field-following initial segments the solver and the ionization panels share. |
 | `protrusions.py` | Protrusions on the `ξ = 0` electrode (`--protrusion`): on-axis enhancement `E/E₀` of a `Spheroid` (closed form), `Cone` and `Rod` (charge simulation method `_csm_solve`, solved once on construction and self-checked). `FieldDistribution.build` multiplies the background by it. |
-| `mechanism.py` | `load_mechanism` execs a mechanism file + optional JSON config (`read_json_configs`) into a `Mechanism` object; `REQUIRED_ATTRS` is the mechanism interface. |
+| `mechanism.py` | `load_mechanism` loads a mechanism + optional JSON config (`read_json_configs`): a `.json` mechanism file is compiled by `declarative.py`, a `.py` module is exec'd into a `Mechanism` object; `REQUIRED_ATTRS` is the interface both satisfy. |
+| `declarative.py` | JSON mechanism files (`"format": "incept1d-mechanism/1"`, `docs/source/configuration/mechanisms.rst`): `load_json_mechanism` checks the file strictly and compiles it into `DeclarativeMechanism` (parameters, gas, tables, definitions, species, alpha/eta, reactions, photoionization, emission; configurations set parameters, multipliers, per-polarity overrides). `is_mechanism_file` tells a mechanism file from a configuration. |
+| `expressions.py` | `Expression`: the formulas of a mechanism file, parsed with `ast`, every node checked against a whitelist, literals as NumPy floats; never `eval` of unchecked text. |
+| `tables.py` | `read_table`: BOLSIG+ output (columns by label, rates by 'target type' summed, recorded mixture/temperature) and two-column LXCat tables, parsed once per process. |
+| `zheleznyak.py` | The Zheleznyak absorption function and its two-stream fit (`fit_twostream`, cached `twostream_groups`); `mechanisms/air/zheleznyak.py` is the plotting CLI. |
 | `solver.py` | Core solver: `_build_A_aug` (augmented ODE matrix, every photon group explicit, each carrying only the streams `photon_streams` reads from the mechanism's `PHOTON_DIRECTIONS`), `midpoint_propagator` / `magnus2_propagator` / adaptive stepping from a field-following start (`fields.field_following_edges`, `parse_dx_spec`, `DX_*_DEFAULT`), the two criteria — `riccati_criterion` (default; `_riccati_g`, adding–doubling in `_slab_scattering` / `_star`, pole test `_spectral_radius`) and `inception_det` (`det Q(λ)`, compound-matrix fallback `_det_Q_compound`) — and `CRITERIA` / `add_criterion_argument` for `--criterion`. |
 | `inception.py` | `find_all_breakdown_EN` finds the `E/N` roots of the criterion (bottom-up scan, floor check below 10 Td, + → − rule for Riccati); `compute_inception_curve` tracks them (branches) over a `p·d` sweep, in parallel blocks with `jobs` → the inception curve PDIV(p·d). CLI: `cli/pdiv.py`. |
 | `eigenvalues.py` | Diagnostic: eigenvalues of the *local* transport matrix `A = R V⁻¹` vs `E/N` (no gap integration); `max_real_eigenvalue` is shared with `ionization`/`growth`. CLI: `cli/eigenvalues.py`. |
@@ -88,19 +92,32 @@ Library (physics) and CLI (argparse, printing, plotting) are separate: each
 | `output.py` | `write_metadata_header` — the date / git revision / command-line block at the top of every `--write-to-file` output. Use it; do not re-implement the git lookup. |
 | `cli/` | `incept1d` entry point (`cli/__init__.py`) and one module per subcommand (`cli/field.py` is the standalone field-profile plotter). |
 
-### Mechanism files (`mechanisms/air/pancheshnyi/air_pancheshnyi.py`, `mechanisms/air/2body/air_2body.py`, `mechanisms/air/rfd/air_rfd.py`)
+### Mechanism files (`mechanisms/paschen/paschen.json`, `mechanisms/air/pancheshnyi/air_pancheshnyi.json`, `mechanisms/air/2body/air_2body.json`, `mechanisms/air/rfd/air_rfd.py`)
 
-Mechanism files live one per directory under `mechanisms/<gas>/<scheme>/`
+A mechanism is normally a **JSON mechanism file** (issue #16), the
+user-facing format: documented in `docs/source/configuration/mechanisms.rst`,
+compiled by `incept1d.declarative`, checked strictly when loaded.  Its
+`parameters` block is the complete list of what a configuration may set.
+Rate coefficients are formulas (`incept1d.expressions`); `alpha`/`eta` are
+given explicitly, never derived from the reactions (an ionization may run
+through a cascade with no single reaction to derive it from).  A Python
+module is the opt-in route for a model the format cannot express; RFD is
+the only shipped one.  Each mechanism directory holds the mechanism and the
+JSON configurations written for it; what the mechanisms of one gas share
+(for air, the LXCat/BOLSIG+ data in `mechanisms/air/lxcat/`) lives in
+`mechanisms/<gas>/`.  A configuration belongs to one mechanism: keys that
+are not its parameters, and multipliers that name no reaction of it, are
+refused.  `incept1d chombo` exports either kind (`chombo.generate_declarative`
+for files: the file's alpha/eta and its `mean_energy` variable).
+
+Python mechanism modules live one per directory under `mechanisms/<gas>/<scheme>/`
 and are **data, not part of the package**: they are `exec`'d by
 `incept1d.mechanism.load_mechanism` via `importlib`, after optionally
 injecting override variables (`_GAMMA0`, `_EREF`, `BOLSIG_FILE`, ...) from
 the companion `config.py` in the same directory. Each directory also holds
 the JSON configurations written for that mechanism: a configuration belongs
 to one mechanism, and the loader rejects reaction multipliers that name no
-reaction of it. What the mechanisms of one gas share lives in
-`mechanisms/<gas>/` — for air, `air_config.py` (the configuration class each
-`config.py` subclasses, restricting the accepted keys), `zheleznyak.py`, and
-the LXCat data in `lxcat/` — and is loaded by path with
+reaction of it. Python code shared by mechanisms is loaded by path with
 `incept1d.mechanism.load_helper`, never via `sys.path`. They import the package normally
 (`from incept1d.constants import kB, Q`), so the package must be installed.
 A mechanism module must expose the fixed interface
@@ -127,9 +144,10 @@ the case where only the Riccati pole test sees inception; `air_rfd.py`
 (relativistic feedback, [Faerder2026b]) is the shipped one, with its
 normal-mode closed form in `tests/closed_form_rfd.py`.
 
-When writing or editing a mechanism file, follow the coordinate convention
-documented at the top of `mechanisms/air/pancheshnyi/air_pancheshnyi.py` (cathode at
-`x=0`, anode at `x=d`, sign convention for `V`). `config.py` implements the
+When writing a Python mechanism, follow the coordinate convention of
+`docs/source/configuration/mechanismfile.rst` (`get_V`: cathode at `x=0`,
+anode at `x=d`, `V_ii = -sgn(Z_i) mu_i |E|`); a mechanism file derives it
+from the charges. `config.py` implements the
 `pre_exec_vars()` / `post_exec_init()` / `mechanism_params()` protocol that
 `load_mechanism` expects — copy that pattern for a new mechanism rather
 than inventing a new config mechanism.
@@ -137,7 +155,7 @@ than inventing a new config mechanism.
 ### Typical call graph
 
 ```
-mechanism file (+ config.py, *.json) ──► incept1d.mechanism.load_mechanism ──► Mechanism
+mechanism (.json, or .py + config.py) + *.json configs ──► incept1d.mechanism.load_mechanism ──► mechanism object
                                                                                   │
                      ┌──────────────────────┬─────────────────────┬───────────────┤
                      ▼                      ▼                     ▼               ▼

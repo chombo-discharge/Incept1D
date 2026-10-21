@@ -3,6 +3,9 @@
     {
         "label": "Phelps",
         "cross_sections": "../lxcat/phelps.txt",
+        "x_n2": 0.8,
+        "x_o2": 0.2,
+        "_mixture": "phelps.txt does not record its gas mixture; N2 0.8, O2 0.2 is assumed",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
@@ -17,6 +20,9 @@
     {
         "label": "Trinity",
         "cross_sections": "../lxcat/trinity.txt",
+        "x_n2": 0.8,
+        "x_o2": 0.2,
+        "_mixture": "trinity.txt does not record its gas mixture; N2 0.8, O2 0.2 is assumed",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,
@@ -31,6 +37,9 @@
     {
         "label": "Biagi",
         "cross_sections": "../lxcat/biagi.txt",
+        "x_n2": 0.8,
+        "x_o2": 0.2,
+        "_mixture": "biagi.txt does not record its gas mixture; N2 0.8, O2 0.2 is assumed",
         "reaction_multipliers":{
             "e + N2 -> 2e + N2+":          1.0,
             "e + O2 -> 2e + O2+":          1.0,

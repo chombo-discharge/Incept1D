@@ -19,7 +19,7 @@ and the streamer criterion `∫α dx = 18` is solved alongside for comparison.
 From the repository root, for the largest sphere, `D = 200` cm:
 
 ```bash
-incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/nodetachment.json \
+incept1d pdiv mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/nodetachment.json \
     --pd-min 1 --pd-max 1000 --pd-num 100 \
     --field sphere-sphere 1000 \
     --streamer-criterion 18 \

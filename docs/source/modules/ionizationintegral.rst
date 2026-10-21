@@ -31,7 +31,7 @@ Inputs
 
 .. code-block:: console
 
-   incept1d ionization MECHANISM.py [CONFIG.json ...]
+   incept1d ionization MECHANISM [CONFIG.json ...]
        --d D [D ...] (--p P [P ...] | --data-file FILE [--pressure-column COL] [--voltage-column COL])
        [--voltage-lo V] [--voltage-hi V] [--voltage-num N] [--single-voltage V]
        [--T T] [--field SPEC] [--protrusion SHAPE ...] [--reverse-field]
@@ -71,11 +71,11 @@ Examples
 .. code-block:: bash
 
    # Both integrals vs voltage, four cross-section sets, 10 mm gap at 10 bar
-   incept1d ionization mechanisms/air/pancheshnyi/air_pancheshnyi.py mechanisms/air/pancheshnyi/databases.json \
+   incept1d ionization mechanisms/air/pancheshnyi/air_pancheshnyi.json mechanisms/air/pancheshnyi/databases.json \
        --p 10 --d 10 --voltage-lo 100 --voltage-hi 300
 
    # Evaluate the integrals at measured breakdown voltages in a sphere-plane gap
-   incept1d ionization mechanisms/air/pancheshnyi/air_pancheshnyi.py --d 20 \
+   incept1d ionization mechanisms/air/pancheshnyi/air_pancheshnyi.json --d 20 \
        --data-file measurements.dat --pressure-column 0 --voltage-column 1 \
        --field sphere-plane 25
 
